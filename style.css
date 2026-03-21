@@ -1,0 +1,210 @@
+body { background-color: #0f0f0f; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+#game-container { display: flex; gap: 15px; width: 98%; height: 95vh; }
+#sidebar { width: 240px; background: #1e1e1e; border-radius: 15px; padding: 15px; color: #ccc; border: 1px solid #333; overflow-y: auto; display: flex; flex-direction: column; }
+#game-table { flex-grow: 1; background: #27ae60; border: 10px solid #3e2723; border-radius: 50px; padding: 20px; color: white; text-align: center; display: flex; flex-direction: column; }
+
+#game-table.your-turn { border-color: #f1c40f; box-shadow: inset 0 0 50px rgba(241, 196, 15, 0.3); }
+
+.card {
+  display: inline-block; width: 80px; height: 130px; 
+  background-image: url('https://gist.github.com/user-attachments/assets/1be959ff-f211-40ab-ac79-46e049cd336a');
+  background-repeat: no-repeat; background-size: 960px 610px; background-color: white; border-radius: 5px; border: 1px solid #000; cursor: pointer; transition: transform 0.2s;
+}
+.card:hover { transform: translateY(-10px); }
+.card.mini { transform: scale(0.5); transform-origin: top left; margin-bottom: -60px; pointer-events: none; }
+.card-back { background: #2980b9 !important; background-image: none !important; border: 2px solid white; }
+
+/* COORDINATE SEMI */
+.seme-Coppe    { background-position-y: -15px; }
+.seme-Ori      { background-position-y: -165px; }
+.seme-Bastoni { background-position-y: -318px; }
+.seme-Spade    { background-position-y: -470px; }
+
+/* COORDINATE VALORI */
+.val-Asso     { background-position-x: -12px; }
+.val-2        { background-position-x: -106px; }
+.val-3        { background-position-x: -202px; }
+.val-4        { background-position-x: -296px; }
+.val-5        { background-position-x: -390px; }
+.val-6        { background-position-x: -486px; }
+.val-7        { background-position-x: -580px; }
+.val-Fante    { background-position-x: -676px; }
+.val-Cavallo { background-position-x: -771px; }
+.val-Re       { background-position-x: -867px; }
+
+.player-status { background: rgba(255,255,255,0.05); margin-bottom: 10px; padding: 10px; border-radius: 8px; text-align: left; border: 1px solid #333; }
+.player-status.me { border-color: #f1c40f; background: rgba(241, 196, 15, 0.1); }
+#lobby-info { background: #2c3e50 !important; padding: 15px !important; border-radius: 10px; border: 1px solid #f1c40f; margin-top: 20px; }
+#display-room-code { color: #f1c40f !important; font-size: 1.5em !important; font-weight: bold; }
+#status-text { font-size: 1.4em; font-weight: bold; margin: 15px 0; }
+.name-tag { background: rgba(0,0,0,0.8); padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-top: 5px; color: #f1c40f; }
+button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bold; border-radius: 8px; cursor: pointer; }
+
+
+/* ========================================= */
+/* NUOVO LAYOUT PARTITA CIRCOLARE      */
+/* ========================================= */
+
+#circular-table {
+    position: relative;
+    width: 100%;
+    height: 80vh;
+    max-width: 1000px;
+    margin: 0 auto;
+    background: radial-gradient(circle, #2e7d32 0%, #1b5e20 100%);
+    border-radius: 50%;
+    border: 10px solid #5d4037;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+    overflow: hidden;
+}
+
+/* Area centrale per le carte giocate */
+#central-table {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 30%;
+    height: 30%;
+    /* background: rgba(255,255,255,0.1); /* DEBUG */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+#cards-on-table {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Le carte sul tavolo centrale */
+#cards-on-table .card {
+    position: absolute; /* Sovrapposte al centro */
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+}
+/* Esempio rotazione carte sul tavolo per realismo (aggiunto via JS) */
+
+/* Contenitore giocatori */
+#players-circle {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+}
+
+/* Rende i box avversari fissi e blocca le fuoriuscite */
+.player-block {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    width: 170px; /* Fisso per gli avversari */
+    min-height: 100px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+/* IL TUO BOX: Si allarga dinamicamente senza uscire dallo schermo */
+.player-block.me {
+    width: auto;
+    min-width: 170px;
+    max-width: 85vw; /* Si ferma ai bordi dello schermo */
+    z-index: 20; 
+}
+
+/* LA TUA MANO: Niente sovrapposizione, ma va a capo se sono troppe */
+#tu-mano {
+    display: flex;
+    justify-content: center;
+    gap: 10px; /* Zero sovrapposizioni! */
+    margin-top: 10px;
+    min-height: 130px;
+    flex-wrap: wrap; /* Magia: manda le carte a capo in automatico! */
+}
+
+/* LA GABBIA PER LE CARTE AVVERSARIE (Questa mancava!) */
+.opponent-hand {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 8px;
+    height: 55px; /* Blocca l'altezza */
+    overflow: hidden; /* Taglia via tutto ciò che sborda */
+}
+
+/* Sposta il popup scommesse più in alto per non coprire le tue carte! */
+#dichiarazione-area {
+    background: rgba(255,255,255,0.9);
+    padding: 15px;
+    border-radius: 8px;
+    position: absolute;
+    top: 40%; /* Prima era 60%, ecco perché copriva le tue carte! */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    text-align: center;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+}
+
+/* Modifica il dorso rimuovendo il margin-left fisso */
+.card-back {
+    width: 35px;
+    height: 50px;
+    background: repeating-linear-gradient(45deg, #b71c1c, #b71c1c 5px, #d32f2f 5px, #d32f2f 10px);
+    border: 1px solid #7f0000;
+    border-radius: 4px;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    transition: all 0.2s ease;
+}
+.card-back:first-child { margin-left: 0; }
+
+
+/* Stile Carta Visibile standard (Corretto per non cancellare l'immagine) */
+.card {
+    background-color: white; /* Usiamo -color per non sovrascrivere l'immagine! */
+    user-select: none;
+}
+
+#tu-mano .card {
+    transition: transform 0.2s;
+}
+#tu-mano .card:hover { 
+    transform: translateY(-15px) scale(1.05); 
+}
+
+/* ========================================= */
+/* POSIZIONAMENTO CARTE GIOCATE SUL TAVOLO   */
+/* ========================================= */
+.table-card {
+    position: absolute;
+    z-index: 50;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.6);
+}
+
+/* Adattamenti per carte più piccole quando necessario */
+.small-card {
+    width: 60px;
+    height: 90px;
+    font-size: 1.2rem;
+}
+
+/* Stile Input Scommessa (Aggiornato) */
+#dichiarazione-area {
+    background: rgba(255,255,255,0.9);
+    padding: 15px;
+    border-radius: 8px;
+    position: absolute;
+    top: 60%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    text-align: center;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+}

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gioco di Lore - Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/main.js" type="module" defer></script>
+</head>
+<body>
+<div id="game-container">
+    <div id="sidebar">
+        <h3>Gerarchia Semi</h3>
+        <ul style="list-style:none; padding:0; font-weight:bold; font-size: 0.9em;">
+            <li style="color:#f1c40f;">● ORI (400)</li>
+            <li style="color:#3498db;">● SPADE (300)</li>
+            <li style="color:#e74c3c;">● COPPE (200)</li>
+            <li style="color:#2ecc71;">● BASTONI (100)</li>
+        </ul>
+        <hr>
+        <div id="mini-scoreboard">
+            <h4>Classifica & Fronte</h4>
+            <div id="score-list">In attesa...</div>
+        </div>
+        <div id="lobby-info" style="display:none;">
+            <p>Codice: <strong id="display-room-code">-</strong></p>
+        </div>
+    </div>
+    <div id="game-table">
+        <h1>Gioco di Lore</h1>
+        <div id="setup-menu">
+            <div id="menu-options">
+                <input type="text" id="player-nickname" placeholder="Tuo Nickname..." style="width:80%; padding:10px;">
+                <div style="margin:20px 0;">
+                    <select id="select-players" style="padding:10px;">
+                        <option value="2">2 Giocatori</option>
+                        <option value="3">3 Giocatori</option>
+                        <option value="4" selected>4 Giocatori</option>
+                        <option value="5">5 Giocatori</option>
+                        <option value="6">6 Giocatori</option>
+                        <option value="7">7 Giocatori</option>
+                        <option value="8">8 Giocatori</option>
+                    </select>
+                    <button onclick="creaNuovaStanza()">CREA</button>
+                </div>
+                <input type="text" id="input-room-code" placeholder="Codice" style="width:100px; padding:10px;">
+                <button onclick="uniscitiAStanza()">ENTRA</button>
+            </div>
+            <div id="lobby-wait" style="display:none;">
+                <h2>Lobby d'attesa</h2>
+                <div id="joined-players-list"></div>
+                <button id="start-game-btn" onclick="iniziaPartitaVera()" style="display:none; background:#27ae60;">AVVIA PARTITA</button>
+            </div>
+        </div>
+        <div id="game-area" style="display: none; position: relative;">
+            <div id="info-giro" style="text-align:center; font-size:1.2em; font-weight:bold; margin-bottom:10px;"></div>
+            
+            <div id="dichiarazione-area" style="display:none;">
+                <h3 style="margin-top:0; color:#333;">La tua dichiarazione</h3>
+                <input type="number" id="bet-input" min="0" value="0" style="padding:10px; width:60px; font-size:1.2em; text-align:center;">
+                <button onclick="inviaDichiarazione()" style="background:#27ae60; color:white; margin-top:10px; width:100%;">DICHIARA</button>
+            </div>
+
+            <div id="circular-table">
+                <div id="central-table">
+                    <div id="cards-on-table"></div>
+                </div>
+                <div id="players-circle"></div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
