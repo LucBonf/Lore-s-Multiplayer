@@ -138,16 +138,55 @@ function getSemeSimbolo(seme) {
 function renderTuaMano(handCont, mano, isMyTurn, fase) {
     if (!handCont) return;
     handCont.innerHTML = ''; // Pulizia di sicurezza
-    mano.forEach((c, idx) => {
-        if (!c.giocata) {
-            const div = document.createElement('div');
+    
+    const carteDaDisegnare = mano.filter(c => !c.giocata);
+    
+    // --- 1. NOVITÀ: ORDINA LE CARTE DALLA PIÙ DEBOLE ALLA PIÙ FORTE ---
+    // Usiamo il valore "forza" già calcolato dal server (Ori > Spade > Coppe > Bastoni)
+    carteDaDisegnare.sort((a, b) => a.forza - b.forza);
+
+    const numCarte = carteDaDisegnare.length;
+    
+    // MATEMATICA: Più carte hai, più si incastrano per non uscire dallo schermo!
+    let marginLeft = 0;
+    if (numCarte > 10) {
+        marginLeft = -50; 
+    } else if (numCarte > 7) {
+        marginLeft = -35; 
+    } else if (numCarte > 4) {
+        marginLeft = -15; 
+    }
+
+    carteDaDisegnare.forEach((c, idx) => {
+        const div = document.createElement('div');
+        
+        // --- 2. NOVITÀ: FIX ASSO DI COPPE E DORSO CON IMMAGINE ---
+        // Se il server ci ha nascosto la carta (Giro Fronte da 1)
+        if (c.valore === "?") {
+            // Aggiungiamo 'card-back' per usare l'immagine definita nel CSS
+            // e manteniamo 'card' per le dimensioni corrette nel tuo box
+            div.className = 'card card-back';
+            
+            // Rimuoviamo gli stili inline vecchi (quelli del dorso blu)
+            div.style.background = '';
+            div.style.border = '';
+        } else {
+            // Carta normale visibile
             div.className = `card seme-${c.seme} val-${c.valore}`;
-            div.onclick = () => { 
-                // Clicchi per giocare la carta
-                if(isMyTurn && fase === 'gioco') socket.emit('gioca_carta', { cartaIdx: idx }); 
-            };
-            handCont.appendChild(div);
         }
+        
+        // Applichiamo il margine negativo per farle sovrapporre!
+        if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
+        
+        // Assegniamo lo z-index corretto per farle impilare da sinistra verso destra
+        div.style.zIndex = 10 + idx;
+
+        div.onclick = () => { 
+            // Clicchi per giocare la carta. 
+            // NOTA: Usando mano.indexOf(c) peschiamo l'indice originale corretto anche se le abbiamo riordinate visivamente!
+            if(isMyTurn && fase === 'gioco') socket.emit('gioca_carta', { cartaIdx: mano.indexOf(c) }); 
+        };
+        handCont.appendChild(div);
     });
 }
 
@@ -175,7 +214,7 @@ window.inviaDichiarazione = () => {
 };
 
 socket.on('lobby_creata', (d) => {
-    document.getElementById('menu-options').style.display = 'none';
+    document.getElementById('setup-menu').style.display = 'none';
     document.getElementById('lobby-wait').style.display = 'block';
     document.getElementById('display-room-code').innerText = d.code;
     document.getElementById('lobby-info').style.display = 'block'; 
@@ -184,7 +223,7 @@ socket.on('lobby_creata', (d) => {
 });
 
 socket.on('aggiorna_lobby', (dati) => {
-    document.getElementById('menu-options').style.display = 'none';
+    document.getElementById('setup-menu').style.display = 'none';
     document.getElementById('lobby-wait').style.display = 'block';
     
     // Mostriamo il codice stanza all'amico e la lista aggiornata
@@ -199,6 +238,8 @@ socket.on('aggiorna_lobby', (dati) => {
 socket.on('conferma_inizio_partita', (dati) => {
     qtaAttuale = dati.qtaCarte;
     document.getElementById('setup-menu').style.display = 'none';
+    document.getElementById('lobby-wait').style.display = 'none';
+    document.getElementById('sidebar').style.display = 'none';
     document.getElementById('game-area').style.display = 'block';
     
     const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
