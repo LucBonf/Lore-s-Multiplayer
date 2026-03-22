@@ -1,9 +1,34 @@
 body { background-color: #0f0f0f; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
 #game-container { display: flex; gap: 15px; width: 98%; height: 95vh; }
 #sidebar { width: 240px; background: #1e1e1e; border-radius: 15px; padding: 15px; color: #ccc; border: 1px solid #333; overflow-y: auto; display: flex; flex-direction: column; }
-#game-table { flex-grow: 1; background: #27ae60; border: 10px solid #3e2723; border-radius: 50px; padding: 20px; color: white; text-align: center; display: flex; flex-direction: column; }
+
+/* IL TAVOLO VERDE RIPRISTINATO E CENTRATO */
+#game-table { 
+    flex-grow: 1; 
+    background: #27ae60; 
+    border: 10px solid #3e2723; 
+    border-radius: 50px; 
+    padding: 20px; 
+    color: white; 
+    text-align: center; 
+    position: relative; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+}
 
 #game-table.your-turn { border-color: #f1c40f; box-shadow: inset 0 0 50px rgba(241, 196, 15, 0.3); }
+
+#game-title {
+    position: absolute;
+    top: 20px;
+    left: 30px;
+    margin: 0;
+    color: white;
+    font-size: 2.2rem;
+    z-index: 100;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
 
 .card {
   display: inline-block; width: 80px; height: 130px; 
@@ -12,7 +37,33 @@ body { background-color: #0f0f0f; font-family: 'Segoe UI', sans-serif; margin: 0
 }
 .card:hover { transform: translateY(-10px); }
 .card.mini { transform: scale(0.5); transform-origin: top left; margin-bottom: -60px; pointer-events: none; }
-.card-back { background: #2980b9 !important; background-image: none !important; border: 2px solid white; }
+/* --- RETRO CARTE CON IMMAGINE CORRETTO (style.css) --- */
+.card-back {
+    /* Manteniamo dimensioni e ombre originali */
+    width: 35px;
+    height: 50px;
+    
+    /* Cambiamo il bordo in grigio scuro per adattarlo all'immagine scura */
+    border: 1px solid #333; 
+    border-radius: 4px;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    transition: all 0.2s ease;
+    
+    /* --- FIX: USIAMO LA TUA IMMAGINE --- */
+    /* Colore di sfondo scuro di sicurezza se l'immagine non carica */
+    background-color: #1a1a1a; 
+    
+    /* LA TUA IMMAGINE */
+    background-image: url('https://gist.github.com/user-attachments/assets/05dbc289-791a-40e6-9a80-cbd5ccd95d6d');
+    
+    /* Centra perfettamente l'immagine (X e Y) */
+    background-position: center; 
+    
+    /* Fa sì che l'immagine copra tutta la carta ritagliandosi se necessario, senza deformarsi */
+    background-size: cover; 
+    
+    background-repeat: no-repeat;
+}
 
 /* COORDINATE SEMI */
 .seme-Coppe    { background-position-y: -15px; }
@@ -120,14 +171,14 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
     z-index: 20; 
 }
 
-/* LA TUA MANO: Niente sovrapposizione, ma va a capo se sono troppe */
+/* RISOLUZIONE PROBLEMA TROPPE CARTE TUA MANO */
 #tu-mano {
     display: flex;
     justify-content: center;
-    gap: 10px; /* Zero sovrapposizioni! */
+    gap: 0; /* IMPORTANTE: Rimuovi il gap! Lo gestiamo col JS */
     margin-top: 10px;
     min-height: 130px;
-    flex-wrap: wrap; /* Magia: manda le carte a capo in automatico! */
+    flex-wrap: nowrap; /* IMPORTANTE: Impedisce assolutamente di andare a capo! */
 }
 
 /* LA GABBIA PER LE CARTE AVVERSARIE (Questa mancava!) */
@@ -154,30 +205,21 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
     box-shadow: 0 5px 15px rgba(0,0,0,0.4);
 }
 
-/* Modifica il dorso rimuovendo il margin-left fisso */
-.card-back {
-    width: 35px;
-    height: 50px;
-    background: repeating-linear-gradient(45deg, #b71c1c, #b71c1c 5px, #d32f2f 5px, #d32f2f 10px);
-    border: 1px solid #7f0000;
-    border-radius: 4px;
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-    transition: all 0.2s ease;
-}
-.card-back:first-child { margin-left: 0; }
-
-
 /* Stile Carta Visibile standard (Corretto per non cancellare l'immagine) */
 .card {
     background-color: white; /* Usiamo -color per non sovrascrivere l'immagine! */
     user-select: none;
 }
 
+/* Assicura che la carta passata col mouse scavalchi le altre */
 #tu-mano .card {
-    transition: transform 0.2s;
+    position: relative;
+    transition: transform 0.2s, margin 0.2s;
 }
+
 #tu-mano .card:hover { 
-    transform: translateY(-15px) scale(1.05); 
+    transform: translateY(-20px) scale(1.1); 
+    z-index: 100 !important; /* La porta avanti a tutte! */
 }
 
 /* ========================================= */
@@ -196,15 +238,10 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
     font-size: 1.2rem;
 }
 
-/* Stile Input Scommessa (Aggiornato) */
-#dichiarazione-area {
-    background: rgba(255,255,255,0.9);
-    padding: 15px;
-    border-radius: 8px;
-    position: absolute;
-    top: 60%; left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 100;
-    text-align: center;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+/* ILLUMINA IL BOX DEL TURNO ATTUALE */
+.player-block.active-turn {
+    border: 3px solid #f1c40f !important; /* Bordo Giallo spesso */
+    box-shadow: 0 0 25px #f1c40f !important; /* Alone luminoso */
+    transform: translate(-50%, -50%) scale(1.05); /* Lo ingrandisce un pelo (opzionale) */
+    z-index: 30; /* Lo porta in primo piano */
 }
