@@ -125,6 +125,7 @@ io.on('connection', (socket) => {
             const lobby = lobbies[code];
             const index = lobby.giocatori.findIndex(p => p.id === socket.id);
             
+            // Se lo troviamo in questa lobby...
             if (index !== -1) {
                 if (lobby.gameInstance) {
                     // PARTITA IN CORSO: Trasformiamo in CPU
@@ -135,17 +136,17 @@ io.on('connection', (socket) => {
                         game.players[playerIndex].nome += " (Bot)";
                         inviaStato(code); // Aggiorna i nomi per gli altri
                         
-                        // Se era proprio il suo turno quando è caduta la linea, facciamo muovere la CPU!
-                        if (game.turnoAttuale === playerIndex) {
+                        // Il Bot muove solo se è il suo turno e la presa non è in fase di animazione
+                        if (game.turnoAttuale === playerIndex && game.tavolo.length < game.numPlayers) {
                             gestisciIA(code);
                         }
                     }
                 } else {
-                    // LOBBY D'ATTESA: Lo rimuoviamo semplicemente
+                    // LOBBY D'ATTESA: Lo rimuoviamo semplicemente prima che inizi
                     lobby.giocatori.splice(index, 1);
                     io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
                 }
-                break;
+                break; // Trovato e gestito, fermiamo il ciclo
             }
         }
     });
@@ -199,7 +200,14 @@ io.on('connection', (socket) => {
         const game = lobbies[code]?.gameInstance;
         const pIdx = game.turnoAttuale;
         if (!game || game.players[pIdx].id !== socket.id) return;
+        
+        // --- FIX 1: Evita che si giochino carte mentre la presa si sta già chiudendo (ritardo 1.2s) ---
+        if (game.tavolo.length >= game.numPlayers) return; 
+
         const carta = game.players[pIdx].mano[dati.cartaIdx];
+
+        // --- FIX 2: Evita i crash se il client invia una carta inesistente o già giocata ---
+        if (!carta || carta.giocata) return; 
 
         // --- RISPOSTA AL SEME ---
         if (game.tavolo.length > 0) {
@@ -207,6 +215,8 @@ io.on('connection', (socket) => {
             const haSeme = game.players[pIdx].mano.some(c => !c.giocata && c.seme === semeU);
             if (haSeme && carta.seme !== semeU) return socket.emit('errore', `Devi rispondere a ${semeU}!`);
         }
+
+        // ... (il resto della funzione gioca_carta rimane uguale) ...
 
         carta.giocata = true;
         game.tavolo.push({ playerId: pIdx, card: carta });
@@ -222,12 +232,15 @@ io.on('connection', (socket) => {
 
     function risolviPresa(code) {
         const game = lobbies[code]?.gameInstance;
+        if (!game) return; // Sicurezza anti-crash aggiuntiva
+
         const vincitore = game.calcolaVincitorePresa();
         game.players[vincitore.playerId].preseFatte++;
         game.tavolo = [];
         game.turnoAttuale = vincitore.playerId;
 
-        if (game.players[0].mano.every(c => c.giocata)) {
+        // --- FIX 3: Ora la mano finisce SOLO se TUTTI i giocatori hanno davvero giocato tutte le carte ---
+        if (game.players.every(p => p.mano.every(c => c.giocata))) {
             game.players.forEach(p => {
                 p.punti += p.preseFatte + (p.preseFatte === p.dichiarazione ? 8 : 0);
             });
