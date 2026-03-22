@@ -1,7 +1,7 @@
 {
   "name": "lores",
   "version": "1.0.0",
-  "description": "Gioco di Lore Multiplayer",
+  "description": "Lores",
   "main": "server.js",
   "type": "module",
   "scripts": {
