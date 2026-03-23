@@ -11,25 +11,50 @@
 </head>
 
 <body>
-    <div id="game-container">
+    <!-- Toast Banner per gli Errori -->
+    <div id="error-banner"></div>
 
-        <div id="sidebar">
-            <h3>Gerarchia Semi</h3>
-            <ul style="list-style:none; padding:0; font-weight:bold; font-size: 0.9em;">
-                <li style="color:#f1c40f;">● ORI (400)</li>
-                <li style="color:#3498db;">● SPADE (300)</li>
-                <li style="color:#e74c3c;">● COPPE (200)</li>
-                <li style="color:#2ecc71;">● BASTONI (100)</li>
-            </ul>
-            <hr>
-            <div id="mini-scoreboard">
-                <h4>Classifica & Fronte</h4>
-                <div id="score-list">In attesa...</div>
-            </div>
-            <div id="lobby-info" style="display:none;">
-                <p>Codice: <strong id="display-room-code">-</strong></p>
+    <!-- Pulsante per aprire le regole -->
+    <button id="btn-regole" onclick="apriRegole()">📜 Regole</button>
+
+    <!-- Modal delle Regole -->
+    <div id="modal-regole" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="chiudiRegole()">&times;</span>
+            <h2 style="color: #f1c40f; margin-top: 0; text-align: center;">📖 Regolamento: Gioco di Lore</h2>
+            <div style="line-height: 1.6; font-size: 1.1rem; color: #ddd; text-align: left;">
+                <p><strong>1. Mazzo e Giocatori:</strong> Si gioca con 40 carte. Il sistema calcola automaticamente
+                    quante carte dare e la sequenza delle mani. Le carte avanzate restano coperte nel mazzo.</p>
+                <p><strong>2. Gerarchia dei Semi:</strong><br>
+                    <span style="color:#f1c40f;">1. Ori (🪙)</span> > <span style="color:#3498db;">2. Spade (🗡️)</span>
+                    > <span style="color:#e74c3c;">3. Coppe (🍷)</span> > <span style="color:#2ecc71;">4. Bastoni
+                        (🏏)</span>.<br>
+                    <em>Un seme di livello superiore batte sempre un seme di livello inferiore, anche se non è il seme
+                        di uscita! (Es. Spade batte sempre Coppe)</em>
+                </p>
+                <p><strong>3. Forza delle Carte (nel seme):</strong><br>Asso > 3 > Re > Cavallo > Fante > 7 > 6 > 5 > 4
+                    > 2</p>
+                <p><strong>4. Regole della Presa:</strong> Se hai carte del seme di uscita devi per forza giocarla
+                    ("Rispondere al seme"). Se non puoi rispondere, gioca o scarta un'altra carta. Vince la carta di
+                    gerarchia maggiore del seme più alto giocato nel turno.</p>
+                <p><strong>5. Sequenza delle Mani:</strong> I giri salgono a partire da 2 carte fino al limite massimo
+                    (es. 10 carte a testa per 4 giocatori), dopodiché si ridiscende e torna fino a 2 carte.</p>
+                <p><strong>6. Dichiarazione (Scommesse):</strong> Prima di giocare, dichiari quante prese pensi di fare
+                    in quella fase. <em>Attenzione:</em> chi dichiara per ultimo ha il <em>"Vincolo del Mazziere"</em>,
+                    ovvero il totale delle scommesse dichiarate da tutti non può uguagliare la quantità di carte
+                    distribuite!</p>
+                <p><strong>7. Punteggio:</strong><br>
+                    - Se indovini esattamente la dichiarazione, prendi <strong>+8 punti bonus</strong>.<br>
+                    - Ottieni sempre <strong>+1 punto</strong> per ognuna delle prese vinte realizzate effettivamente.
+                </p>
+                <p><strong>8. Giro Finale Speciale (Fronte):</strong><br>Al termine di tutto c'è la finale speciale a 1
+                    carta: in questo turno la tua carta apparirà coperta, mentre vedrai la carta scoperta di tutti gli
+                    altri giocatori! Scommetterai quindi alla cieca in base a cosa hanno gli altri.</p>
             </div>
         </div>
+    </div>
+
+    <div id="game-container">
 
         <div id="game-table" style="position: relative; display: flex; justify-content: center; align-items: center;">
 
@@ -65,6 +90,13 @@
 
             <div id="lobby-wait" style="display:none; text-align: center; z-index: 10; width: 300px;">
                 <h2 style="margin-top: 0; text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">Lobby d'attesa</h2>
+
+                <div id="lobby-info"
+                    style="display:none; margin-bottom: 20px; font-size: 1.2rem; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; border: 1px solid #f1c40f;">
+                    <p style="margin: 0; color: #ddd;">Codice Stanza:<br><strong id="display-room-code"
+                            style="color: #f1c40f; font-size: 1.8rem; letter-spacing: 2px;">-</strong></p>
+                </div>
+
                 <div id="joined-players-list"
                     style="margin-bottom: 20px; font-size: 1.2rem; line-height: 1.8; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
                 </div>

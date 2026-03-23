@@ -16,18 +16,6 @@ body {
     height: 95vh;
 }
 
-#sidebar {
-    width: 240px;
-    background: #1e1e1e;
-    border-radius: 15px;
-    padding: 15px;
-    color: #ccc;
-    border: 1px solid #333;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-}
-
 /* IL TAVOLO VERDE RIPRISTINATO E CENTRATO */
 #game-table {
     flex-grow: 1;
@@ -390,4 +378,96 @@ button {
     /* Lo ingrandisce un pelo (opzionale) */
     z-index: 30;
     /* Lo porta in primo piano */
+}
+
+/* ========================================= */
+/* STILI MODAL REGOLE E PULSANTE             */
+/* ========================================= */
+
+#btn-regole {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    background: #3498db;
+    color: white;
+    border: 2px solid white;
+    padding: 10px 15px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    z-index: 1000;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    transition: transform 0.2s, background 0.2s;
+}
+
+#btn-regole:hover {
+    transform: scale(1.1);
+    background: #2980b9;
+}
+
+.modal {
+    display: none; 
+    position: fixed; 
+    z-index: 2000; 
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    background-color: rgba(0,0,0,0.8); 
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background-color: #1e1e1e;
+    margin: 5% auto; 
+    padding: 30px;
+    border: 2px solid #f1c40f;
+    border-radius: 12px;
+    width: 80%; 
+    max-width: 800px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    position: relative;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.close-btn {
+    color: #aaa;
+    float: right;
+    font-size: 35px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close-btn:hover,
+.close-btn:focus {
+    color: #fff;
+    text-decoration: none;
+}
+
+/* ========================================= */
+/* BANNER NOTIFICHE ERRORI                   */
+/* ========================================= */
+#error-banner {
+    position: fixed;
+    top: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #e74c3c;
+    color: white;
+    padding: 15px 30px;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    z-index: 9999;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none;
+    text-align: center;
+}
+
+#error-banner.show {
+    top: 20px;
 }

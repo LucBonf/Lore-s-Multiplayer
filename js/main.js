@@ -239,7 +239,6 @@ socket.on('conferma_inizio_partita', (dati) => {
     qtaAttuale = dati.qtaCarte;
     document.getElementById('setup-menu').style.display = 'none';
     document.getElementById('lobby-wait').style.display = 'none';
-    document.getElementById('sidebar').style.display = 'none';
     document.getElementById('game-area').style.display = 'block';
 
     const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
@@ -257,18 +256,40 @@ socket.on('conferma_inizio_partita', (dati) => {
     // CHIAMIAMO LA MAGIA CIRCOLARE QUI!
     renderGiocatori(dati);
 
-    // Aggiorniamo la classifica laterale (manteniamo questa utilità)
-    document.getElementById('score-list').innerHTML = dati.tuttiGiocatori.map(p => {
-        let fronteImg = "";
-        if (dati.qtaCarte === 1 && p.socketId !== socket.id && p.cartaFronte) {
-            fronteImg = `<div class="card mini seme-${p.cartaFronte.seme} val-${p.cartaFronte.valore}" style="margin:5px 0;"></div>`;
-        }
-        return `<div class="player-status ${p.socketId === socket.id ? 'me' : ''}"><strong>${p.nome}</strong>: ${p.punti}pt<br>${fronteImg}<small>Dich: ${p.dichiarazione} | Prese: ${p.prese}</small></div>`;
-    }).join('');
 });
 
-socket.on('errore', (m) => alert(m));
+// Funzione per mostrare banner di errore a schermo
+function mostraErrore(messaggio) {
+    const banner = document.getElementById('error-banner');
+    if (!banner) return;
+    banner.innerText = "⚠️ " + messaggio;
+    banner.classList.add('show');
+    
+    // Rimuove la notifica dopo 3.5 secondi
+    setTimeout(() => {
+        banner.classList.remove('show');
+    }, 3500);
+}
+
+socket.on('errore', (m) => mostraErrore(m));
 socket.on('fine_partita', (cl) => {
     alert("🏆 CLASSIFICA FINALE:\n" + cl.map((p, i) => `${i + 1}° ${p.nome}: ${p.punti}pt`).join('\n'));
     location.reload();
 });
+
+// Funzioni per l'apertura e chiusura del Regolamento
+window.apriRegole = () => {
+    document.getElementById('modal-regole').style.display = 'block';
+};
+
+window.chiudiRegole = () => {
+    document.getElementById('modal-regole').style.display = 'none';
+};
+
+// Chiudi il modal cliccando fuori dal riquadro
+window.onclick = (event) => {
+    const modal = document.getElementById('modal-regole');
+    if (event.target === modal) {
+        modal.style.display = 'none';
+    }
+};
