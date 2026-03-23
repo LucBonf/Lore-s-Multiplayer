@@ -1,23 +1,52 @@
-body { background-color: #0f0f0f; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-#game-container { display: flex; gap: 15px; width: 98%; height: 95vh; }
-#sidebar { width: 240px; background: #1e1e1e; border-radius: 15px; padding: 15px; color: #ccc; border: 1px solid #333; overflow-y: auto; display: flex; flex-direction: column; }
-
-/* IL TAVOLO VERDE RIPRISTINATO E CENTRATO */
-#game-table { 
-    flex-grow: 1; 
-    background: #27ae60; 
-    border: 10px solid #3e2723; 
-    border-radius: 50px; 
-    padding: 20px; 
-    color: white; 
-    text-align: center; 
-    position: relative; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
+body {
+    background-color: #0f0f0f;
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
 }
 
-#game-table.your-turn { border-color: #f1c40f; box-shadow: inset 0 0 50px rgba(241, 196, 15, 0.3); }
+#game-container {
+    display: flex;
+    gap: 15px;
+    width: 98%;
+    height: 95vh;
+}
+
+#sidebar {
+    width: 240px;
+    background: #1e1e1e;
+    border-radius: 15px;
+    padding: 15px;
+    color: #ccc;
+    border: 1px solid #333;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* IL TAVOLO VERDE RIPRISTINATO E CENTRATO */
+#game-table {
+    flex-grow: 1;
+    background: #27ae60;
+    border: 10px solid #3e2723;
+    border-radius: 50px;
+    padding: 20px;
+    color: white;
+    text-align: center;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#game-table.your-turn {
+    border-color: #f1c40f;
+    box-shadow: inset 0 0 50px rgba(241, 196, 15, 0.3);
+}
 
 #game-title {
     position: absolute;
@@ -27,69 +56,171 @@ body { background-color: #0f0f0f; font-family: 'Segoe UI', sans-serif; margin: 0
     color: white;
     font-size: 2.2rem;
     z-index: 100;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .card {
-  display: inline-block; width: 80px; height: 130px; 
-  background-image: url('https://gist.github.com/user-attachments/assets/1be959ff-f211-40ab-ac79-46e049cd336a');
-  background-repeat: no-repeat; background-size: 960px 610px; background-color: white; border-radius: 5px; border: 1px solid #000; cursor: pointer; transition: transform 0.2s;
+    display: inline-block;
+    width: 80px;
+    height: 130px;
+    background-image: url('https://gist.github.com/user-attachments/assets/1be959ff-f211-40ab-ac79-46e049cd336a');
+    background-repeat: no-repeat;
+    background-size: 960px 610px;
+    background-color: white;
+    border-radius: 5px;
+    border: 1px solid #000;
+    cursor: pointer;
+    transition: transform 0.2s;
 }
-.card:hover { transform: translateY(-10px); }
-.card.mini { transform: scale(0.5); transform-origin: top left; margin-bottom: -60px; pointer-events: none; }
+
+.card:hover {
+    transform: translateY(-10px);
+}
+
+.card.mini {
+    transform: scale(0.5);
+    transform-origin: top left;
+    margin-bottom: -60px;
+    pointer-events: none;
+}
+
 /* --- RETRO CARTE CON IMMAGINE CORRETTO (style.css) --- */
 .card-back {
     /* Manteniamo dimensioni e ombre originali */
     width: 35px;
     height: 50px;
-    
+
     /* Cambiamo il bordo in grigio scuro per adattarlo all'immagine scura */
-    border: 1px solid #333; 
+    border: 1px solid #333;
     border-radius: 4px;
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
     transition: all 0.2s ease;
-    
+
     /* --- FIX: USIAMO LA TUA IMMAGINE --- */
     /* Colore di sfondo scuro di sicurezza se l'immagine non carica */
-    background-color: #1a1a1a; 
-    
+    background-color: #1a1a1a;
+
     /* LA TUA IMMAGINE */
     background-image: url('https://gist.github.com/user-attachments/assets/05dbc289-791a-40e6-9a80-cbd5ccd95d6d');
-    
+
     /* Centra perfettamente l'immagine (X e Y) */
-    background-position: center; 
-    
+    background-position: center;
+
     /* Fa sì che l'immagine copra tutta la carta ritagliandosi se necessario, senza deformarsi */
-    background-size: cover; 
-    
+    background-size: cover;
+
     background-repeat: no-repeat;
 }
 
 /* COORDINATE SEMI */
-.seme-Coppe    { background-position-y: -15px; }
-.seme-Ori      { background-position-y: -165px; }
-.seme-Bastoni { background-position-y: -318px; }
-.seme-Spade    { background-position-y: -470px; }
+.seme-Coppe {
+    background-position-y: -15px;
+}
+
+.seme-Ori {
+    background-position-y: -165px;
+}
+
+.seme-Bastoni {
+    background-position-y: -318px;
+}
+
+.seme-Spade {
+    background-position-y: -470px;
+}
 
 /* COORDINATE VALORI */
-.val-Asso     { background-position-x: -12px; }
-.val-2        { background-position-x: -106px; }
-.val-3        { background-position-x: -202px; }
-.val-4        { background-position-x: -296px; }
-.val-5        { background-position-x: -390px; }
-.val-6        { background-position-x: -486px; }
-.val-7        { background-position-x: -580px; }
-.val-Fante    { background-position-x: -676px; }
-.val-Cavallo { background-position-x: -771px; }
-.val-Re       { background-position-x: -867px; }
+.val-Asso {
+    background-position-x: -12px;
+}
 
-.player-status { background: rgba(255,255,255,0.05); margin-bottom: 10px; padding: 10px; border-radius: 8px; text-align: left; border: 1px solid #333; }
-.player-status.me { border-color: #f1c40f; background: rgba(241, 196, 15, 0.1); }
-#lobby-info { background: #2c3e50 !important; padding: 15px !important; border-radius: 10px; border: 1px solid #f1c40f; margin-top: 20px; }
-#display-room-code { color: #f1c40f !important; font-size: 1.5em !important; font-weight: bold; }
-#status-text { font-size: 1.4em; font-weight: bold; margin: 15px 0; }
-.name-tag { background: rgba(0,0,0,0.8); padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-top: 5px; color: #f1c40f; }
-button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bold; border-radius: 8px; cursor: pointer; }
+.val-2 {
+    background-position-x: -106px;
+}
+
+.val-3 {
+    background-position-x: -202px;
+}
+
+.val-4 {
+    background-position-x: -296px;
+}
+
+.val-5 {
+    background-position-x: -390px;
+}
+
+.val-6 {
+    background-position-x: -486px;
+}
+
+.val-7 {
+    background-position-x: -580px;
+}
+
+.val-Fante {
+    background-position-x: -676px;
+}
+
+.val-Cavallo {
+    background-position-x: -771px;
+}
+
+.val-Re {
+    background-position-x: -867px;
+}
+
+.player-status {
+    background: rgba(255, 255, 255, 0.05);
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: left;
+    border: 1px solid #333;
+}
+
+.player-status.me {
+    border-color: #f1c40f;
+    background: rgba(241, 196, 15, 0.1);
+}
+
+#lobby-info {
+    background: #2c3e50 !important;
+    padding: 15px !important;
+    border-radius: 10px;
+    border: 1px solid #f1c40f;
+    margin-top: 20px;
+}
+
+#display-room-code {
+    color: #f1c40f !important;
+    font-size: 1.5em !important;
+    font-weight: bold;
+}
+
+#status-text {
+    font-size: 1.4em;
+    font-weight: bold;
+    margin: 15px 0;
+}
+
+.name-tag {
+    background: rgba(0, 0, 0, 0.8);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    margin-top: 5px;
+    color: #f1c40f;
+}
+
+button {
+    padding: 12px 24px;
+    background: #f1c40f;
+    border: none;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+}
 
 
 /* ========================================= */
@@ -105,7 +236,7 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
     background: radial-gradient(circle, #2e7d32 0%, #1b5e20 100%);
     border-radius: 50%;
     border: 10px solid #5d4037;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
     overflow: hidden;
 }
 
@@ -135,9 +266,11 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
 
 /* Le carte sul tavolo centrale */
 #cards-on-table .card {
-    position: absolute; /* Sovrapposte al centro */
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+    position: absolute;
+    /* Sovrapposte al centro */
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
 }
+
 /* Esempio rotazione carte sul tavolo per realismo (aggiunto via JS) */
 
 /* Contenitore giocatori */
@@ -154,10 +287,11 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
     color: white;
     padding: 10px;
     border-radius: 8px;
-    width: 170px; /* Fisso per gli avversari */
+    width: 170px;
+    /* Fisso per gli avversari */
     min-height: 100px;
     text-align: center;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     border: 2px solid transparent;
     transition: all 0.3s ease;
     z-index: 10;
@@ -167,18 +301,21 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
 .player-block.me {
     width: auto;
     min-width: 170px;
-    max-width: 85vw; /* Si ferma ai bordi dello schermo */
-    z-index: 20; 
+    max-width: 85vw;
+    /* Si ferma ai bordi dello schermo */
+    z-index: 20;
 }
 
 /* RISOLUZIONE PROBLEMA TROPPE CARTE TUA MANO */
 #tu-mano {
     display: flex;
     justify-content: center;
-    gap: 0; /* IMPORTANTE: Rimuovi il gap! Lo gestiamo col JS */
+    gap: 0;
+    /* IMPORTANTE: Rimuovi il gap! Lo gestiamo col JS */
     margin-top: 10px;
     min-height: 130px;
-    flex-wrap: nowrap; /* IMPORTANTE: Impedisce assolutamente di andare a capo! */
+    flex-wrap: nowrap;
+    /* IMPORTANTE: Impedisce assolutamente di andare a capo! */
 }
 
 /* LA GABBIA PER LE CARTE AVVERSARIE (Questa mancava!) */
@@ -187,27 +324,31 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
     justify-content: center;
     align-items: center;
     margin-top: 8px;
-    height: 55px; /* Blocca l'altezza */
-    overflow: hidden; /* Taglia via tutto ciò che sborda */
+    height: 55px;
+    /* Blocca l'altezza */
+    overflow: hidden;
+    /* Taglia via tutto ciò che sborda */
 }
 
 /* Sposta il popup scommesse più in alto per non coprire le tue carte! */
 #dichiarazione-area {
-    background: rgba(255,255,255,0.9);
+    background: rgba(255, 255, 255, 0.9);
     padding: 15px;
     border-radius: 8px;
     position: absolute;
-    top: 40%; /* Prima era 60%, ecco perché copriva le tue carte! */
+    top: 40%;
+    /* Prima era 60%, ecco perché copriva le tue carte! */
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 100;
     text-align: center;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
 }
 
 /* Stile Carta Visibile standard (Corretto per non cancellare l'immagine) */
 .card {
-    background-color: white; /* Usiamo -color per non sovrascrivere l'immagine! */
+    background-color: white;
+    /* Usiamo -color per non sovrascrivere l'immagine! */
     user-select: none;
 }
 
@@ -217,9 +358,10 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
     transition: transform 0.2s, margin 0.2s;
 }
 
-#tu-mano .card:hover { 
-    transform: translateY(-20px) scale(1.1); 
-    z-index: 100 !important; /* La porta avanti a tutte! */
+#tu-mano .card:hover {
+    transform: translateY(-20px) scale(1.1);
+    z-index: 100 !important;
+    /* La porta avanti a tutte! */
 }
 
 /* ========================================= */
@@ -228,7 +370,7 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
 .table-card {
     position: absolute;
     z-index: 50;
-    box-shadow: 3px 3px 10px rgba(0,0,0,0.6);
+    box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.6);
 }
 
 /* Adattamenti per carte più piccole quando necessario */
@@ -240,8 +382,12 @@ button { padding: 12px 24px; background: #f1c40f; border: none; font-weight: bol
 
 /* ILLUMINA IL BOX DEL TURNO ATTUALE */
 .player-block.active-turn {
-    border: 3px solid #f1c40f !important; /* Bordo Giallo spesso */
-    box-shadow: 0 0 25px #f1c40f !important; /* Alone luminoso */
-    transform: translate(-50%, -50%) scale(1.05); /* Lo ingrandisce un pelo (opzionale) */
-    z-index: 30; /* Lo porta in primo piano */
+    border: 3px solid #f1c40f !important;
+    /* Bordo Giallo spesso */
+    box-shadow: 0 0 25px #f1c40f !important;
+    /* Alone luminoso */
+    transform: translate(-50%, -50%) scale(1.05);
+    /* Lo ingrandisce un pelo (opzionale) */
+    z-index: 30;
+    /* Lo porta in primo piano */
 }

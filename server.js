@@ -44,15 +44,15 @@ class Player {
 
 class LoreGame {
     constructor(numPlayers) {
-        this.players = Array.from({length: numPlayers}, (_, i) => new Player(i, `CPU ${i}`));
+        this.players = Array.from({ length: numPlayers }, (_, i) => new Player(i, `CPU ${i}`));
         this.numPlayers = numPlayers;
         this.indiceMazziere = Math.floor(Math.random() * numPlayers);
         this.maxCarte = Math.floor(40 / numPlayers);
         this.indiceGiro = 0;
         this.tavolo = [];
-        this.fase = "scommesse"; 
+        this.fase = "scommesse";
         this.sommaScommesse = 0;
-        
+
         let seq = [];
         for (let i = 2; i <= this.maxCarte; i++) seq.push(i);
         for (let i = this.maxCarte - 1; i >= 2; i--) seq.push(i);
@@ -119,12 +119,12 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log(`Giocatore disconnesso: ${socket.id}`);
-        
+
         // Cerchiamo in quale lobby si trovava
         for (const code in lobbies) {
             const lobby = lobbies[code];
             const index = lobby.giocatori.findIndex(p => p.id === socket.id);
-            
+
             // Se lo troviamo in questa lobby...
             if (index !== -1) {
                 if (lobby.gameInstance) {
@@ -135,7 +135,7 @@ io.on('connection', (socket) => {
                         game.players[playerIndex].isHuman = false;
                         game.players[playerIndex].nome += " (Bot)";
                         inviaStato(code); // Aggiorna i nomi per gli altri
-                        
+
                         // Il Bot muove solo se è il suo turno e la presa non è in fase di animazione
                         if (game.turnoAttuale === playerIndex && game.tavolo.length < game.numPlayers) {
                             gestisciIA(code);
@@ -179,7 +179,7 @@ io.on('connection', (socket) => {
         if (isNaN(val) || val < 0 || val > qta) {
             return socket.emit('errore', `Dichiarazione non valida! In questo turno puoi dichiarare da 0 a ${qta}.`);
         }
-        
+
         // --- VINCOLO DEL MAZZIERE ---
         if (game.turnoAttuale === game.indiceMazziere) {
             if (game.sommaScommesse + val === qta) {
@@ -200,14 +200,14 @@ io.on('connection', (socket) => {
         const game = lobbies[code]?.gameInstance;
         const pIdx = game.turnoAttuale;
         if (!game || game.players[pIdx].id !== socket.id) return;
-        
+
         // --- FIX 1: Evita che si giochino carte mentre la presa si sta già chiudendo (ritardo 1.2s) ---
-        if (game.tavolo.length >= game.numPlayers) return; 
+        if (game.tavolo.length >= game.numPlayers) return;
 
         const carta = game.players[pIdx].mano[dati.cartaIdx];
 
         // --- FIX 2: Evita i crash se il client invia una carta inesistente o già giocata ---
-        if (!carta || carta.giocata) return; 
+        if (!carta || carta.giocata) return;
 
         // --- RISPOSTA AL SEME ---
         if (game.tavolo.length > 0) {
@@ -246,7 +246,7 @@ io.on('connection', (socket) => {
             });
             game.indiceGiro++;
             if (game.indiceGiro >= game.sequenzaTurni.length) {
-                io.to(code).emit('fine_partita', [...game.players].sort((a,b) => b.punti - a.punti));
+                io.to(code).emit('fine_partita', [...game.players].sort((a, b) => b.punti - a.punti));
                 return;
             } else {
                 game.indiceMazziere = (game.indiceMazziere + 1) % game.numPlayers;
@@ -260,22 +260,22 @@ io.on('connection', (socket) => {
     function gestisciIA(code) {
         const game = lobbies[code]?.gameInstance;
         if (!game || game.players[game.turnoAttuale].isHuman) return;
-        
+
         setTimeout(() => {
             const p = game.players[game.turnoAttuale];
             const qta = game.sequenzaTurni[game.indiceGiro];
-            
+
             if (game.fase === "scommesse") {
                 // SCOMMESSA: Il bot conta quante carte forti ha (Assi, Tre, Re) e scommette di conseguenza
                 let s = p.mano.filter(c => c.forza >= 300).length;
                 s = Math.min(s, qta); // Non scommette mai più delle carte in mano
-                
+
                 // Vincolo mazziere per i Bot
                 if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
                     s = (s > 0) ? s - 1 : s + 1;
                 }
-                
-                p.dichiarazione = s; 
+
+                p.dichiarazione = s;
                 game.sommaScommesse += s;
                 game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
                 if (game.players.every(pl => pl.dichiarazione !== "-")) game.fase = "gioco";
@@ -291,14 +291,14 @@ io.on('connection', (socket) => {
                     // 2. Deve rispondere a una carta
                     const semeUscita = game.tavolo[0].card.seme;
                     const carteValide = manoV.filter(c => c.seme === semeUscita); // Obbligo di rispondere al seme
-                    
+
                     if (carteValide.length > 0) {
                         // Ha il seme richiesto! Trova la carta che al momento sta vincendo sul tavolo
                         const vincenteAttuale = game.calcolaVincitorePresa();
-                        
+
                         // Guarda se tra le carte valide ne ha una che batte quella vincente
                         const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
-                        
+
                         if (carteVincenti.length > 0) {
                             // Può vincere: gioca la carta PIÙ PICCOLA necessaria per vincere (risparmiando le più forti!)
                             cartaDaGiocare = carteVincenti.reduce((min, c) => (c.forza < min.forza) ? c : min, carteVincenti[0]);
@@ -314,11 +314,11 @@ io.on('connection', (socket) => {
 
                 cartaDaGiocare.giocata = true;
                 game.tavolo.push({ playerId: game.turnoAttuale, card: cartaDaGiocare });
-                
-                if (game.tavolo.length === game.numPlayers) { 
-                    inviaStato(code); 
-                    setTimeout(() => risolviPresa(code), 1400); 
-                    return; 
+
+                if (game.tavolo.length === game.numPlayers) {
+                    inviaStato(code);
+                    setTimeout(() => risolviPresa(code), 1400);
+                    return;
                 }
                 game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
             }
@@ -336,14 +336,14 @@ io.on('connection', (socket) => {
         // Invio uno stato personalizzato solo ai giocatori umani presenti
         lobby.giocatori.forEach(giocatoreUmano => {
             const payload = {
-                fase: game.fase, 
-                turnoAttuale: game.turnoAttuale, 
-                tavolo: game.tavolo, 
-                sommaScommesse: game.sommaScommesse, 
+                fase: game.fase,
+                turnoAttuale: game.turnoAttuale,
+                tavolo: game.tavolo,
+                sommaScommesse: game.sommaScommesse,
                 qtaCarte: qta,
                 tuttiGiocatori: game.players.map((p, i) => {
                     let manoDaInviare = p.mano;
-                
+
                     // Se è il turno "Fronte" e questo giocatore è quello a cui sto inviando i dati...
                     if (qta === 1 && p.id === giocatoreUmano.id) {
                         // ...sostituisco i valori della sua mano con valori fittizi per nasconderli dal Network del browser
@@ -351,11 +351,11 @@ io.on('connection', (socket) => {
                     }
 
                     return {
-                        nome: p.nome, 
-                        punti: p.punti, 
-                        dichiarazione: p.dichiarazione, 
+                        nome: p.nome,
+                        punti: p.punti,
+                        dichiarazione: p.dichiarazione,
                         prese: p.preseFatte,
-                        isMazziere: (i === game.indiceMazziere), 
+                        isMazziere: (i === game.indiceMazziere),
                         socketId: p.id,
                         cartaFronte: (qta === 1) ? p.mano.find(c => !c.giocata) : null,
                         mano: manoDaInviare

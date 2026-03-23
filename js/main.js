@@ -9,18 +9,18 @@ function renderGiocatori(data) {
     const playersCircle = document.getElementById('players-circle');
     const cardsOnTable = document.getElementById('cards-on-table');
     const infoGiro = document.getElementById('info-giro');
-    
-    playersCircle.innerHTML = ''; 
-    cardsOnTable.innerHTML = ''; 
+
+    playersCircle.innerHTML = '';
+    cardsOnTable.innerHTML = '';
 
     infoGiro.innerText = `Giro ${data.qtaCarte} carte - Somma Scommesse: ${data.sommaScommesse}`;
 
     const numPlayers = data.tuttiGiocatori.length;
     const mioIndice = data.tuttiGiocatori.findIndex(p => p.socketId === socket.id);
     const stepAngolo = 360 / numPlayers;
-    
-    const raggioX = 42; 
-    const raggioY = 38; 
+
+    const raggioX = 42;
+    const raggioY = 38;
     const raggioCarteX = 20;
     const raggioCarteY = 20;
 
@@ -50,11 +50,11 @@ function renderGiocatori(data) {
 
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
-        if (isMe) pBlock.classList.add('me'); 
+        if (isMe) pBlock.classList.add('me');
         if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
         pBlock.style.left = `${posX}%`;
         pBlock.style.top = `${posY}%`;
-        
+
         // Usiamo la scala dinamica per i box
         pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
 
@@ -79,8 +79,8 @@ function renderGiocatori(data) {
                 oppHandCont.appendChild(fronteDiv);
             } else {
                 const carteInManoCount = p.mano ? p.mano.filter(c => !c.giocata).length : 0;
-                
-                let margineNegativo = 0; 
+
+                let margineNegativo = 0;
                 if (carteInManoCount > 1) {
                     const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
                     margineNegativo = Math.min(0, spazioPerCarta - 35);
@@ -107,25 +107,25 @@ function renderGiocatori(data) {
         const c = giocata.card;
         const pId = giocata.playerId;
         const posData = posizioniCarteTavoloPerGiocatore.get(pId);
-        
+
         if (posData) {
             const divCartaTavolo = document.createElement('div');
-            divCartaTavolo.className = `card seme-${c.seme} val-${c.valore} table-card`; 
+            divCartaTavolo.className = `card seme-${c.seme} val-${c.valore} table-card`;
             divCartaTavolo.style.left = `${posData.x}%`;
             divCartaTavolo.style.top = `${posData.y}%`;
-            divCartaTavolo.style.zIndex = 100 + index; 
-            
-            const randRot = (Math.random() * 14) - 7; 
+            divCartaTavolo.style.zIndex = 100 + index;
+
+            const randRot = (Math.random() * 14) - 7;
             // Usiamo la scala dinamica per le carte giocate!
             divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${randRot}deg)`;
-            
+
             cardsOnTable.appendChild(divCartaTavolo);
         }
     });
 }
 
 function getSemeSimbolo(seme) {
-    switch(seme) {
+    switch (seme) {
         case 'Ori': return '🪙';
         case 'Spade': return '🗡️';
         case 'Coppe': return '🍷';
@@ -138,35 +138,35 @@ function getSemeSimbolo(seme) {
 function renderTuaMano(handCont, mano, isMyTurn, fase) {
     if (!handCont) return;
     handCont.innerHTML = ''; // Pulizia di sicurezza
-    
+
     const carteDaDisegnare = mano.filter(c => !c.giocata);
-    
+
     // --- 1. NOVITÀ: ORDINA LE CARTE DALLA PIÙ DEBOLE ALLA PIÙ FORTE ---
     // Usiamo il valore "forza" già calcolato dal server (Ori > Spade > Coppe > Bastoni)
     carteDaDisegnare.sort((a, b) => a.forza - b.forza);
 
     const numCarte = carteDaDisegnare.length;
-    
+
     // MATEMATICA: Più carte hai, più si incastrano per non uscire dallo schermo!
     let marginLeft = 0;
     if (numCarte > 10) {
-        marginLeft = -50; 
+        marginLeft = -50;
     } else if (numCarte > 7) {
-        marginLeft = -35; 
+        marginLeft = -35;
     } else if (numCarte > 4) {
-        marginLeft = -15; 
+        marginLeft = -15;
     }
 
     carteDaDisegnare.forEach((c, idx) => {
         const div = document.createElement('div');
-        
+
         // --- 2. NOVITÀ: FIX ASSO DI COPPE E DORSO CON IMMAGINE ---
         // Se il server ci ha nascosto la carta (Giro Fronte da 1)
         if (c.valore === "?") {
             // Aggiungiamo 'card-back' per usare l'immagine definita nel CSS
             // e manteniamo 'card' per le dimensioni corrette nel tuo box
             div.className = 'card card-back';
-            
+
             // Rimuoviamo gli stili inline vecchi (quelli del dorso blu)
             div.style.background = '';
             div.style.border = '';
@@ -174,17 +174,17 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
             // Carta normale visibile
             div.className = `card seme-${c.seme} val-${c.valore}`;
         }
-        
+
         // Applichiamo il margine negativo per farle sovrapporre!
         if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
-        
+
         // Assegniamo lo z-index corretto per farle impilare da sinistra verso destra
         div.style.zIndex = 10 + idx;
 
-        div.onclick = () => { 
+        div.onclick = () => {
             // Clicchi per giocare la carta. 
             // NOTA: Usando mano.indexOf(c) peschiamo l'indice originale corretto anche se le abbiamo riordinate visivamente!
-            if(isMyTurn && fase === 'gioco') socket.emit('gioca_carta', { cartaIdx: mano.indexOf(c) }); 
+            if (isMyTurn && fase === 'gioco') socket.emit('gioca_carta', { cartaIdx: mano.indexOf(c) });
         };
         handCont.appendChild(div);
     });
@@ -217,7 +217,7 @@ socket.on('lobby_creata', (d) => {
     document.getElementById('setup-menu').style.display = 'none';
     document.getElementById('lobby-wait').style.display = 'block';
     document.getElementById('display-room-code').innerText = d.code;
-    document.getElementById('lobby-info').style.display = 'block'; 
+    document.getElementById('lobby-info').style.display = 'block';
     document.getElementById('start-game-btn').style.display = 'block';
     document.getElementById('joined-players-list').innerHTML = d.giocatori.map(p => `<div>👤 ${p.nome}</div>`).join('');
 });
@@ -225,13 +225,13 @@ socket.on('lobby_creata', (d) => {
 socket.on('aggiorna_lobby', (dati) => {
     document.getElementById('setup-menu').style.display = 'none';
     document.getElementById('lobby-wait').style.display = 'block';
-    
+
     // Mostriamo il codice stanza all'amico e la lista aggiornata
     if (dati.code) {
         document.getElementById('display-room-code').innerText = dati.code;
-        document.getElementById('lobby-info').style.display = 'block'; 
+        document.getElementById('lobby-info').style.display = 'block';
     }
-    
+
     document.getElementById('joined-players-list').innerHTML = dati.giocatori.map(p => `<div>👤 ${p.nome}</div>`).join('');
 });
 
@@ -241,7 +241,7 @@ socket.on('conferma_inizio_partita', (dati) => {
     document.getElementById('lobby-wait').style.display = 'none';
     document.getElementById('sidebar').style.display = 'none';
     document.getElementById('game-area').style.display = 'block';
-    
+
     const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
     const eMioTurno = (pAttuale.socketId === socket.id);
 
@@ -269,6 +269,6 @@ socket.on('conferma_inizio_partita', (dati) => {
 
 socket.on('errore', (m) => alert(m));
 socket.on('fine_partita', (cl) => {
-    alert("🏆 CLASSIFICA FINALE:\n" + cl.map((p, i) => `${i+1}° ${p.nome}: ${p.punti}pt`).join('\n'));
+    alert("🏆 CLASSIFICA FINALE:\n" + cl.map((p, i) => `${i + 1}° ${p.nome}: ${p.punti}pt`).join('\n'));
     location.reload();
 });
