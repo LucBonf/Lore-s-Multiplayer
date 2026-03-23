@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lores</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/main.js" type="module" defer></script>
+</head>
+<body>
+<div id="game-container">
+    
+    <div id="sidebar">
+        <h3>Gerarchia Semi</h3>
+        <ul style="list-style:none; padding:0; font-weight:bold; font-size: 0.9em;">
+            <li style="color:#f1c40f;">● ORI (400)</li>
+            <li style="color:#3498db;">● SPADE (300)</li>
+            <li style="color:#e74c3c;">● COPPE (200)</li>
+            <li style="color:#2ecc71;">● BASTONI (100)</li>
+        </ul>
+        <hr>
+        <div id="mini-scoreboard">
+            <h4>Classifica & Fronte</h4>
+            <div id="score-list">In attesa...</div>
+        </div>
+        <div id="lobby-info" style="display:none;">
+            <p>Codice: <strong id="display-room-code">-</strong></p>
+        </div>
+    </div>
+
+    <div id="game-table" style="position: relative; display: flex; justify-content: center; align-items: center;">
+        
+        <h1 id="game-title">Lores</h1>
+
+        <div id="setup-menu" style="text-align: center; width: 320px; z-index: 10;">
+            <input type="text" id="player-nickname" placeholder="Tuo Nickname..." style="width: 90%; padding: 10px; margin-bottom: 20px; text-align: center; font-size: 1.1rem; border-radius: 5px; border: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+            
+            <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+                <select id="select-players" style="padding: 10px; border-radius: 5px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                    <option value="3">3 Giocatori</option>
+                    <option value="4" selected>4 Giocatori</option>
+                    <option value="5">5 Giocatori</option>
+                    <option value="6">6 Giocatori</option>
+                    <option value="7">7 Giocatori</option>
+                    <option value="8">8 Giocatori</option>
+                </select>
+                <button onclick="creaNuovaStanza()" style="padding: 10px 20px; font-weight: bold; background: #f1c40f; color: #333; border: none; border-radius: 5px; cursor: pointer; flex-grow: 1; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">CREA</button>
+            </div>
+            
+            <hr style="border-color: rgba(255,255,255,0.4); margin-bottom: 20px;">
+            
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <input type="text" id="input-room-code" placeholder="Codice" style="width: 100px; padding: 10px; text-align: center; font-size: 1.1rem; border-radius: 5px; border: none; text-transform: uppercase; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <button onclick="uniscitiAStanza()" style="padding: 10px 20px; font-weight: bold; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; flex-grow: 1; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">ENTRA</button>
+            </div>
+        </div>
+        
+        <div id="lobby-wait" style="display:none; text-align: center; z-index: 10; width: 300px;">
+            <h2 style="margin-top: 0; text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">Lobby d'attesa</h2>
+            <div id="joined-players-list" style="margin-bottom: 20px; font-size: 1.2rem; line-height: 1.8; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);"></div>
+            <button id="start-game-btn" onclick="iniziaPartitaVera()" style="display:none; background:#27ae60; padding:15px 30px; font-size: 1.1rem; font-weight:bold; color: white; border: 2px solid white; border-radius: 8px; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">AVVIA PARTITA</button>
+        </div>
+
+        <div id="game-area" style="display: none; position: relative; width: 100%; height: 100%;">
+            <div id="info-giro" style="text-align:center; font-size:1.2em; font-weight:bold; margin-bottom:10px;"></div>
+            
+            <div id="dichiarazione-area" style="display:none;">
+                <h3 style="margin-top:0; color:#333;">La tua dichiarazione</h3>
+                <input type="number" id="bet-input" min="0" value="0" style="padding:10px; width:60px; font-size:1.2em; text-align:center;">
+                <button onclick="inviaDichiarazione()" style="background:#27ae60; color:white; margin-top:10px; width:100%;">DICHIARA</button>
+            </div>
+
+            <div id="circular-table">
+                <div id="central-table">
+                    <div id="cards-on-table"></div>
+                </div>
+                <div id="players-circle"></div>
+            </div>
+        </div>
+
+        <div id="classifica-finale-container" style="display:none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 40px; border-radius: 15px; text-align: center; border: 2px solid #f1c40f; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 200;">
+            <h1 style="color: #f1c40f; margin-top: 0; font-size: 2.5rem;">PARTITA FINITA!</h1>
+            <div id="classifica-finale-lista" style="font-size: 1.5rem; line-height: 2; margin-bottom: 30px;"></div>
+            <button onclick="location.reload()" style="background: #3498db; color: white; padding: 15px 30px; font-size: 1.2rem; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">TORNA ALLA LOBBY</button>
+        </div>
+
+    </div> </div> </body>
+</html>
