@@ -2,21 +2,82 @@ const socket = io();
 let qtaAttuale = 0; // Per validazione locale
 let canPlay = true;
 
-let sessionToken = sessionStorage.getItem('lores_token');
+let sessionToken = sessionStorage.getItem('lucas_token');
 if (!sessionToken) {
     sessionToken = Math.random().toString(36).substring(2, 12);
-    sessionStorage.setItem('lores_token', sessionToken);
+    sessionStorage.setItem('lucas_token', sessionToken);
 }
 
 socket.on('connect', () => {
-    const savedCode = sessionStorage.getItem('lores_room');
+    const savedCode = sessionStorage.getItem('lucas_room');
     if (savedCode) {
         socket.emit('riconnetti', { code: savedCode, token: sessionToken });
     }
 });
 
 socket.on('riconnessione_fallita', () => {
-    sessionStorage.removeItem('lores_room');
+    sessionStorage.removeItem('lucas_room');
+});
+
+// =========================================
+//   LOGICA LOGIN E CLASSIFICA
+// =========================================
+
+let userProfile = null;
+
+window.eseguiLogin = () => {
+    const code = document.getElementById('login-code').value.trim();
+    const nickname = document.getElementById('login-nickname').value.trim();
+    if (!code) {
+        mostraErrore("Devi inserire un codice segreto!");
+        return;
+    }
+    socket.emit('login', { uniqueCode: code, nickname: nickname, token: sessionToken });
+};
+
+window.continuaComeOspite = () => {
+    const randomSuffix = Math.random().toString(36).substring(2, 7);
+    const guestId = "GUEST_" + randomSuffix;
+    socket.emit('login', { uniqueCode: guestId, nickname: "Ospite " + randomSuffix, token: sessionToken });
+};
+
+socket.on('login_ok', (profile) => {
+    userProfile = profile;
+    document.getElementById('login-menu').style.display = 'none';
+    document.getElementById('setup-menu').style.display = 'block';
+    
+    // Mostriamo i dati dell'utente nel menu setup
+    document.getElementById('welcome-message').innerHTML = `
+        Benvenuto, ${profile.nickname}! 
+        <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">Partite Vinte: ${profile.partiteVinte} | Punti: ${profile.punteggioTotale}</div>
+    `;
+});
+
+socket.on('login_err', (msg) => {
+    mostraErrore(msg);
+});
+
+window.apriClassifica = () => {
+    document.getElementById('modal-classifica').style.display = 'block';
+    socket.emit('richiedi_classifica');
+};
+
+window.chiudiClassifica = () => {
+    document.getElementById('modal-classifica').style.display = 'none';
+};
+
+socket.on('classifica_dati', (dati) => {
+    const container = document.getElementById('leaderboard-list');
+    if (dati.length === 0) {
+        container.innerHTML = "<p style='text-align:center;'>Nessun dato ancora disponibile in classifica.</p>";
+        return;
+    }
+    container.innerHTML = dati.map((u, i) => `
+        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #555; padding: 10px 0;">
+            <span><strong>${i+1}°.</strong> ${u.nickname}</span>
+            <span>${u.punteggioTotale} pt (${u.partiteVinte} Vinte)</span>
+        </div>
+    `).join('');
 });
 
 // =========================================
@@ -212,16 +273,16 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
 }
 
 window.creaNuovaStanza = () => {
-    sessionStorage.removeItem('lores_room');
-    const nome = document.getElementById('player-nickname').value.trim() || "Host";
+    sessionStorage.removeItem('lucas_room');
+    const nome = userProfile ? userProfile.nickname : "Host";
     const num = document.getElementById('select-players').value;
-    socket.emit('crea_lobby', { nome: nome, numGiocatori: num, token: sessionToken });
+    socket.emit('crea_lobby', { nome: nome, numGiocatori: num, token: sessionToken, uniqueCode: userProfile ? userProfile.uniqueCode : null });
 };
 
 window.uniscitiAStanza = () => {
-    const nome = document.getElementById('player-nickname').value.trim() || "Giocatore";
+    const nome = userProfile ? userProfile.nickname : "Giocatore";
     const code = document.getElementById('input-room-code').value.toUpperCase();
-    socket.emit('unisciti_lobby', { nome: nome, code: code, token: sessionToken });
+    socket.emit('unisciti_lobby', { nome: nome, code: code, token: sessionToken, uniqueCode: userProfile ? userProfile.uniqueCode : null });
 };
 
 window.iniziaPartitaVera = () => socket.emit('richiesta_inizio_partita');
@@ -238,7 +299,7 @@ window.inviaDichiarazione = () => {
 };
 
 socket.on('lobby_creata', (d) => {
-    sessionStorage.setItem('lores_room', d.code);
+    sessionStorage.setItem('lucas_room', d.code);
     document.getElementById('setup-menu').style.display = 'none';
     document.getElementById('lobby-wait').style.display = 'block';
     document.getElementById('display-room-code').innerText = d.code;
@@ -253,7 +314,7 @@ socket.on('aggiorna_lobby', (dati) => {
 
     // Mostriamo il codice stanza all'amico e la lista aggiornata
     if (dati.code) {
-        sessionStorage.setItem('lores_room', dati.code);
+        sessionStorage.setItem('lucas_room', dati.code);
         document.getElementById('display-room-code').innerText = dati.code;
         document.getElementById('lobby-info').style.display = 'block';
     }
@@ -303,7 +364,7 @@ function mostraErrore(messaggio) {
 
 socket.on('errore', (m) => mostraErrore(m));
 socket.on('fine_partita', (cl) => {
-    sessionStorage.removeItem('lores_room');
+    sessionStorage.removeItem('lucas_room');
     alert("🏆 CLASSIFICA FINALE:\n" + cl.map((p, i) => `${i + 1}° ${p.nome}: ${p.punti}pt`).join('\n'));
     location.reload();
 });
@@ -319,8 +380,12 @@ window.chiudiRegole = () => {
 
 // Chiudi il modal cliccando fuori dal riquadro
 window.onclick = (event) => {
-    const modal = document.getElementById('modal-regole');
-    if (event.target === modal) {
-        modal.style.display = 'none';
+    const modalRegole = document.getElementById('modal-regole');
+    const modalClassifica = document.getElementById('modal-classifica');
+    if (event.target === modalRegole) {
+        modalRegole.style.display = 'none';
+    }
+    if (event.target === modalClassifica) {
+        modalClassifica.style.display = 'none';
     }
 };

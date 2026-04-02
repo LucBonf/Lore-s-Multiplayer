@@ -3,11 +3,33 @@ import http from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+// Schema Utente MongoDB
+const userSchema = new mongoose.Schema({
+    uniqueCode: { type: String, required: true, unique: true },
+    nickname: { type: String, required: true },
+    partiteGiocate: { type: Number, default: 0 },
+    partiteVinte: { type: Number, default: 0 },
+    punteggioTotale: { type: Number, default: 0 }
+});
+const User = mongoose.model('User', userSchema);
+
+let dbConnected = false;
+if (process.env.MONGODB_URI) {
+    mongoose.connect(process.env.MONGODB_URI)
+        .then(() => { console.log('🔗 Connesso a MongoDB Atlas!'); dbConnected = true; })
+        .catch(err => console.error('Errore connessione MongoDB:', err));
+} else {
+    console.log('⚠️ Nessun MONGODB_URI trovato! Classifiche e Login provvisori (non persistenti).');
+}
 
 app.use(express.static(__dirname));
 
@@ -26,11 +48,12 @@ class Card {
 }
 
 class Player {
-    constructor(id, nome, isHuman = false, token = null) {
+    constructor(id, nome, isHuman = false, token = null, uniqueCode = null) {
         this.id = id;
         this.nome = nome;
         this.isHuman = isHuman;
         this.token = token;
+        this.uniqueCode = uniqueCode;
         this.mano = [];
         this.punti = 0;
         this.dichiarazione = "-";
@@ -43,7 +66,7 @@ class Player {
     }
 }
 
-class LoreGame {
+class LucasGame {
     constructor(numPlayers) {
         this.players = Array.from({ length: numPlayers }, (_, i) => new Player(i, `CPU ${i}`));
         this.numPlayers = numPlayers;
@@ -90,9 +113,36 @@ class LoreGame {
 const lobbies = {};
 
 io.on('connection', (socket) => {
+    
+    socket.on('login', async (dati) => {
+        if (!dbConnected) {
+            // Modalità simulata in assenza di DB
+            return socket.emit('login_ok', { uniqueCode: dati.uniqueCode, nickname: dati.nickname || "Player", partiteVinte: 0, punteggioTotale: 0 });
+        }
+        try {
+            let user = await User.findOne({ uniqueCode: dati.uniqueCode });
+            if (!user) {
+                if (!dati.nickname) return socket.emit('login_err', 'Account non trovato. Inserisci un Nickname per registrarne uno nuovo!');
+                user = new User({ uniqueCode: dati.uniqueCode, nickname: dati.nickname });
+                await user.save();
+            }
+            socket.emit('login_ok', user);
+        } catch (e) {
+            socket.emit('login_err', 'Errore DB: ' + e.message);
+        }
+    });
+
+    socket.on('richiedi_classifica', async () => {
+        if (!dbConnected) return socket.emit('classifica_dati', []);
+        try {
+            let limit = await User.find().sort({ punteggioTotale: -1 }).limit(10);
+            socket.emit('classifica_dati', limit);
+        } catch(e) {}
+    });
+
     socket.on('crea_lobby', (dati) => {
         const code = Math.random().toString(36).substring(2, 6).toUpperCase();
-        lobbies[code] = { host: socket.id, parametri: dati, giocatori: [{ id: socket.id, nome: dati.nome, token: dati.token }] };
+        lobbies[code] = { host: socket.id, parametri: dati, giocatori: [{ id: socket.id, nome: dati.nome, token: dati.token, uniqueCode: dati.uniqueCode }] };
         socket.join(code);
         socket.roomCode = code; // Aggiungi questa riga!
         socket.emit('lobby_creata', { code: code, giocatori: lobbies[code].giocatori });
@@ -140,7 +190,7 @@ io.on('connection', (socket) => {
                 return socket.emit('errore', "La lobby è piena!");
             }
             if (lobby.giocatori.find(p => p.id === socket.id)) return;
-            lobby.giocatori.push({ id: socket.id, nome: dati.nome, token: dati.token });
+            lobby.giocatori.push({ id: socket.id, nome: dati.nome, token: dati.token, uniqueCode: dati.uniqueCode });
             socket.join(dati.code);
             socket.roomCode = dati.code; // Aggiungi questa riga!
             io.to(dati.code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: dati.code });
@@ -191,13 +241,14 @@ io.on('connection', (socket) => {
     function avviaPartita(code) {
         const lobby = lobbies[code];
         if (!lobby || lobby.gameInstance) return;
-        lobby.gameInstance = new LoreGame(parseInt(lobby.parametri.numGiocatori));
+        lobby.gameInstance = new LucasGame(parseInt(lobby.parametri.numGiocatori));
         lobby.gameInstance.players.forEach((p, i) => {
             if (lobby.giocatori[i]) {
                 p.nome = lobby.giocatori[i].nome;
                 p.id = lobby.giocatori[i].id;
                 p.isHuman = true;
                 p.token = lobby.giocatori[i].token;
+                p.uniqueCode = lobby.giocatori[i].uniqueCode;
             }
         });
         lobby.gameInstance.distribuisci();
@@ -296,7 +347,28 @@ io.on('connection', (socket) => {
             });
             game.indiceGiro++;
             if (game.indiceGiro >= game.sequenzaTurni.length) {
-                io.to(code).emit('fine_partita', [...game.players].sort((a, b) => b.punti - a.punti));
+                const classificaFinale = [...game.players].sort((a, b) => b.punti - a.punti);
+                
+                // --- SALVATAGGIO CLASSIFICHE MONGO DB ---
+                if (dbConnected) {
+                    const vincitoreAssoluto = classificaFinale[0].punti;
+                    game.players.forEach(async (p) => {
+                        if (p.isHuman && p.uniqueCode) {
+                            try {
+                                let isWinner = (p.punti === vincitoreAssoluto) ? 1 : 0;
+                                await User.updateOne(
+                                    { uniqueCode: p.uniqueCode },
+                                    { 
+                                        $inc: { partiteGiocate: 1, partiteVinte: isWinner, punteggioTotale: p.punti },
+                                        $set: { nickname: p.nome } // Sincronizza eventuale nome in caso sia cambiato globalmente (se permetti update)
+                                    }
+                                );
+                            } catch(e) { console.error("Errore update user stats:", e); }
+                        }
+                    });
+                }
+
+                io.to(code).emit('fine_partita', classificaFinale);
                 return;
             } else {
                 game.indiceMazziere = (game.indiceMazziere + 1) % game.numPlayers;

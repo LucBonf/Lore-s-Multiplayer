@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lores</title>
+    <title>Lucas</title>
     <link rel="stylesheet" href="style.css">
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/main.js" type="module" defer></script>
@@ -14,14 +14,17 @@
     <!-- Toast Banner per gli Errori -->
     <div id="error-banner"></div>
 
-    <!-- Pulsante per aprire le regole -->
-    <button id="btn-regole" onclick="apriRegole()">📜 Regole</button>
+    <!-- Pulsante per aprire le regole e la classifica -->
+    <div style="position: absolute; top: 20px; right: 30px; display: flex; gap: 10px; z-index: 1000;">
+        <button id="btn-leaderboard" onclick="apriClassifica()" style="background: #e67e22; color: white; border: 2px solid white; padding: 10px 15px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s;">🏆 Classifica</button>
+        <button id="btn-regole" onclick="apriRegole()">📜 Regole</button>
+    </div>
 
     <!-- Modal delle Regole -->
     <div id="modal-regole" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="chiudiRegole()">&times;</span>
-            <h2 style="color: #f1c40f; margin-top: 0; text-align: center;">📖 Regolamento: Gioco di Lore</h2>
+            <h2 style="color: #f1c40f; margin-top: 0; text-align: center;">📖 Regolamento: Gioco di Lucas</h2>
             <div style="line-height: 1.6; font-size: 1.1rem; color: #ddd; text-align: left;">
                 <p><strong>1. Mazzo e Giocatori:</strong> Si gioca con 40 carte. Il sistema calcola automaticamente
                     quante carte dare e la sequenza delle mani. Le carte avanzate restano coperte nel mazzo.</p>
@@ -54,16 +57,40 @@
         </div>
     </div>
 
+    <!-- Modal Classifica Globale -->
+    <div id="modal-classifica" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-btn" onclick="chiudiClassifica()">&times;</span>
+            <h2 style="color: #e67e22; margin-top: 0; text-align: center;">🏆 Classifica Globale</h2>
+            <div id="leaderboard-list" style="margin-top: 20px; font-size: 1.2rem; color: #ddd; text-align: left; line-height: 1.8;">
+                <p style="text-align: center;">Caricamento classifica in corso...</p>
+            </div>
+        </div>
+    </div>
+
     <div id="game-container">
 
         <div id="game-table" style="position: relative; display: flex; justify-content: center; align-items: center;">
 
-            <h1 id="game-title">Lores</h1>
+            <h1 id="game-title">Lucas</h1>
 
-            <div id="setup-menu" style="text-align: center; width: 320px; z-index: 10;">
-                <input type="text" id="player-nickname" placeholder="Tuo Nickname..."
-                    style="width: 90%; padding: 10px; margin-bottom: 20px; text-align: center; font-size: 1.1rem; border-radius: 5px; border: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+            <!-- MENU DI LOGIN -->
+            <div id="login-menu" style="text-align: center; width: 320px; z-index: 10;">
+                <h2 style="color: #f1c40f; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); margin-bottom: 20px;">Accesso Account</h2>
+                <input type="text" id="login-code" placeholder="Il tuo Codice Segreto..."
+                    style="width: 90%; padding: 10px; margin-bottom: 10px; text-align: center; font-size: 1.1rem; border-radius: 5px; border: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <input type="text" id="login-nickname" placeholder="Scegli un Nickname (solo nuovi account)..."
+                    style="width: 90%; padding: 10px; margin-bottom: 20px; text-align: center; font-size: 1rem; border-radius: 5px; border: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <button onclick="eseguiLogin()" style="padding: 10px 20px; font-weight: bold; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 1.2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">ACCEDI / REGISTRATI</button>
+                <div style="margin-top: 15px;">
+                    <button onclick="continuaComeOspite()" style="background: none; border: 1px solid #aaa; color: #ccc; padding: 6px 15px; border-radius: 5px; cursor: pointer; font-size: 0.9rem; transition: color 0.2s;">Gioca come Ospite (senza salvataggio)</button>
+                </div>
+            </div>
 
+            <!-- MENU DI STANZA (Nascosto finché non fai login) -->
+            <div id="setup-menu" style="display: none; text-align: center; width: 320px; z-index: 10;">
+                <div id="welcome-message" style="color: #f1c40f; font-size: 1.3rem; font-weight: bold; margin-bottom: 20px; text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">Benvenuto!</div>
+                
                 <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
                     <select id="select-players"
                         style="padding: 10px; border-radius: 5px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">

@@ -1,7 +1,7 @@
 {
-  "name": "lores",
+  "name": "lucas",
   "version": "1.0.0",
-  "description": "Lores",
+  "description": "Lucas",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -10,7 +10,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.4.0",
     "express": "^5.2.1",
+    "mongoose": "^9.3.3",
     "socket.io": "^4.8.3"
   }
 }

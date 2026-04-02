@@ -35,7 +35,7 @@ class Player {
     }
 }
 
-class LoreGame {
+class LucasGame {
     constructor(numPlayers) {
         this.players = Array.from({ length: numPlayers }, (_, i) => new Player(i, i === 0 ? 'Random' : `Smart ${i}`, i !== 0));
         this.numPlayers = numPlayers;
@@ -78,7 +78,7 @@ class LoreGame {
 }
 
 function runDeepSimulations() {
-    console.log("=== LORES AI DEEP ANALYSIS: SMART vs RANDOM ===");
+    console.log("=== LUCAS AI DEEP ANALYSIS: SMART vs RANDOM ===");
     console.log("Testando su 10.000 iterazioni per configurazione... Si prega di attendere.\n");
     
     let results = [];
@@ -95,7 +95,7 @@ function runDeepSimulations() {
         let matches = 10000;
         
         for (let sim = 0; sim < matches; sim++) {
-            let game = new LoreGame(num);
+            let game = new LucasGame(num);
             game.distribuisci();
             
             let abortSafety = 0;

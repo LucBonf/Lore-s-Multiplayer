@@ -488,7 +488,7 @@ button {
     }
 
     #info-giro {
-        margin-top: 40px !important; /* Evita sovrapposizione col titolo Lores */
+        margin-top: 40px !important; /* Evita sovrapposizione col titolo Lucas */
         font-size: 1rem !important;
         position: relative;
         z-index: 100;
