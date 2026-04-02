@@ -26,10 +26,11 @@ class Card {
 }
 
 class Player {
-    constructor(id, nome, isHuman = false) {
+    constructor(id, nome, isHuman = false, token = null) {
         this.id = id;
         this.nome = nome;
         this.isHuman = isHuman;
+        this.token = token;
         this.mano = [];
         this.punti = 0;
         this.dichiarazione = "-";
@@ -52,6 +53,7 @@ class LoreGame {
         this.tavolo = [];
         this.fase = "scommesse";
         this.sommaScommesse = 0;
+        this.acceptInput = true;
 
         let seq = [];
         for (let i = 2; i <= this.maxCarte; i++) seq.push(i);
@@ -90,20 +92,55 @@ const lobbies = {};
 io.on('connection', (socket) => {
     socket.on('crea_lobby', (dati) => {
         const code = Math.random().toString(36).substring(2, 6).toUpperCase();
-        lobbies[code] = { host: socket.id, parametri: dati, giocatori: [{ id: socket.id, nome: dati.nome }] };
+        lobbies[code] = { host: socket.id, parametri: dati, giocatori: [{ id: socket.id, nome: dati.nome, token: dati.token }] };
         socket.join(code);
         socket.roomCode = code; // Aggiungi questa riga!
         socket.emit('lobby_creata', { code: code, giocatori: lobbies[code].giocatori });
     });
 
+    function gestisciRiconnessione(socket, code, token) {
+        const lobby = lobbies[code];
+        if (!lobby) return socket.emit('riconnessione_fallita');
+
+        let foundLobbyPlayer = lobby.giocatori.find(p => p.token === token);
+        if (!foundLobbyPlayer) return socket.emit('riconnessione_fallita');
+
+        foundLobbyPlayer.id = socket.id;
+        socket.join(code);
+        socket.roomCode = code;
+
+        if (lobby.gameInstance) {
+            const game = lobby.gameInstance;
+            const pIndex = game.players.findIndex(p => p.token === token);
+            if (pIndex !== -1) {
+                const p = game.players[pIndex];
+                p.id = socket.id;
+                p.isHuman = true;
+                p.nome = p.nome.replace(" (Bot)", "");
+            }
+            inviaStato(code);
+        } else {
+            io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
+        }
+    }
+
+    socket.on('riconnetti', (dati) => {
+        gestisciRiconnessione(socket, dati.code, dati.token);
+    });
+
     socket.on('unisciti_lobby', (dati) => {
         const lobby = lobbies[dati.code];
         if (lobby) {
+            let existingPlayer = lobby.giocatori.find(p => p.token && p.token === dati.token);
+            if (existingPlayer) {
+                return gestisciRiconnessione(socket, dati.code, dati.token);
+            }
+
             if (lobby.giocatori.length >= parseInt(lobby.parametri.numGiocatori)) {
                 return socket.emit('errore', "La lobby è piena!");
             }
             if (lobby.giocatori.find(p => p.id === socket.id)) return;
-            lobby.giocatori.push({ id: socket.id, nome: dati.nome });
+            lobby.giocatori.push({ id: socket.id, nome: dati.nome, token: dati.token });
             socket.join(dati.code);
             socket.roomCode = dati.code; // Aggiungi questa riga!
             io.to(dati.code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: dati.code });
@@ -160,6 +197,7 @@ io.on('connection', (socket) => {
                 p.nome = lobby.giocatori[i].nome;
                 p.id = lobby.giocatori[i].id;
                 p.isHuman = true;
+                p.token = lobby.giocatori[i].token;
             }
         });
         lobby.gameInstance.distribuisci();
@@ -198,8 +236,11 @@ io.on('connection', (socket) => {
     socket.on('gioca_carta', (dati) => {
         const code = socket.roomCode;
         const game = lobbies[code]?.gameInstance;
-        const pIdx = game.turnoAttuale;
+        const pIdx = game?.turnoAttuale;
         if (!game || game.players[pIdx].id !== socket.id) return;
+        
+        // --- MICRO-RITARDO ANTI-GLITCH ---
+        if (!game.acceptInput) return;
 
         // --- FIX 1: Evita che si giochino carte mentre la presa si sta già chiudendo (ritardo 1.2s) ---
         if (game.tavolo.length >= game.numPlayers) return;
@@ -225,6 +266,11 @@ io.on('connection', (socket) => {
             setTimeout(() => risolviPresa(code), 1200);
         } else {
             game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
+            
+            // --- MICRO-RITARDO SUL SERVER (Previene carte istantanee) ---
+            game.acceptInput = false;
+            setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 400);
+            
             inviaStato(code);
             gestisciIA(code);
         }
@@ -238,6 +284,10 @@ io.on('connection', (socket) => {
         game.players[vincitore.playerId].preseFatte++;
         game.tavolo = [];
         game.turnoAttuale = vincitore.playerId;
+
+        // --- MICRO-RITARDO SUL SERVER AL CAMBIO PRESA ---
+        game.acceptInput = false;
+        setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 500);
 
         // --- FIX 3: Ora la mano finisce SOLO se TUTTI i giocatori hanno davvero giocato tutte le carte ---
         if (game.players.every(p => p.mano.every(c => c.giocata))) {
@@ -266,9 +316,17 @@ io.on('connection', (socket) => {
             const qta = game.sequenzaTurni[game.indiceGiro];
 
             if (game.fase === "scommesse") {
-                // SCOMMESSA: Il bot conta quante carte forti ha (Assi, Tre, Re) e scommette di conseguenza
-                let s = p.mano.filter(c => c.forza >= 300).length;
-                s = Math.min(s, qta); // Non scommette mai più delle carte in mano
+                // SCOMMESSA: Conta Asso e 3 di qualsiasi seme, più le carte forti di Ori e Spade.
+                let s = p.mano.filter(c => {
+                    if (c.seme === 'Ori' && c.forza > 405) return true; // Ori medio-alti
+                    if (c.seme === 'Spade' && c.forza > 308) return true; // Spade medie
+                    if (c.valore === 'Asso' || c.valore === '3') return true; 
+                    return false;
+                }).length;
+
+                // Modulatore per non scommettere ciecamente tutte le carte se abbiamo mano full
+                if (s > qta / 1.5 && qta > 3) s = Math.floor(s * 0.8);
+                s = Math.min(s, qta); 
 
                 // Vincolo mazziere per i Bot
                 if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
@@ -280,13 +338,27 @@ io.on('connection', (socket) => {
                 game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
                 if (game.players.every(pl => pl.dichiarazione !== "-")) game.fase = "gioco";
             } else {
-                // FASE DI GIOCO: Intelligenza Migliorata
+                // FASE DI GIOCO: Intelligenza Migliorata Goal-Oriented
                 const manoV = p.mano.filter(c => !c.giocata);
                 let cartaDaGiocare;
+                
+                const vuoleVincere = p.preseFatte < p.dichiarazione; // Obiettivo: continuare a vincere o provare a non fare più prese?
 
                 if (game.tavolo.length === 0) {
-                    // 1. Il Bot lancia per primo: gioca la sua carta più alta
-                    cartaDaGiocare = manoV.reduce((max, c) => (c.forza > max.forza) ? c : max, manoV[0]);
+                    // 1. Il Bot lancia per primo
+                    if (vuoleVincere) {
+                        // Cerca di lanciare l'Asso più forte che ha per incassare sicuro
+                        let assi = manoV.filter(c => c.valore === 'Asso');
+                        if (assi.length > 0) {
+                            cartaDaGiocare = assi.reduce((max, c) => (c.forza > max.forza) ? c : max, assi[0]);
+                        } else {
+                            // Altrimenti lancia una "scartina" per far svuotare la mano agli avversari e testare il terreno
+                            cartaDaGiocare = manoV.reduce((min, c) => (c.forza < min.forza) ? c : min, manoV[0]);
+                        }
+                    } else {
+                        // VUOLE PERDERE: Lancia la sua carta in assoluto più debole!
+                        cartaDaGiocare = manoV.reduce((min, c) => (c.forza < min.forza) ? c : min, manoV[0]);
+                    }
                 } else {
                     // 2. Deve rispondere a una carta
                     const semeUscita = game.tavolo[0].card.seme;
@@ -295,20 +367,37 @@ io.on('connection', (socket) => {
                     if (carteValide.length > 0) {
                         // Ha il seme richiesto! Trova la carta che al momento sta vincendo sul tavolo
                         const vincenteAttuale = game.calcolaVincitorePresa();
-
-                        // Guarda se tra le carte valide ne ha una che batte quella vincente
                         const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
 
-                        if (carteVincenti.length > 0) {
-                            // Può vincere: gioca la carta PIÙ PICCOLA necessaria per vincere (risparmiando le più forti!)
-                            cartaDaGiocare = carteVincenti.reduce((min, c) => (c.forza < min.forza) ? c : min, carteVincenti[0]);
+                        if (vuoleVincere) {
+                            // VUOLE VINCERE
+                            if (carteVincenti.length > 0) {
+                                // Può vincere: gioca la carta PIÙ PICCOLA necessaria per vincere (risparmia carichi!)
+                                cartaDaGiocare = carteVincenti.reduce((min, c) => (c.forza < min.forza) ? c : min, carteVincenti[0]);
+                            } else {
+                                // Sa di perdere la presa: gioca la sua carta più inutile di quel seme
+                                cartaDaGiocare = carteValide.reduce((min, c) => (c.forza < min.forza) ? c : min, carteValide[0]);
+                            }
                         } else {
-                            // Sa di perdere la presa: gioca la sua carta più inutile di quel seme
-                            cartaDaGiocare = carteValide.reduce((min, c) => (c.forza < min.forza) ? c : min, carteValide[0]);
+                            // VUOLE PERDERE CHIARAMENTE (Evitare di sballare)
+                            const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
+                            if (cartePerdenti.length > 0) {
+                                // Se può perdere, scarta la carta perdente PIÙ ALTA per sbarazzarsi dei pezzi grossi senza far prese!
+                                cartaDaGiocare = cartePerdenti.reduce((max, c) => (c.forza > max.forza) ? c : max, cartePerdenti[0]);
+                            } else {
+                                // Sfortunatamente è obbligato a incassare... usa la carta vincente minima.
+                                cartaDaGiocare = carteValide.reduce((min, c) => (c.forza < min.forza) ? c : min, carteValide[0]);
+                            }
                         }
                     } else {
-                        // Non ha il seme richiesto: si libera della carta più debole assoluta che ha in mano
-                        cartaDaGiocare = manoV.reduce((min, c) => (c.forza < min.forza) ? c : min, manoV[0]);
+                        // Non ha il seme richiesto (può liberarsi di ciò che vuole senza mai vincere)
+                        if (vuoleVincere) {
+                            // Si libera della carta più debole assoluta, tenendo quelle forti
+                            cartaDaGiocare = manoV.reduce((min, c) => (c.forza < min.forza) ? c : min, manoV[0]);
+                        } else {
+                            // VUOLE PERDERE: Scarica le SUE CARTE PIÙ ALTE ASSOLUTE (Assi, Re) così è sicuro che non incasserà prese dopo!
+                            cartaDaGiocare = manoV.reduce((max, c) => (c.forza > max.forza) ? c : max, manoV[0]);
+                        }
                     }
                 }
 

@@ -1,5 +1,23 @@
 const socket = io();
 let qtaAttuale = 0; // Per validazione locale
+let canPlay = true;
+
+let sessionToken = sessionStorage.getItem('lores_token');
+if (!sessionToken) {
+    sessionToken = Math.random().toString(36).substring(2, 12);
+    sessionStorage.setItem('lores_token', sessionToken);
+}
+
+socket.on('connect', () => {
+    const savedCode = sessionStorage.getItem('lores_room');
+    if (savedCode) {
+        socket.emit('riconnetti', { code: savedCode, token: sessionToken });
+    }
+});
+
+socket.on('riconnessione_fallita', () => {
+    sessionStorage.removeItem('lores_room');
+});
 
 // =========================================
 //   NUOVO RENDER GIOCATORI CIRCOLARE (MAIN.JS)
@@ -184,36 +202,43 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
         div.onclick = () => {
             // Clicchi per giocare la carta. 
             // NOTA: Usando mano.indexOf(c) peschiamo l'indice originale corretto anche se le abbiamo riordinate visivamente!
-            if (isMyTurn && fase === 'gioco') socket.emit('gioca_carta', { cartaIdx: mano.indexOf(c) });
+            if (isMyTurn && fase === 'gioco' && canPlay) {
+                canPlay = false; // Blocca click multipli istantanei
+                socket.emit('gioca_carta', { cartaIdx: mano.indexOf(c) });
+            }
         };
         handCont.appendChild(div);
     });
 }
 
 window.creaNuovaStanza = () => {
+    sessionStorage.removeItem('lores_room');
     const nome = document.getElementById('player-nickname').value.trim() || "Host";
     const num = document.getElementById('select-players').value;
-    socket.emit('crea_lobby', { nome: nome, numGiocatori: num });
+    socket.emit('crea_lobby', { nome: nome, numGiocatori: num, token: sessionToken });
 };
 
 window.uniscitiAStanza = () => {
     const nome = document.getElementById('player-nickname').value.trim() || "Giocatore";
     const code = document.getElementById('input-room-code').value.toUpperCase();
-    socket.emit('unisciti_lobby', { nome: nome, code: code });
+    socket.emit('unisciti_lobby', { nome: nome, code: code, token: sessionToken });
 };
 
 window.iniziaPartitaVera = () => socket.emit('richiesta_inizio_partita');
 
 window.inviaDichiarazione = () => {
+    if (!canPlay) return;
     const val = parseInt(document.getElementById('bet-input').value);
     if (val > qtaAttuale) {
         alert(`Non puoi dichiarare più di ${qtaAttuale}!`);
         return;
     }
+    canPlay = false; // Blocca click multipli
     socket.emit('invia_scommessa', val);
 };
 
 socket.on('lobby_creata', (d) => {
+    sessionStorage.setItem('lores_room', d.code);
     document.getElementById('setup-menu').style.display = 'none';
     document.getElementById('lobby-wait').style.display = 'block';
     document.getElementById('display-room-code').innerText = d.code;
@@ -228,6 +253,7 @@ socket.on('aggiorna_lobby', (dati) => {
 
     // Mostriamo il codice stanza all'amico e la lista aggiornata
     if (dati.code) {
+        sessionStorage.setItem('lores_room', dati.code);
         document.getElementById('display-room-code').innerText = dati.code;
         document.getElementById('lobby-info').style.display = 'block';
     }
@@ -256,6 +282,10 @@ socket.on('conferma_inizio_partita', (dati) => {
     // CHIAMIAMO LA MAGIA CIRCOLARE QUI!
     renderGiocatori(dati);
 
+    // --- MICRO-RITARDO SUI CLICK ---
+    // Ritarda la possibilità di giocare una carta non appena lo stato viene ricevuto e renderizzato, evitando carte "istantanee"
+    canPlay = false;
+    setTimeout(() => { canPlay = true; }, 500);
 });
 
 // Funzione per mostrare banner di errore a schermo
@@ -273,6 +303,7 @@ function mostraErrore(messaggio) {
 
 socket.on('errore', (m) => mostraErrore(m));
 socket.on('fine_partita', (cl) => {
+    sessionStorage.removeItem('lores_room');
     alert("🏆 CLASSIFICA FINALE:\n" + cl.map((p, i) => `${i + 1}° ${p.nome}: ${p.punti}pt`).join('\n'));
     location.reload();
 });
