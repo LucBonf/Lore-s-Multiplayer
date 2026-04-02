@@ -87,6 +87,7 @@ class LucasGame {
         this.fase = "scommesse";
         this.sommaScommesse = 0;
         this.acceptInput = true;
+        this.carteUscite = []; // MEMORIA: tiene traccia di tutte le carte giocate nel giro attuale
 
         let seq = [];
         for (let i = 2; i <= this.maxCarte; i++) seq.push(i);
@@ -109,6 +110,7 @@ class LucasGame {
         this.turnoAttuale = (this.indiceMazziere + 1) % this.players.length;
         this.sommaScommesse = 0;
         this.tavolo = [];
+        this.carteUscite = []; // Reset memoria a ogni nuova distribuzione
     }
 
     calcolaVincitorePresa() {
@@ -368,6 +370,10 @@ io.on('connection', (socket) => {
 
         const vincitore = game.calcolaVincitorePresa();
         game.players[vincitore.playerId].preseFatte++;
+        
+        // MEMORIZZAZIONE: Salviamo le carte che sono passate sul tavolo
+        game.tavolo.forEach(g => game.carteUscite.push(g.card));
+        
         game.tavolo = [];
         game.turnoAttuale = vincitore.playerId;
 
@@ -423,22 +429,25 @@ io.on('connection', (socket) => {
             const qta = game.sequenzaTurni[game.indiceGiro];
 
             if (game.fase === "scommesse") {
-                // SCOMMESSA: Conta Asso e 3 di qualsiasi seme, più le carte forti di Ori e Spade.
-                let s = p.mano.filter(c => {
-                    if (c.seme === 'Ori' && c.forza > 405) return true; // Ori medio-alti
-                    if (c.seme === 'Spade' && c.forza > 308) return true; // Spade medie
-                    if (c.valore === 'Asso' || c.valore === '3') return true; 
-                    return false;
-                }).length;
+                // SCOMMESSA AVANZATA (Power Scoring)
+                let powerScore = 0;
+                p.mano.forEach(c => {
+                    if (c.valore === 'Asso') powerScore += 90;
+                    else if (c.valore === '3') powerScore += 75;
+                    else if (['Re', 'Cavallo', 'Fante'].includes(c.valore)) powerScore += 50;
+                    else powerScore += 20;
 
-                // Modulatore per non scommettere ciecamente tutte le carte se abbiamo mano full
-                if (s > qta / 1.5 && qta > 3) s = Math.floor(s * 0.8);
-                s = Math.min(s, qta); 
+                    if (c.seme === 'Ori') powerScore += 40;
+                    if (c.seme === 'Spade') powerScore += 25;
+                });
 
-                // Vincolo mazziere per i Bot
+                let s = Math.floor(powerScore / 115); 
+                if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
+
                 if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
-                    s = (s > 0) ? s - 1 : s + 1;
+                    s = (s >= qta / 2) ? s - 1 : s + 1;
                 }
+                s = Math.max(0, Math.min(s, qta));
 
                 p.dichiarazione = s;
                 game.sommaScommesse += s;
@@ -448,63 +457,37 @@ io.on('connection', (socket) => {
                 // FASE DI GIOCO: Intelligenza Migliorata Goal-Oriented
                 const manoV = p.mano.filter(c => !c.giocata);
                 let cartaDaGiocare;
-                
-                const vuoleVincere = p.preseFatte < p.dichiarazione; // Obiettivo: continuare a vincere o provare a non fare più prese?
+                const vuoleVincere = p.preseFatte < p.dichiarazione;
 
                 if (game.tavolo.length === 0) {
-                    // 1. Il Bot lancia per primo
+                    // LEAD: Il Bot lancia per primo
                     if (vuoleVincere) {
-                        // Cerca di lanciare l'Asso più forte che ha per incassare sicuro
-                        let assi = manoV.filter(c => c.valore === 'Asso');
-                        if (assi.length > 0) {
-                            cartaDaGiocare = assi.reduce((max, c) => (c.forza > max.forza) ? c : max, assi[0]);
-                        } else {
-                            // Altrimenti lancia una "scartina" per far svuotare la mano agli avversari e testare il terreno
-                            cartaDaGiocare = manoV.reduce((min, c) => (c.forza < min.forza) ? c : min, manoV[0]);
-                        }
+                        let cartaRegnante = manoV.find(c => {
+                            const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
+                            return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
+                        });
+                        cartaDaGiocare = cartaRegnante || manoV.sort((a, b) => b.forza - a.forza)[Math.floor(manoV.length / 2)];
                     } else {
-                        // VUOLE PERDERE: Lancia la sua carta in assoluto più debole!
-                        cartaDaGiocare = manoV.reduce((min, c) => (c.forza < min.forza) ? c : min, manoV[0]);
+                        cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
                     }
                 } else {
-                    // 2. Deve rispondere a una carta
+                    // RISPOSTA: Deve seguire il seme
                     const semeUscita = game.tavolo[0].card.seme;
-                    const carteValide = manoV.filter(c => c.seme === semeUscita); // Obbligo di rispondere al seme
+                    const carteValide = manoV.filter(c => c.seme === semeUscita);
 
                     if (carteValide.length > 0) {
-                        // Ha il seme richiesto! Trova la carta che al momento sta vincendo sul tavolo
                         const vincenteAttuale = game.calcolaVincitorePresa();
                         const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
 
                         if (vuoleVincere) {
-                            // VUOLE VINCERE
-                            if (carteVincenti.length > 0) {
-                                // Può vincere: gioca la carta PIÙ PICCOLA necessaria per vincere (risparmia carichi!)
-                                cartaDaGiocare = carteVincenti.reduce((min, c) => (c.forza < min.forza) ? c : min, carteVincenti[0]);
-                            } else {
-                                // Sa di perdere la presa: gioca la sua carta più inutile di quel seme
-                                cartaDaGiocare = carteValide.reduce((min, c) => (c.forza < min.forza) ? c : min, carteValide[0]);
-                            }
+                            cartaDaGiocare = (carteVincenti.length > 0) ? carteVincenti.sort((a, b) => a.forza - b.forza)[0] : carteValide.sort((a, b) => b.forza - a.forza)[0];
                         } else {
-                            // VUOLE PERDERE CHIARAMENTE (Evitare di sballare)
                             const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
-                            if (cartePerdenti.length > 0) {
-                                // Se può perdere, scarta la carta perdente PIÙ ALTA per sbarazzarsi dei pezzi grossi senza far prese!
-                                cartaDaGiocare = cartePerdenti.reduce((max, c) => (c.forza > max.forza) ? c : max, cartePerdenti[0]);
-                            } else {
-                                // Sfortunatamente è obbligato a incassare... usa la carta vincente minima.
-                                cartaDaGiocare = carteValide.reduce((min, c) => (c.forza < min.forza) ? c : min, carteValide[0]);
-                            }
+                            cartaDaGiocare = (cartePerdenti.length > 0) ? cartePerdenti.sort((a, b) => b.forza - a.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
                         }
                     } else {
-                        // Non ha il seme richiesto (può liberarsi di ciò che vuole senza mai vincere)
-                        if (vuoleVincere) {
-                            // Si libera della carta più debole assoluta, tenendo quelle forti
-                            cartaDaGiocare = manoV.reduce((min, c) => (c.forza < min.forza) ? c : min, manoV[0]);
-                        } else {
-                            // VUOLE PERDERE: Scarica le SUE CARTE PIÙ ALTE ASSOLUTE (Assi, Re) così è sicuro che non incasserà prese dopo!
-                            cartaDaGiocare = manoV.reduce((max, c) => (c.forza > max.forza) ? c : max, manoV[0]);
-                        }
+                        // SCARTO: Non ha il seme
+                        cartaDaGiocare = vuoleVincere ? manoV.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => b.forza - a.forza)[0];
                     }
                 }
 
@@ -514,12 +497,12 @@ io.on('connection', (socket) => {
                 if (game.tavolo.length === game.numPlayers) {
                     inviaStato(code);
                     setTimeout(() => risolviPresa(code), 1400);
-                    return;
+                } else {
+                    game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
+                    inviaStato(code);
+                    gestisciIA(code);
                 }
-                game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
             }
-            inviaStato(code);
-            gestisciIA(code);
         }, 1500); // Ritardo leggermente aumentato per far capire all'umano le mosse
     }
 

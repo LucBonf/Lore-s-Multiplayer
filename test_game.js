@@ -52,6 +52,7 @@ class LucasGame {
         seq.push(1);
         this.sequenzaTurni = seq;
         this.turnoAttuale = (this.indiceMazziere + 1) % numPlayers;
+        this.carteUscite = [];
     }
 
     distribuisci() {
@@ -68,6 +69,7 @@ class LucasGame {
         this.turnoAttuale = (this.indiceMazziere + 1) % this.players.length;
         this.sommaScommesse = 0;
         this.tavolo = [];
+        this.carteUscite = [];
     }
 
     calcolaVincitorePresa() {
@@ -118,21 +120,25 @@ function runDeepSimulations() {
                 if (game.fase === "scommesse") {
                     let s = 0;
                     if (p.isSmart) {
-                        s = p.mano.filter(c => {
-                            if (c.seme === 'Ori' && c.forza > 405) return true; 
-                            if (c.seme === 'Spade' && c.forza > 308) return true; 
-                            if (c.valore === 'Asso' || c.valore === '3') return true; 
-                            return false;
-                        }).length;
-                        if (s > qta / 1.5 && qta > 3) s = Math.floor(s * 0.8);
-                        s = Math.min(s, qta); 
+                        let powerScore = 0;
+                        p.mano.forEach(c => {
+                            if (c.valore === 'Asso') powerScore += 90;
+                            else if (c.valore === '3') powerScore += 75;
+                            else if (['Re', 'Cavallo', 'Fante'].includes(c.valore)) powerScore += 50;
+                            else powerScore += 20;
+                            if (c.seme === 'Ori') powerScore += 40;
+                            if (c.seme === 'Spade') powerScore += 25;
+                        });
+                        s = Math.floor(powerScore / 115);
+                        if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
                     } else {
                         s = Math.floor(Math.random() * (qta + 1));
                     }
                     
                     if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
-                        s = (s > 0) ? s - 1 : s + 1;
+                        s = (s >= qta / 2) ? s - 1 : s + 1;
                     }
+                    s = Math.max(0, Math.min(s, qta));
                     
                     p.dichiarazione = s;
                     game.sommaScommesse += s;
@@ -145,42 +151,35 @@ function runDeepSimulations() {
                     if (!p.isSmart) {
                         if (game.tavolo.length > 0) {
                             let seme = game.tavolo[0].card.seme;
-                            let valide = manoV.filter(c=>c.seme === seme);
-                            if (valide.length > 0) cartaDaGiocare = valide[Math.floor(Math.random()*valide.length)];
-                            else cartaDaGiocare = manoV[Math.floor(Math.random()*manoV.length)];
+                            let valide = manoV.filter(c => c.seme === seme);
+                            if (valide.length > 0) cartaDaGiocare = valide[Math.floor(Math.random() * valide.length)];
+                            else cartaDaGiocare = manoV[Math.floor(Math.random() * manoV.length)];
                         } else {
                             cartaDaGiocare = manoV[Math.floor(Math.random()*manoV.length)];
                         }
                     } else {
+                        // SMART AI PLAY
                         const vuoleVincere = p.preseFatte < p.dichiarazione;
-                        
                         if (game.tavolo.length === 0) {
-                            if (vuoleVincere) {
-                                let assi = manoV.filter(c => c.valore === 'Asso');
-                                if (assi.length > 0) cartaDaGiocare = assi.reduce((max, c) => (c.forza > max.forza) ? c : max, assi[0]);
-                                else cartaDaGiocare = manoV.reduce((min, c) => (c.forza < min.forza) ? c : min, manoV[0]);
-                            } else {
-                                cartaDaGiocare = manoV.reduce((min, c) => (c.forza < min.forza) ? c : min, manoV[0]);
-                            }
+                            let cartaRegnante = manoV.find(c => {
+                                const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
+                                return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
+                            });
+                            cartaDaGiocare = cartaRegnante || manoV.sort((a, b) => b.forza - a.forza)[Math.floor(manoV.length / 2)];
                         } else {
                             const semeUscita = game.tavolo[0].card.seme;
                             const carteValide = manoV.filter(c => c.seme === semeUscita);
-                            
                             if (carteValide.length > 0) {
                                 const vincenteAttuale = game.calcolaVincitorePresa();
                                 const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
-
                                 if (vuoleVincere) {
-                                    if (carteVincenti.length > 0) cartaDaGiocare = carteVincenti.reduce((min, c) => (c.forza < min.forza) ? c : min, carteVincenti[0]);
-                                    else cartaDaGiocare = carteValide.reduce((min, c) => (c.forza < min.forza) ? c : min, carteValide[0]);
+                                    cartaDaGiocare = (carteVincenti.length > 0) ? carteVincenti.sort((a, b) => a.forza - b.forza)[0] : carteValide.sort((a, b) => b.forza - a.forza)[0];
                                 } else {
                                     const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
-                                    if (cartePerdenti.length > 0) cartaDaGiocare = cartePerdenti.reduce((max, c) => (c.forza > max.forza) ? c : max, cartePerdenti[0]);
-                                    else cartaDaGiocare = carteValide.reduce((min, c) => (c.forza < min.forza) ? c : min, carteValide[0]);
+                                    cartaDaGiocare = (cartePerdenti.length > 0) ? cartePerdenti.sort((a, b) => b.forza - a.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
                                 }
                             } else {
-                                if (vuoleVincere) cartaDaGiocare = manoV.reduce((min, c) => (c.forza < min.forza) ? c : min, manoV[0]);
-                                else cartaDaGiocare = manoV.reduce((max, c) => (c.forza > max.forza) ? c : max, manoV[0]);
+                                cartaDaGiocare = vuoleVincere ? manoV.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                             }
                         }
                     }
@@ -191,15 +190,16 @@ function runDeepSimulations() {
                     if (game.tavolo.length === game.numPlayers) {
                         const vincitore = game.calcolaVincitorePresa();
                         game.players[vincitore.playerId].preseFatte++;
+                        game.tavolo.forEach(gt => game.carteUscite.push(gt.card));
                         game.tavolo = [];
                         game.turnoAttuale = vincitore.playerId;
 
-                        if (game.players.every(p => p.mano.every(c => c.giocata))) {
-                            game.players.forEach(p => {
-                                let successo = p.preseFatte === p.dichiarazione;
-                                p.punti += p.preseFatte + (successo ? 8 : 0);
+                        if (game.players.every(pl => pl.mano.every(c => c.giocata))) {
+                            game.players.forEach(pl => {
+                                let successo = pl.preseFatte === pl.dichiarazione;
+                                pl.punti += pl.preseFatte + (successo ? 8 : 0);
                                 
-                                if (p.isSmart) {
+                                if (pl.isSmart) {
                                     smartTotali++;
                                     if (successo) smartAzzeccate++;
                                 } else {
