@@ -14,18 +14,7 @@
     <!-- Toast Banner per gli Errori -->
     <div id="error-banner"></div>
 
-    <!-- Pulsante per le regole (Sinistra) -->
-    <div style="position: absolute; top: 20px; left: 30px; z-index: 1000;">
-        <button id="btn-regole" onclick="apriRegole()"
-            style="background: #3498db; color: white; border: 2px solid white; padding: 10px 15px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s;">📜 Regole</button>
-    </div>
 
-    <!-- Pulsante per la classifica (Destra) -->
-    <div style="position: absolute; top: 20px; right: 30px; z-index: 1000;">
-        <button id="btn-leaderboard" onclick="apriClassifica()"
-            style="background: #e67e22; color: white; border: 2px solid white; padding: 10px 15px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s;">🏆
-            Classifica</button>
-    </div>
 
     <!-- Modal delle Regole -->
     <div id="modal-regole" class="modal">
@@ -80,6 +69,18 @@
         <div id="game-table" style="position: relative; display: flex; justify-content: center; align-items: center;">
 
             <h1 id="game-title">Lucas</h1>
+
+            <!-- Pulsante Regole (Dentro il layout principale per garantirne visibilità) -->
+            <div style="position: absolute; top: 25px; left: 250px; z-index: 1000;">
+                <button id="btn-regole" onclick="apriRegole()"
+                    style="background: #3498db; color: white; border: 2px solid white; padding: 8px 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s;">📜 Regole</button>
+            </div>
+
+            <!-- Pulsante Classifica -->
+            <div style="position: absolute; top: 20px; right: 20px; z-index: 1000;">
+                <button id="btn-leaderboard" onclick="apriClassifica()"
+                    style="background: #e67e22; color: white; border: 2px solid white; padding: 10px 15px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s;">🏆 Classifica</button>
+            </div>
 
             <!-- MENU DI LOGIN -->
             <div id="login-menu" style="text-align: center; width: 320px; z-index: 10;">
