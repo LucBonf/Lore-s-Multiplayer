@@ -92,7 +92,7 @@ function runDeepSimulations() {
         let randomAzzeccate = 0;
         let randomTotali = 0;
 
-        let matches = 10000;
+        let matches = 100000;
         
         for (let sim = 0; sim < matches; sim++) {
             let game = new LucasGame(num);
