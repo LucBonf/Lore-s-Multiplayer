@@ -26,12 +26,17 @@ socket.on('riconnessione_fallita', () => {
 let userProfile = null;
 
 window.eseguiLogin = () => {
-    const code = document.getElementById('login-code').value.trim();
     const nickname = document.getElementById('login-nickname').value.trim();
-    if (!code) {
-        mostraErrore("Devi inserire un codice segreto!");
+    const pin = document.getElementById('login-pin').value.trim();
+    if (!nickname) {
+        mostraErrore("Devi inserire un Nickname!");
         return;
     }
+    if (!pin || pin.length !== 4 || isNaN(pin)) {
+        mostraErrore("Devi inserire un PIN numerico di 4 cifre!");
+        return;
+    }
+    const code = nickname.toLowerCase() + "_" + pin;
     socket.emit('login', { uniqueCode: code, nickname: nickname, token: sessionToken });
 };
 
