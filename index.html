@@ -14,10 +14,16 @@
     <!-- Toast Banner per gli Errori -->
     <div id="error-banner"></div>
 
-    <!-- Pulsante per aprire le regole e la classifica -->
-    <div style="position: absolute; top: 20px; right: 30px; display: flex; gap: 10px; z-index: 1000;">
-        <button id="btn-leaderboard" onclick="apriClassifica()" style="background: #e67e22; color: white; border: 2px solid white; padding: 10px 15px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s;">🏆 Classifica</button>
+    <!-- Pulsante per le regole (Sinistra) -->
+    <div style="position: absolute; top: 20px; left: 30px; z-index: 1000;">
         <button id="btn-regole" onclick="apriRegole()">📜 Regole</button>
+    </div>
+
+    <!-- Pulsante per la classifica (Destra) -->
+    <div style="position: absolute; top: 20px; right: 30px; z-index: 1000;">
+        <button id="btn-leaderboard" onclick="apriClassifica()"
+            style="background: #e67e22; color: white; border: 2px solid white; padding: 10px 15px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s;">🏆
+            Classifica</button>
     </div>
 
     <!-- Modal delle Regole -->
