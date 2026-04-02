@@ -351,7 +351,7 @@ io.on('connection', (socket) => {
         game.tavolo.push({ playerId: pIdx, card: carta });
         if (game.tavolo.length === game.numPlayers) {
             inviaStato(code);
-            setTimeout(() => risolviPresa(code), 1200);
+            setTimeout(() => risolviPresa(code), 600);
         } else {
             game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
             
@@ -441,7 +441,15 @@ io.on('connection', (socket) => {
                     if (c.seme === 'Spade') powerScore += 15;
                 });
 
-                let s = Math.floor(powerScore / 120); 
+                // --- LOGICA CONTESTUALE (Matrix Training) ---
+                // 1. Adattamento al numero di giocatori
+                const div = (game.numPlayers <= 3) ? 120 : 150;
+                
+                // 2. Adattamento alla posizione (chi parla dopo ha più info)
+                const ordineTurno = (game.turnoAttuale - (game.indiceMazziere + 1) + game.numPlayers) % game.numPlayers;
+                const posFactor = 0.85 + (ordineTurno / game.numPlayers) * 0.3; // 0.85x per il primo, 1.15x per l'ultimo
+
+                let s = Math.floor((powerScore / div) * posFactor); 
                 if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
 
                 if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
@@ -453,6 +461,9 @@ io.on('connection', (socket) => {
                 game.sommaScommesse += s;
                 game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
                 if (game.players.every(pl => pl.dichiarazione !== "-")) game.fase = "gioco";
+                
+                inviaStato(code);
+                gestisciIA(code);
             } else {
                 // FASE DI GIOCO: Intelligenza Migliorata Goal-Oriented
                 const manoV = p.mano.filter(c => !c.giocata);
@@ -496,14 +507,14 @@ io.on('connection', (socket) => {
 
                 if (game.tavolo.length === game.numPlayers) {
                     inviaStato(code);
-                    setTimeout(() => risolviPresa(code), 1400);
+                    setTimeout(() => risolviPresa(code), 700);
                 } else {
                     game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
                     inviaStato(code);
                     gestisciIA(code);
                 }
             }
-        }, 1500); // Ritardo leggermente aumentato per far capire all'umano le mosse
+        }, 400); 
     }
 
     function inviaStato(code) {
