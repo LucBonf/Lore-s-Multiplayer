@@ -6,6 +6,16 @@ import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 dotenv.config();
+import filter from 'leo-profanity';
+
+// Inizializza il filtro con le lingue supportate
+filter.loadDictionary('en');
+filter.add(filter.list('it'));
+filter.add(filter.list('fr'));
+filter.add(filter.list('es'));
+filter.add(filter.list('de'));
+filter.add(filter.list('pt'));
+filter.add(filter.list('ru'));
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -115,6 +125,11 @@ const lobbies = {};
 io.on('connection', (socket) => {
     
     socket.on('login', async (dati) => {
+        // Controllo profanità universale
+        if (dati.nickname && filter.check(dati.nickname)) {
+            return socket.emit('login_err', 'Per favore, usa un nickname rispettoso!');
+        }
+
         if (!dbConnected) {
             // Modalità simulata in assenza di DB
             return socket.emit('login_ok', { uniqueCode: dati.uniqueCode, nickname: dati.nickname || "Player", partiteVinte: 0, punteggioTotale: 0 });

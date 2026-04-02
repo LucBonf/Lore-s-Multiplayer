@@ -160,6 +160,8 @@ function renderGiocatori(data) {
                 const fronteDiv = document.createElement('div');
                 fronteDiv.className = `card seme-${p.cartaFronte.seme} val-${p.cartaFronte.valore}`;
                 fronteDiv.style.transform = "scale(0.7)";
+                fronteDiv.style.transformOrigin = "center";
+                fronteDiv.style.margin = "10px auto"; // Spazio sopra e sotto per evitare tagli
                 oppHandCont.appendChild(fronteDiv);
             } else {
                 const carteInManoCount = p.mano ? p.mano.filter(c => !c.giocata).length : 0;

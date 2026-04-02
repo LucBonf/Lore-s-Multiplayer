@@ -309,10 +309,8 @@ button {
     justify-content: center;
     align-items: center;
     margin-top: 8px;
-    height: 55px;
-    /* Blocca l'altezza */
-    overflow: hidden;
-    /* Taglia via tutto ciò che sborda */
+    min-height: 60px;
+    /* Rimosso overflow: hidden per evitare tagli sulla carta a giro 1 */
 }
 
 /* Sposta il popup scommesse più in alto per non coprire le tue carte! */
