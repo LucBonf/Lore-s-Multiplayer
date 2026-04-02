@@ -438,10 +438,10 @@ io.on('connection', (socket) => {
                     else powerScore += 2;
 
                     if (c.seme === 'Ori') powerScore += 40;
-                    if (c.seme === 'Spade') powerScore += 25;
+                    if (c.seme === 'Spade') powerScore += 15;
                 });
 
-                let s = Math.floor(powerScore / 115); 
+                let s = Math.floor(powerScore / 120); 
                 if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
 
                 if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
