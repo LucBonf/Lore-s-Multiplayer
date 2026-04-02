@@ -119,10 +119,23 @@ io.on('connection', (socket) => {
             // Modalità simulata in assenza di DB
             return socket.emit('login_ok', { uniqueCode: dati.uniqueCode, nickname: dati.nickname || "Player", partiteVinte: 0, punteggioTotale: 0 });
         }
+
+        // --- SKIPA IL DB PER GLI OSPITI ---
+        if (dati.uniqueCode && dati.uniqueCode.startsWith("GUEST_")) {
+            return socket.emit('login_ok', { uniqueCode: dati.uniqueCode, nickname: dati.nickname, partiteVinte: 0, punteggioTotale: 0 });
+        }
+
         try {
             let user = await User.findOne({ uniqueCode: dati.uniqueCode });
             if (!user) {
-                if (!dati.nickname) return socket.emit('login_err', 'Account non trovato. Inserisci un Nickname per registrarne uno nuovo!');
+                // Check per evitare nickname duplicati (case insensitive) e proteggere i nomi originali
+                if (!dati.nickname) return socket.emit('login_err', 'Nickname mancante.');
+
+                const existingName = await User.findOne({ nickname: { $regex: new RegExp("^" + dati.nickname + "$", "i") } });
+                if (existingName) {
+                    return socket.emit('login_err', 'Questo Nickname è già in uso! Se l\'account è tuo, hai sbagliato il PIN.');
+                }
+
                 user = new User({ uniqueCode: dati.uniqueCode, nickname: dati.nickname });
                 await user.save();
             }
@@ -353,7 +366,7 @@ io.on('connection', (socket) => {
                 if (dbConnected) {
                     const vincitoreAssoluto = classificaFinale[0].punti;
                     game.players.forEach(async (p) => {
-                        if (p.isHuman && p.uniqueCode) {
+                        if (p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_")) {
                             try {
                                 let isWinner = (p.punti === vincitoreAssoluto) ? 1 : 0;
                                 await User.updateOne(
