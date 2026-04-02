@@ -432,10 +432,10 @@ io.on('connection', (socket) => {
                 // SCOMMESSA AVANZATA (Power Scoring)
                 let powerScore = 0;
                 p.mano.forEach(c => {
-                    if (c.valore === 'Asso') powerScore += 90;
-                    else if (c.valore === '3') powerScore += 75;
-                    else if (['Re', 'Cavallo', 'Fante'].includes(c.valore)) powerScore += 50;
-                    else powerScore += 20;
+                    if (c.valore === 'Asso') powerScore += 135;
+                    else if (c.valore === '3') powerScore += 115;
+                    else if (['Re', 'Cavallo', 'Fante'].includes(c.valore)) powerScore += 10;
+                    else powerScore += 2;
 
                     if (c.seme === 'Ori') powerScore += 40;
                     if (c.seme === 'Spade') powerScore += 25;
