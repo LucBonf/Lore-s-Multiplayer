@@ -370,8 +370,19 @@ function mostraErrore(messaggio) {
 socket.on('errore', (m) => mostraErrore(m));
 socket.on('fine_partita', (cl) => {
     sessionStorage.removeItem('lucas_room');
-    alert("🏆 CLASSIFICA FINALE:\n" + cl.map((p, i) => `${i + 1}° ${p.nome}: ${p.punti}pt`).join('\n'));
-    location.reload();
+    
+    // Popola la classifica della stanza nel modal
+    const listHtml = cl.map((p, i) => {
+        let pos = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : `${i + 1}°`));
+        let pts = p.punti;
+        return `<div style="display: flex; justify-content: space-between; border-bottom: 1px solid #7f8c8d; padding: 5px 0;">
+                    <span>${pos} ${p.nome}</span>
+                    <span style="color: #f1c40f; font-weight: bold;">${pts} pt</span>
+                </div>`;
+    }).join('');
+    
+    document.getElementById('endgame-list').innerHTML = listHtml;
+    document.getElementById('modal-endgame').style.display = 'block';
 });
 
 // Funzioni per l'apertura e chiusura del Regolamento
