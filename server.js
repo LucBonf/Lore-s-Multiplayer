@@ -131,9 +131,16 @@ io.on('connection', (socket) => {
                 // Check per evitare nickname duplicati (case insensitive) e proteggere i nomi originali
                 if (!dati.nickname) return socket.emit('login_err', 'Nickname mancante.');
 
+                // Blocco specifico per impedire la registrazione di "Lucas" (riservato al creatore)
+                if (dati.nickname.toLowerCase() === 'lucas') {
+                    return socket.emit('login_err', "Non puoi usare questo username: è un nome di sistema riservato!");
+                }
+
+                // Ricerca case-insensitive per impedire varianti (es: Lùca, lUcA, luca son considerati uguali dal Regex base inglese,
+                // e blocca chi tenta di rubare un nome esistente con un PIN sbagliato o una maiuscola diversa)
                 const existingName = await User.findOne({ nickname: { $regex: new RegExp("^" + dati.nickname + "$", "i") } });
                 if (existingName) {
-                    return socket.emit('login_err', 'Questo Nickname è già in uso! Se l\'account è tuo, hai sbagliato il PIN.');
+                    return socket.emit('login_err', 'Non puoi usare questo username / Hai sbagliato il PIN.');
                 }
 
                 user = new User({ uniqueCode: dati.uniqueCode, nickname: dati.nickname });
