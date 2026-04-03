@@ -21,8 +21,14 @@ socket.on('riconnessione_fallita', () => {
 
 // --- INIZIALIZZAZIONE UI ALL'AVVIO ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Se non c'è una stanza salvata, mostriamo subito il login
-    if (!sessionStorage.getItem('lucas_room')) {
+    const savedUser = localStorage.getItem('lucas_user');
+    const isRoomActive = sessionStorage.getItem('lucas_room');
+
+    if (savedUser) {
+        const user = JSON.parse(savedUser);
+        socket.emit('login', { uniqueCode: user.uniqueCode, nickname: user.nickname, token: sessionToken });
+        // Se non siamo in stanza, switchSection('setup-menu') verrà chiamato da login_ok
+    } else if (!isRoomActive) {
         switchSection('login-menu');
     }
 });
@@ -56,6 +62,8 @@ window.continuaComeOspite = () => {
 
 socket.on('login_ok', (profile) => {
     userProfile = profile;
+    // Persistenza identità
+    localStorage.setItem('lucas_user', JSON.stringify({ uniqueCode: profile.uniqueCode, nickname: profile.nickname }));
     
     // Mostriamo il menu di setup solo se non siamo già in partita
     if (!sessionStorage.getItem('lucas_room')) {
@@ -352,9 +360,8 @@ window.esciDallaPartita = () => {
     if (confirm("Vuoi davvero uscire dalla partita? Un bot prenderà il tuo posto.")) {
         sessionStorage.removeItem('lucas_room');
         socket.emit('esci_partita');
-        // Usiamo un reset manuale anziché solo reload per sicurezza immediata
-        switchSection('login-menu');
-        location.reload(); 
+        // Non facciamo reload ma torniamo al lobby setup direttamente
+        switchSection('setup-menu');
     }
 };
 

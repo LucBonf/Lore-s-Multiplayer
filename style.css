@@ -46,6 +46,25 @@ body {
     font-size: 2.2rem;
     z-index: 100;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    pointer-events: none; /* Evita che il titolo blocchi i click sotto di lui */
+}
+
+/* --- NUOVO: CONTROLLI DI TESTATA --- */
+.top-controls {
+    position: absolute;
+    z-index: 1000;
+    display: flex;
+    gap: 10px;
+}
+
+.top-controls.left {
+    top: 25px;
+    left: 200px;
+}
+
+.top-controls.right {
+    top: 20px;
+    right: 20px;
 }
 
 .card {
@@ -499,73 +518,77 @@ button {
 }
 
 /* ========================================= */
-/* RESPONSIVITÀ PER DISPOSITIVI MOBILI (ZOOM 100%) */
+/* RESPONSIVITÀ PER DISPOSITIVI MOBILI */
 /* ========================================= */
 @media (max-width: 768px) {
+    #game-table {
+        border-width: 8px;
+        padding: 10px;
+    }
+
     #game-title {
-        font-size: 1.5rem;
+        font-size: 1.2rem;
         top: 10px;
         left: 10px;
+        width: 100%;
+        text-align: center;
     }
     
-    #btn-regole {
-        padding: 5px 10px;
-        font-size: 0.9rem;
+    .top-controls.left {
+        top: 40px;
+        left: 10px;
+    }
+
+    .top-controls.right {
         top: 10px;
         right: 10px;
-        border-width: 1px;
+    }
+
+    /* Tasto ESCI su mobile */
+    #esci-container {
+        top: 40px !important;
+        right: 10px !important;
     }
 
     #info-giro {
-        margin-top: 40px !important; /* Evita sovrapposizione col titolo Lucas */
-        font-size: 1rem !important;
-        position: relative;
-        z-index: 100;
+        margin-top: 70px !important;
+        font-size: 0.9rem !important;
+    }
+
+    .top-controls button {
+        padding: 5px 8px !important;
+        font-size: 0.75rem !important;
     }
 
     #circular-table {
-        overflow: visible; /* Fondamentale per non tagliare le carte e i player fuori dal cerchio */
-        height: 70vh;
+        height: 65vh;
+        margin-top: 20px;
     }
 
     .player-block {
-        width: 110px;
-        min-width: 110px;
-        padding: 6px;
-        font-size: 0.75rem;
+        width: 90px;
+        min-width: 90px;
+        padding: 4px;
+        font-size: 0.65rem;
     }
 
-    .player-block .stats {
-        font-size: 0.7rem;
+    .card {
+        width: 60px;
+        height: 95px;
+        background-size: 720px 457px; /* Scalato proporzionalmente */
     }
 
     .player-block.me {
-        width: auto;
-        min-width: 150px;
-        max-width: 95vw;
-        bottom: 0; /* Assicura che resti ancorato bene senza uscire di sotto */
-    }
-
-    #tu-mano {
-        min-height: 100px;
-    }
-    
-    .card {
-        transform: scale(0.75); /* Rimpicciolisce globamente le carte su mobile */
-        transform-origin: top center;
+        min-width: 130px;
     }
 
     #dichiarazione-area {
-        width: 250px;
-        padding: 10px;
-        top: 45%;
+        width: 200px;
+        font-size: 0.8rem;
     }
 
-    #setup-menu {
-        width: 90% !important;
-    }
-    
-    #setup-menu input, #setup-menu select, #setup-menu button {
-        font-size: 0.95rem !important;
+    #login-menu, #setup-menu {
+        width: 95% !important;
+        transform: scale(0.9);
     }
 }

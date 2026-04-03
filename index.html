@@ -81,14 +81,13 @@
 
             <h1 id="game-title">Lucas</h1>
 
-            <!-- Pulsante Regole (Dentro il layout principale per garantirne visibilità) -->
-            <div style="position: absolute; top: 25px; left: 250px; z-index: 1000;">
+            <!-- CONTROLLI DI TESTATA (Regole e Classifica) -->
+            <div class="top-controls left">
                 <button id="btn-regole" onclick="apriRegole()"
                     style="background: #3498db; color: white; border: 2px solid white; padding: 8px 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s;">📜 Regole</button>
             </div>
 
-            <!-- Pulsante Classifica -->
-            <div style="position: absolute; top: 20px; right: 20px; z-index: 1000;">
+            <div class="top-controls right">
                 <button id="btn-leaderboard" onclick="apriClassifica()"
                     style="background: #e67e22; color: white; border: 2px solid white; padding: 10px 15px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s;">🏆 Classifica</button>
             </div>
@@ -153,9 +152,9 @@
 
             <div id="game-area" style="display: none; position: relative; width: 100%; height: 100%; z-index: 100;">
                 <!-- Pulsante ESCI (Posizione sicura in alto a destra) -->
-                <div style="position: absolute; top: 20px; right: 220px; z-index: 1000;">
+                <div id="esci-container" style="position: absolute; top: 20px; right: 140px; z-index: 1000;">
                     <button onclick="esciDallaPartita()" 
-                        style="background: #c0392b; color: white; border: 2px solid white; padding: 12px 20px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: background 0.2s;">🚪 ESCI</button>
+                        style="background: #c0392b; color: white; border: 2px solid white; padding: 10px 15px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: background 0.2s;">🚪 ESCI</button>
                 </div>
                 
                 <div id="info-giro" style="text-align:center; font-size:1.2em; font-weight:bold; margin-bottom:10px;">
