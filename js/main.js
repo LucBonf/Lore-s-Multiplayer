@@ -17,6 +17,7 @@ socket.on('connect', () => {
 
 socket.on('riconnessione_fallita', () => {
     sessionStorage.removeItem('lucas_room');
+    switchSection('setup-menu');
 });
 
 // --- INIZIALIZZAZIONE UI ALL'AVVIO ---
@@ -27,10 +28,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedUser) {
         const user = JSON.parse(savedUser);
         socket.emit('login', { uniqueCode: user.uniqueCode, nickname: user.nickname, token: sessionToken });
-        // Se non siamo in stanza, switchSection('setup-menu') verrà chiamato da login_ok
-    } else if (!isRoomActive) {
+    } else {
+        // Se non abbiamo un utente salvato, mostriamo subito il login
         switchSection('login-menu');
     }
+
+    // --- SICUREZZA TOTALE: SE DOPO 3 SECONDI IL TAVOLO È ANCORA VUOTO, MOSTRA QUALCOSA ---
+    setTimeout(() => {
+        const ga = document.getElementById('game-area').style.display;
+        const lw = document.getElementById('lobby-wait').style.display;
+        const sm = document.getElementById('setup-menu').style.display;
+        const lm = document.getElementById('login-menu').style.display;
+
+        if (ga === 'none' && lw === 'none' && sm === 'none' && lm === 'none') {
+            console.log("Stato vuoto rilevato, forzo il login/setup...");
+            if (savedUser) {
+                switchSection('setup-menu');
+            } else {
+                switchSection('login-menu');
+            }
+        }
+    }, 3000);
 });
 
 // =========================================
