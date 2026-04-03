@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lucas</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=1.1">
     <script src="/socket.io/socket.io.js"></script>
-    <script src="js/main.js" type="module" defer></script>
+    <script src="js/main.js?v=1.1" type="module" defer></script>
 </head>
 
 <body>
@@ -93,8 +93,8 @@
                     style="background: #e67e22; color: white; border: 2px solid white; padding: 10px 15px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s;">🏆 Classifica</button>
             </div>
 
-            <!-- MENU DI LOGIN -->
-            <div id="login-menu" style="text-align: center; width: 320px; z-index: 10;">
+            <!-- MENU DI LOGIN (Nascosto di default) -->
+            <div id="login-menu" style="display: none; text-align: center; width: 320px; z-index: 100;">
                 <h2 style="color: #f1c40f; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); margin-bottom: 20px;">Accesso Account</h2>
                 <input type="text" id="login-nickname" placeholder="Il tuo Nickname..."
                     style="width: 90%; padding: 10px; margin-bottom: 10px; text-align: center; font-size: 1.1rem; border-radius: 5px; border: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
@@ -151,11 +151,11 @@
                     PARTITA</button>
             </div>
 
-            <div id="game-area" style="display: none; position: relative; width: 100%; height: 100%;">
-                <!-- Pulsante ESCI (Nuovo) -->
-                <div style="position: absolute; top: 10px; left: 10px; z-index: 1000;">
+            <div id="game-area" style="display: none; position: relative; width: 100%; height: 100%; z-index: 100;">
+                <!-- Pulsante ESCI (Posizione sicura in alto a destra) -->
+                <div style="position: absolute; top: 20px; right: 220px; z-index: 1000;">
                     <button onclick="esciDallaPartita()" 
-                        style="background: #c0392b; color: white; border: 1px solid white; padding: 6px 12px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">🚪 ESCI</button>
+                        style="background: #c0392b; color: white; border: 2px solid white; padding: 12px 20px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: background 0.2s;">🚪 ESCI</button>
                 </div>
                 
                 <div id="info-giro" style="text-align:center; font-size:1.2em; font-weight:bold; margin-bottom:10px;">

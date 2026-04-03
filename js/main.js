@@ -19,15 +19,13 @@ socket.on('riconnessione_fallita', () => {
     sessionStorage.removeItem('lucas_room');
 });
 
-// --- NOVITTÀ: Gestione Centralizzata delle Sezioni ---
-function switchSection(activeId) {
-    const sections = ['login-menu', 'setup-menu', 'lobby-wait', 'game-area', 'classifica-finale-container'];
-    sections.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = (id === activeId) ? 'block' : 'none';
-    });
-}
-window.switchSection = switchSection;
+// --- INIZIALIZZAZIONE UI ALL'AVVIO ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Se non c'è una stanza salvata, mostriamo subito il login
+    if (!sessionStorage.getItem('lucas_room')) {
+        switchSection('login-menu');
+    }
+});
 
 // =========================================
 //   LOGICA LOGIN E CLASSIFICA
@@ -59,18 +57,19 @@ window.continuaComeOspite = () => {
 socket.on('login_ok', (profile) => {
     userProfile = profile;
     
-    // --- FIX REFRESH: Se ho una stanza salvata, non mostro il menu di setup ---
+    // Mostriamo il menu di setup solo se non siamo già in partita
     if (!sessionStorage.getItem('lucas_room')) {
         switchSection('setup-menu');
-    } else {
-        document.getElementById('login-menu').style.display = 'none';
     }
 
     // Mostriamo i dati dell'utente nel menu setup
-    document.getElementById('welcome-message').innerHTML = `
-        Benvenuto, ${profile.nickname}! 
-        <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">Partite Vinte: ${profile.partiteVinte} | Punti: ${profile.punteggioTotale}</div>
-    `;
+    const welcome = document.getElementById('welcome-message');
+    if (welcome) {
+        welcome.innerHTML = `
+            Benvenuto, ${profile.nickname}! 
+            <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">Partite Vinte: ${profile.partiteVinte} | Punti: ${profile.punteggioTotale}</div>
+        `;
+    }
 });
 
 socket.on('login_err', (msg) => {
@@ -353,8 +352,18 @@ window.esciDallaPartita = () => {
     if (confirm("Vuoi davvero uscire dalla partita? Un bot prenderà il tuo posto.")) {
         sessionStorage.removeItem('lucas_room');
         socket.emit('esci_partita');
-        location.reload(); // Riavvia per tornare alla home pulita
+        // Usiamo un reset manuale anziché solo reload per sicurezza immediata
+        switchSection('login-menu');
+        location.reload(); 
     }
+};
+
+window.apriRegole = () => {
+    document.getElementById('modal-regole').style.display = 'block';
+};
+
+window.chiudiRegole = () => {
+    document.getElementById('modal-regole').style.display = 'none';
 };
 
 socket.on('lobby_creata', (d) => {
