@@ -243,6 +243,12 @@ io.on('connection', (socket) => {
 
     socket.on('esci_partita', () => {
         const code = socket.roomCode;
+        if (!code) return;
+
+        // --- FIX: Lasciamo la stanza subito per non ricevere l'aggiornamento di stato successivo ---
+        socket.leave(code);
+        socket.roomCode = null;
+
         const lobby = lobbies[code];
         if (lobby) {
             // Rimuovi dalla lobby (lista d'attesa)
@@ -265,8 +271,6 @@ io.on('connection', (socket) => {
                 io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
             }
         }
-        socket.leave(code);
-        socket.roomCode = null;
     });
 
     socket.on('disconnect', () => {
