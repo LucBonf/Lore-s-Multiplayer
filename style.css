@@ -537,6 +537,16 @@ button {
     .top-controls.left {
         top: 40px;
         left: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    #btn-regole {
+        position: static !important;
+        right: auto !important;
+        top: auto !important;
+        transform: none !important;
     }
 
     .top-controls.right {
@@ -572,14 +582,16 @@ button {
         font-size: 0.65rem;
     }
 
+    /* Le carte su mobile vengono scalate uniformemente per non perdere l'allineamento dei disegni */
     .card {
-        width: 60px;
-        height: 95px;
-        background-size: 720px 457px; /* Scalato proporzionalmente */
+        transform: scale(0.75);
+        transform-origin: center;
+        margin: -10px -5px !important; /* Compensa la scala per non lasciare troppi spazi vuoti */
     }
 
     .player-block.me {
         min-width: 130px;
+        padding-bottom: 25px; /* Spazio per le carte scalate */
     }
 
     #dichiarazione-area {
