@@ -19,6 +19,16 @@ socket.on('riconnessione_fallita', () => {
     sessionStorage.removeItem('lucas_room');
 });
 
+// --- NOVITTÀ: Gestione Centralizzata delle Sezioni ---
+function switchSection(activeId) {
+    const sections = ['login-menu', 'setup-menu', 'lobby-wait', 'game-area', 'classifica-finale-container'];
+    sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = (id === activeId) ? 'block' : 'none';
+    });
+}
+window.switchSection = switchSection;
+
 // =========================================
 //   LOGICA LOGIN E CLASSIFICA
 // =========================================
@@ -48,11 +58,12 @@ window.continuaComeOspite = () => {
 
 socket.on('login_ok', (profile) => {
     userProfile = profile;
-    document.getElementById('login-menu').style.display = 'none';
     
     // --- FIX REFRESH: Se ho una stanza salvata, non mostro il menu di setup ---
     if (!sessionStorage.getItem('lucas_room')) {
-        document.getElementById('setup-menu').style.display = 'block';
+        switchSection('setup-menu');
+    } else {
+        document.getElementById('login-menu').style.display = 'none';
     }
 
     // Mostriamo i dati dell'utente nel menu setup
@@ -348,8 +359,7 @@ window.esciDallaPartita = () => {
 
 socket.on('lobby_creata', (d) => {
     sessionStorage.setItem('lucas_room', d.code);
-    document.getElementById('setup-menu').style.display = 'none';
-    document.getElementById('lobby-wait').style.display = 'block';
+    switchSection('lobby-wait');
     document.getElementById('display-room-code').innerText = d.code;
     document.getElementById('lobby-info').style.display = 'block';
     document.getElementById('start-game-btn').style.display = 'block';
@@ -357,8 +367,7 @@ socket.on('lobby_creata', (d) => {
 });
 
 socket.on('aggiorna_lobby', (dati) => {
-    document.getElementById('setup-menu').style.display = 'none';
-    document.getElementById('lobby-wait').style.display = 'block';
+    switchSection('lobby-wait');
 
     // Mostriamo il codice stanza all'amico e la lista aggiornata
     if (dati.code) {
@@ -372,9 +381,7 @@ socket.on('aggiorna_lobby', (dati) => {
 
 socket.on('conferma_inizio_partita', (dati) => {
     qtaAttuale = dati.qtaCarte;
-    document.getElementById('setup-menu').style.display = 'none';
-    document.getElementById('lobby-wait').style.display = 'none';
-    document.getElementById('game-area').style.display = 'block';
+    switchSection('game-area');
 
     const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
     const eMioTurno = (pAttuale.socketId === socket.id);
