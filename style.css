@@ -584,14 +584,15 @@ button {
 
     /* Le carte su mobile vengono scalate uniformemente per non perdere l'allineamento dei disegni */
     .card {
-        transform: scale(0.75);
+        transform: scale(0.5);
         transform-origin: center;
-        margin: -10px -5px !important; /* Compensa la scala per non lasciare troppi spazi vuoti */
+        margin: -25px -15px !important; /* Compensa la scala per compattare la mano */
     }
 
     .player-block.me {
-        min-width: 130px;
-        padding-bottom: 25px; /* Spazio per le carte scalate */
+        min-width: 120px;
+        padding-bottom: 35px; /* Spazio per le carte scalate */
+        padding-top: 10px;
     }
 
     #dichiarazione-area {
