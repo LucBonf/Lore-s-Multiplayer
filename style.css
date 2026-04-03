@@ -269,16 +269,26 @@ button {
 }
 
 /* --- NUOVE ANIMAZIONI IA CONTESTUALE --- */
+/* --- ANIMAZIONE CARTA VINCENTE (AURA D'ORO) --- */
 .card-winning {
-    box-shadow: 0 0 15px 5px #f1c40f !important;
-    border: 2px solid #f1c40f !important;
     z-index: 1000 !important;
-    animation: winning-pulse 1s infinite alternate;
+    /* Usiamo filter drop-shadow per un'aura che segue i bordi della carta */
+    filter: drop-shadow(0 0 10px rgba(241, 196, 15, 0.8)) drop-shadow(0 0 20px rgba(241, 196, 15, 0.4));
+    box-shadow: 0 0 30px rgba(241, 196, 15, 0.6) !important;
+    border: 3px solid #f1c40f !important;
+    animation: winning-glow 1.5s infinite alternate ease-in-out;
+    transition: all 0.3s ease;
 }
 
-@keyframes winning-pulse {
-    from { transform: translate(-50%, -50%) scale(1.1) rotate(0deg); }
-    to { transform: translate(-50%, -50%) scale(1.15) rotate(2deg); }
+@keyframes winning-glow {
+    from {
+        filter: drop-shadow(0 0 8px rgba(241, 196, 15, 0.7)) drop-shadow(0 0 15px rgba(241, 196, 15, 0.3));
+        box-shadow: 0 0 25px rgba(241, 196, 15, 0.5) !important;
+    }
+    to {
+        filter: drop-shadow(0 0 15px rgba(241, 196, 15, 0.9)) drop-shadow(0 0 30px rgba(241, 196, 15, 0.5));
+        box-shadow: 0 0 45px rgba(241, 196, 15, 0.8) !important;
+    }
 }
 
 .winner-badge {
@@ -406,12 +416,6 @@ button {
     box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.6);
 }
 
-/* Adattamenti per carte più piccole quando necessario */
-.small-card {
-    width: 60px;
-    height: 90px;
-    font-size: 1.2rem;
-}
 
 /* ILLUMINA IL BOX DEL TURNO ATTUALE */
 .player-block.active-turn {
