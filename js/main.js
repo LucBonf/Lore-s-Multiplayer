@@ -31,10 +31,14 @@ function switchSection(activeId) {
             }
         });
 
-        // Toggle della visibilità del tasto Classifica (Nascosto solo durante il gioco)
+        // Toggle della visibilità dei tasti in alto a destra (Swap Classifica / ESCI)
         const btnLeaderboard = document.getElementById('btn-leaderboard');
-        if (btnLeaderboard) {
-            btnLeaderboard.style.display = (activeId === 'game-area') ? 'none' : 'block';
+        const btnEsci = document.getElementById('btn-esci-principale');
+        
+        if (btnLeaderboard && btnEsci) {
+            const isGame = (activeId === 'game-area');
+            btnLeaderboard.style.display = isGame ? 'none' : 'inline-block';
+            btnEsci.style.display = isGame ? 'inline-block' : 'none';
         }
     } catch (e) {
         console.error("Errore in switchSection:", e);
