@@ -30,6 +30,12 @@ function switchSection(activeId) {
                 el.style.display = (id === activeId) ? 'block' : 'none';
             }
         });
+
+        // Toggle della visibilità del tasto Classifica (Nascosto solo durante il gioco)
+        const btnLeaderboard = document.getElementById('btn-leaderboard');
+        if (btnLeaderboard) {
+            btnLeaderboard.style.display = (activeId === 'game-area') ? 'none' : 'block';
+        }
     } catch (e) {
         console.error("Errore in switchSection:", e);
     }
