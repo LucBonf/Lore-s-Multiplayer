@@ -582,11 +582,9 @@ button {
         font-size: 0.65rem;
     }
 
-    /* Le carte su mobile vengono scalate uniformemente per non perdere l'allineamento dei disegni */
+    /* Le carte su mobile hanno una scala base gestita via JS */
     .card {
-        transform: scale(0.5);
         transform-origin: center;
-        margin: -25px -15px !important; /* Compensa la scala per compattare la mano */
     }
 
     .player-block.me {

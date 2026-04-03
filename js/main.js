@@ -171,15 +171,17 @@ function renderGiocatori(data) {
     const raggioCarteX = 20;
     const raggioCarteY = 20;
 
-    // RIPRISTINIAMO LE SCALE DINAMICHE PER IL TAVOLO CENTRALE
-    let scalaPlayerBlock = 1;
-    let scalaTableCard = 0.8;
+    // SCALE DINAMICHE: Rimpiccioliamo le carte se ci sono tanti giocatori
+    const isMobile = window.innerWidth <= 768;
+    let scalaPlayerBlock = isMobile ? 1 : 1; 
+    let scalaTableCard = isMobile ? 0.4 : 0.8; // Su mobile le carte al centro devono essere molto piccole
+
     if (numPlayers >= 7) {
-        scalaPlayerBlock = 0.7;
-        scalaTableCard = 0.55; // Carte sul tavolo piccolissime per fare spazio!
+        scalaPlayerBlock = isMobile ? 0.65 : 0.7;
+        scalaTableCard = isMobile ? 0.3 : 0.55;
     } else if (numPlayers >= 5) {
-        scalaPlayerBlock = 0.8;
-        scalaTableCard = 0.7;
+        scalaPlayerBlock = isMobile ? 0.75 : 0.8;
+        scalaTableCard = isMobile ? 0.35 : 0.7;
     }
 
     const posizioniCarteTavoloPerGiocatore = new Map();
@@ -325,18 +327,34 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
 
     const numCarte = carteDaDisegnare.length;
 
+    // --- 1. NOVITÀ: SCALA DINAMICA IN BASE AL NUMERO DI CARTE ---
+    // Più carte hai, più diventano piccole (minimo 0.6 su desktop, 0.35 su mobile)
+    const isMobile = window.innerWidth <= 768;
+    const baseScale = isMobile ? 0.5 : 1.0;
+    
+    // Se hai più di 5 carte, iniziamo a rimpicciolirle
+    let dynamicScale = baseScale;
+    if (numCarte > 5) {
+        // Riduciamo di un 5% per ogni carta oltre la quinta
+        dynamicScale = baseScale * Math.max(0.65, 1 - (numCarte - 5) * 0.06);
+    }
+
     // MATEMATICA: Più carte hai, più si incastrano per non uscire dallo schermo!
     let marginLeft = 0;
     if (numCarte > 10) {
-        marginLeft = -50;
+        marginLeft = isMobile ? -35 : -50;
     } else if (numCarte > 7) {
-        marginLeft = -35;
+        marginLeft = isMobile ? -25 : -35;
     } else if (numCarte > 4) {
-        marginLeft = -15;
+        marginLeft = isMobile ? -15 : -15;
     }
 
+    // Applichiamo la scala e il margine dinamico
     carteDaDisegnare.forEach((c, idx) => {
         const div = document.createElement('div');
+        div.style.transform = `scale(${dynamicScale})`;
+        div.style.transformOrigin = "center";
+        if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
 
         // --- 2. NOVITÀ: FIX ASSO DI COPPE E DORSO CON IMMAGINE ---
         // Se il server ci ha nascosto la carta (Giro Fronte da 1)
