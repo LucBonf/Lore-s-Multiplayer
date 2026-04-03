@@ -49,8 +49,12 @@ window.continuaComeOspite = () => {
 socket.on('login_ok', (profile) => {
     userProfile = profile;
     document.getElementById('login-menu').style.display = 'none';
-    document.getElementById('setup-menu').style.display = 'block';
     
+    // --- FIX REFRESH: Se ho una stanza salvata, non mostro il menu di setup ---
+    if (!sessionStorage.getItem('lucas_room')) {
+        document.getElementById('setup-menu').style.display = 'block';
+    }
+
     // Mostriamo i dati dell'utente nel menu setup
     document.getElementById('welcome-message').innerHTML = `
         Benvenuto, ${profile.nickname}! 
@@ -332,6 +336,14 @@ window.inviaDichiarazione = () => {
     }
     canPlay = false; // Blocca click multipli
     socket.emit('invia_scommessa', val);
+};
+
+window.esciDallaPartita = () => {
+    if (confirm("Vuoi davvero uscire dalla partita? Un bot prenderà il tuo posto.")) {
+        sessionStorage.removeItem('lucas_room');
+        socket.emit('esci_partita');
+        location.reload(); // Riavvia per tornare alla home pulita
+    }
 };
 
 socket.on('lobby_creata', (d) => {

@@ -241,6 +241,34 @@ io.on('connection', (socket) => {
         if (code) avviaPartita(code);
     });
 
+    socket.on('esci_partita', () => {
+        const code = socket.roomCode;
+        const lobby = lobbies[code];
+        if (lobby) {
+            // Rimuovi dalla lobby (lista d'attesa)
+            const idx = lobby.giocatori.findIndex(p => p.id === socket.id);
+            if (idx !== -1) lobby.giocatori.splice(idx, 1);
+
+            // Gestione del subentro IA se il gioco è in corso
+            if (lobby.gameInstance) {
+                const game = lobby.gameInstance;
+                const p = game.players.find(pl => pl.id === socket.id);
+                if (p) {
+                    p.isHuman = false;
+                    p.id = null; // Stacca il socketId
+                    p.nome += " (Bot)";
+                    inviaStato(code);
+                    gestisciIA(code);
+                }
+            } else {
+                // Se era ancora in lobby, aggiorna gli altri
+                io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
+            }
+        }
+        socket.leave(code);
+        socket.roomCode = null;
+    });
+
     socket.on('disconnect', () => {
         console.log(`Giocatore disconnesso: ${socket.id}`);
 
