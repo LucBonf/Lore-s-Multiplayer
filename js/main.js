@@ -421,13 +421,11 @@ window.inviaDichiarazione = () => {
 };
 
 window.esciDallaPartita = () => {
-    console.log("Tentativo di uscita dalla partita...");
-    if (confirm("Vuoi davvero uscire dalla partita? Un bot prenderà il tuo posto.")) {
-        sessionStorage.removeItem('lucas_room');
-        socket.emit('esci_partita');
-        // Torniamo alla schermata di setup
-        window.switchSection('setup-menu');
-    }
+    console.log("Uscita dalla partita (Fast Exit)...");
+    sessionStorage.removeItem('lucas_room');
+    socket.emit('esci_partita');
+    // Torniamo alla schermata di setup
+    window.switchSection('setup-menu');
 };
 
 window.apriRegole = () => {
