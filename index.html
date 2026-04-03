@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lucas</title>
-    <link rel="stylesheet" href="style.css?v=1.2">
+    <link rel="stylesheet" href="style.css?v=2.0">
     <script src="/socket.io/socket.io.js"></script>
-    <script src="js/main.js?v=1.2" type="module" defer></script>
+    <script src="js/main.js?v=2.0" type="module" defer></script>
 </head>
 
 <body>
@@ -93,7 +93,7 @@
             </div>
 
             <!-- MENU DI LOGIN (Nascosto di default) -->
-            <div id="login-menu" style="display: none; text-align: center; width: 320px; z-index: 100;">
+            <div id="login-menu" style="display: none; text-align: center; width: 320px; z-index: 2500;">
                 <h2 style="color: #f1c40f; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); margin-bottom: 20px;">Accesso Account</h2>
                 <input type="text" id="login-nickname" placeholder="Il tuo Nickname..."
                     style="width: 90%; padding: 10px; margin-bottom: 10px; text-align: center; font-size: 1.1rem; border-radius: 5px; border: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
@@ -106,7 +106,7 @@
             </div>
 
             <!-- MENU DI STANZA (Nascosto finché non fai login) -->
-            <div id="setup-menu" style="display: none; text-align: center; width: 320px; z-index: 2000;">
+            <div id="setup-menu" style="display: none; text-align: center; width: 320px; z-index: 2500;">
                 <div id="welcome-message" style="color: #f1c40f; font-size: 1.3rem; font-weight: bold; margin-bottom: 20px; text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">Benvenuto!</div>
                 
                 <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">

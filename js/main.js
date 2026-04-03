@@ -20,35 +20,58 @@ socket.on('riconnessione_fallita', () => {
     switchSection('setup-menu');
 });
 
+// --- NOVITÀ: Gestione Centralizzata delle Sezioni (Resiliente) ---
+function switchSection(activeId) {
+    try {
+        const sections = ['login-menu', 'setup-menu', 'lobby-wait', 'game-area', 'classifica-finale-container'];
+        sections.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.display = (id === activeId) ? 'block' : 'none';
+            }
+        });
+    } catch (e) {
+        console.error("Errore in switchSection:", e);
+    }
+}
+window.switchSection = switchSection;
+
 // --- INIZIALIZZAZIONE UI ALL'AVVIO ---
 document.addEventListener('DOMContentLoaded', () => {
-    const savedUser = localStorage.getItem('lucas_user');
-    const isRoomActive = sessionStorage.getItem('lucas_room');
+    try {
+        const savedUser = localStorage.getItem('lucas_user');
+        const isRoomActive = sessionStorage.getItem('lucas_room');
 
-    if (savedUser) {
-        const user = JSON.parse(savedUser);
-        socket.emit('login', { uniqueCode: user.uniqueCode, nickname: user.nickname, token: sessionToken });
-    } else {
-        // Se non abbiamo un utente salvato, mostriamo subito il login
+        if (savedUser) {
+            const user = JSON.parse(savedUser);
+            socket.emit('login', { uniqueCode: user.uniqueCode, nickname: user.nickname, token: sessionToken });
+        } else {
+            // Se non abbiamo un utente salvato, mostriamo subito il login
+            switchSection('login-menu');
+        }
+
+        // --- SICUREZZA TOTALE (SELF-HEALING): SE DOPO 3 SECONDI IL TAVOLO È ANCORA VUOTO, FORZA ---
+        setTimeout(() => {
+            const sections = ['game-area', 'lobby-wait', 'setup-menu', 'login-menu'];
+            const isAnythingVisible = sections.some(id => {
+                const el = document.getElementById(id);
+                return el && el.style.display !== 'none';
+            });
+
+            if (!isAnythingVisible) {
+                console.warn("Rilevato stato 'Empty Table'. Tentativo di ripristino UI...");
+                if (savedUser) {
+                    switchSection('setup-menu');
+                } else {
+                    switchSection('login-menu');
+                }
+            }
+        }, 3000);
+    } catch (err) {
+        console.error("Errore fatale in inizializzazione:", err);
+        // Fallback estremo: prova a mostrare il login
         switchSection('login-menu');
     }
-
-    // --- SICUREZZA TOTALE: SE DOPO 3 SECONDI IL TAVOLO È ANCORA VUOTO, MOSTRA QUALCOSA ---
-    setTimeout(() => {
-        const ga = document.getElementById('game-area').style.display;
-        const lw = document.getElementById('lobby-wait').style.display;
-        const sm = document.getElementById('setup-menu').style.display;
-        const lm = document.getElementById('login-menu').style.display;
-
-        if (ga === 'none' && lw === 'none' && sm === 'none' && lm === 'none') {
-            console.log("Stato vuoto rilevato, forzo il login/setup...");
-            if (savedUser) {
-                switchSection('setup-menu');
-            } else {
-                switchSection('login-menu');
-            }
-        }
-    }, 3000);
 });
 
 // =========================================
