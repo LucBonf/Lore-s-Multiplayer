@@ -249,6 +249,37 @@ button {
     align-items: center;
 }
 
+/* --- NUOVE ANIMAZIONI IA CONTESTUALE --- */
+.card-winning {
+    box-shadow: 0 0 15px 5px #f1c40f !important;
+    border: 2px solid #f1c40f !important;
+    z-index: 1000 !important;
+    animation: winning-pulse 1s infinite alternate;
+}
+
+@keyframes winning-pulse {
+    from { transform: translate(-50%, -50%) scale(1.1) rotate(0deg); }
+    to { transform: translate(-50%, -50%) scale(1.15) rotate(2deg); }
+}
+
+.winner-badge {
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 2.5rem;
+    z-index: 2000;
+    animation: bounce-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none;
+    text-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+@keyframes bounce-in {
+    0% { transform: translateX(-50%) scale(0); opacity: 0; }
+    60% { transform: translateX(-50%) scale(1.3); opacity: 1; }
+    100% { transform: translateX(-50%) scale(1); }
+}
+
 /* Le carte sul tavolo centrale */
 #cards-on-table .card {
     position: absolute;

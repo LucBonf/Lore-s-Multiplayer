@@ -134,6 +134,7 @@ function renderGiocatori(data) {
 
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
+        pBlock.setAttribute('data-player-id', serverPlayerIndex);
         if (isMe) pBlock.classList.add('me');
         if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
         pBlock.style.left = `${posX}%`;
@@ -189,6 +190,10 @@ function renderGiocatori(data) {
         posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
     }
 
+    // --- NOVITÀ: Identifichiamo la carta vincente attuale sul tavolo ---
+    let maxForza = -1;
+    let winnerCardDiv = null;
+
     data.tavolo.forEach((giocata, index) => {
         const c = giocata.card;
         const pId = giocata.playerId;
@@ -202,13 +207,37 @@ function renderGiocatori(data) {
             divCartaTavolo.style.zIndex = 100 + index;
 
             const randRot = (Math.random() * 14) - 7;
-            // Usiamo la scala dinamica per le carte giocate!
             divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${randRot}deg)`;
+
+            // Cerchiamo la carta più forte
+            if (c.forza > maxForza) {
+                maxForza = c.forza;
+                winnerCardDiv = divCartaTavolo;
+            }
 
             cardsOnTable.appendChild(divCartaTavolo);
         }
     });
+
+    // Applichiamo l'evidenziazione alla carta vincente
+    if (winnerCardDiv) {
+        winnerCardDiv.classList.add('card-winning');
+    }
 }
+
+// --- NOVITÀ: Animazione Vincitore Presa ---
+socket.on('vincitore_presa', ({ playerId }) => {
+    const playerBlock = document.querySelector(`.player-block[data-player-id="${playerId}"]`);
+    if (playerBlock) {
+        const badge = document.createElement('div');
+        badge.className = 'winner-badge';
+        badge.innerText = '🏆';
+        playerBlock.appendChild(badge);
+        
+        // Rimuoviamo dopo 2 secondi (poco dopo la pulizia del tavolo)
+        setTimeout(() => badge.remove(), 2000);
+    }
+});
 
 function getSemeSimbolo(seme) {
     switch (seme) {

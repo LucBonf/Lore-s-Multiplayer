@@ -351,7 +351,7 @@ io.on('connection', (socket) => {
         game.tavolo.push({ playerId: pIdx, card: carta });
         if (game.tavolo.length === game.numPlayers) {
             inviaStato(code);
-            setTimeout(() => risolviPresa(code), 600);
+            setTimeout(() => risolviPresa(code), 1500);
         } else {
             game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
             
@@ -371,6 +371,9 @@ io.on('connection', (socket) => {
         const vincitore = game.calcolaVincitorePresa();
         game.players[vincitore.playerId].preseFatte++;
         
+        // --- NOVITÀ: Notifica al client chi ha vinto la presa prima di pulire il tavolo ---
+        io.to(code).emit('vincitore_presa', { playerId: vincitore.playerId });
+
         // MEMORIZZAZIONE: Salviamo le carte che sono passate sul tavolo
         game.tavolo.forEach(g => game.carteUscite.push(g.card));
         
@@ -507,14 +510,14 @@ io.on('connection', (socket) => {
 
                 if (game.tavolo.length === game.numPlayers) {
                     inviaStato(code);
-                    setTimeout(() => risolviPresa(code), 700);
+                    setTimeout(() => risolviPresa(code), 1500);
                 } else {
                     game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
                     inviaStato(code);
                     gestisciIA(code);
                 }
             }
-        }, 400); 
+        }, 1200); 
     }
 
     function inviaStato(code) {
