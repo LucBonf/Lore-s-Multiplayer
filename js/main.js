@@ -225,9 +225,14 @@ function renderGiocatori(data) {
             if (data.qtaCarte === 1 && p.cartaFronte) {
                 const fronteDiv = document.createElement('div');
                 fronteDiv.className = `card seme-${p.cartaFronte.seme} val-${p.cartaFronte.valore}`;
-                fronteDiv.style.transform = "scale(0.7)";
+                
+                // Scala ridotta se siamo su mobile, altrimenti la versione desktop
+                const isMobile = window.innerWidth <= 768;
+                const scaleValue = isMobile ? 0.4 : 0.7;
+                
+                fronteDiv.style.transform = `scale(${scaleValue})`;
                 fronteDiv.style.transformOrigin = "center";
-                fronteDiv.style.margin = "10px auto"; // Spazio sopra e sotto per evitare tagli
+                fronteDiv.style.margin = isMobile ? "-20px auto" : "10px auto"; // Spazio sopra e sotto ridotto su mobile
                 oppHandCont.appendChild(fronteDiv);
             } else {
                 const carteInManoCount = p.mano ? p.mano.filter(c => !c.giocata).length : 0;
