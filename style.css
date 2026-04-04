@@ -1,12 +1,13 @@
 body {
-    background-color: #0f0f0f;
-    font-family: 'Segoe UI', sans-serif;
+    background-color: #0d0d0d;
+    font-family: 'Outfit', 'Segoe UI', sans-serif;
     margin: 0;
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
     overflow: hidden;
+    color: #f5f5f5;
 }
 
 #game-container {
@@ -19,10 +20,10 @@ body {
 /* IL TAVOLO VERDE RIPRISTINATO E CENTRATO */
 #game-table {
     flex-grow: 1;
-    background: #1b5e20; /* verde panno classico */
-    border: 20px solid #1a1a1a; /* bordo nero simulazione pelle/pad */
+    background: radial-gradient(circle at center, #2e7d32 0%, #1b5e20 70%, #0d3810 100%);
+    border: 20px solid #1a1a1a;
     border-radius: 40px;
-    box-shadow: inset 0 0 40px rgba(0,0,0,0.8), 0 15px 30px rgba(0,0,0,0.6);
+    box-shadow: inset 0 0 100px rgba(0,0,0,0.6), 0 20px 40px rgba(0,0,0,0.7);
     padding: 20px;
     color: white;
     text-align: center;
@@ -30,11 +31,12 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 #game-table.your-turn {
-    border-color: #f1c40f;
-    box-shadow: inset 0 0 50px rgba(241, 196, 15, 0.3);
+    border-color: rgba(241, 196, 15, 0.6);
+    box-shadow: inset 0 0 80px rgba(241, 196, 15, 0.2), 0 20px 40px rgba(0,0,0,0.7);
 }
 
 #game-title {
@@ -405,16 +407,23 @@ button {
 /* Sposta il popup scommesse più in alto per non coprire le tue carte! */
 #dichiarazione-area {
     background: rgba(255, 255, 255, 0.9);
-    padding: 15px;
-    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 20px;
+    border-radius: 12px;
     position: absolute;
     top: 40%;
-    /* Prima era 60%, ecco perché copriva le tue carte! */
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 100;
     text-align: center;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popIn {
+    0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
 
 /* Stile Carta Visibile standard (Corretto per non cancellare l'immagine) */
@@ -449,13 +458,20 @@ button {
 /* ILLUMINA IL BOX DEL TURNO ATTUALE */
 .player-block.active-turn {
     border: 3px solid #f1c40f !important;
-    /* Bordo Giallo spesso */
-    box-shadow: 0 0 25px #f1c40f !important;
-    /* Alone luminoso */
-    transform: translate(-50%, -50%) scale(1.05);
-    /* Lo ingrandisce un pelo (opzionale) */
+    box-shadow: 0 0 30px rgba(241, 196, 15, 0.8) !important;
+    animation: turn-pulse 1.5s infinite alternate ease-in-out;
     z-index: 30;
-    /* Lo porta in primo piano */
+}
+
+@keyframes turn-pulse {
+    from {
+        box-shadow: 0 0 20px rgba(241, 196, 15, 0.5);
+        transform: scale(1.05);
+    }
+    to {
+        box-shadow: 0 0 35px rgba(241, 196, 15, 0.9);
+        transform: scale(1.08);
+    }
 }
 
 /* ========================================= */
@@ -480,14 +496,15 @@ button {
 }
 
 .modal-content {
-    background-color: #1e1e1e;
+    background-color: rgba(30, 30, 30, 0.8);
+    backdrop-filter: blur(12px);
     margin: 5% auto; 
     padding: 30px;
-    border: 2px solid #f1c40f;
-    border-radius: 12px;
+    border: 2px solid rgba(241, 196, 15, 0.5);
+    border-radius: 15px;
     width: 80%; 
     max-width: 800px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.7);
     position: relative;
     max-height: 80vh;
     overflow-y: auto;
