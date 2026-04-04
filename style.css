@@ -39,14 +39,16 @@ body {
 
 #game-title {
     position: absolute;
-    top: 20px;
-    left: 30px;
+    top: 15px;
+    left: 0;
+    width: 100%;
     margin: 0;
     color: white;
     font-size: 2.2rem;
     z-index: 100;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    pointer-events: none; /* Evita che il titolo blocchi i click sotto di lui */
+    text-align: center;
+    pointer-events: none;
 }
 
 /* --- NUOVO: CONTROLLI DI TESTATA --- */
@@ -58,12 +60,12 @@ body {
 }
 
 .top-controls.left {
-    top: 25px;
-    left: 200px;
+    top: 15px;
+    left: 20px;
 }
 
 .top-controls.right {
-    top: 20px;
+    top: 15px;
     right: 20px;
 }
 
@@ -460,26 +462,9 @@ button {
 /* STILI MODAL REGOLE E PULSANTE             */
 /* ========================================= */
 
+/* Il pulsante regole eredita le posizioni dal contenitore .top-controls.left */
 #btn-regole {
-    position: absolute;
-    top: 20px;
-    right: 30px;
     background: #3498db;
-    color: white;
-    border: 2px solid white;
-    padding: 10px 15px;
-    font-size: 1.1rem;
-    font-weight: bold;
-    border-radius: 8px;
-    cursor: pointer;
-    z-index: 1000;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-    transition: transform 0.2s, background 0.2s;
-}
-
-#btn-regole:hover {
-    transform: scale(1.1);
-    background: #2980b9;
 }
 
 .modal {
@@ -558,15 +543,15 @@ button {
     }
 
     #game-title {
-        font-size: 1.2rem;
-        top: 10px;
-        left: 10px;
+        font-size: 1.1rem;
+        top: 8px;
+        left: 0;
         width: 100%;
         text-align: center;
     }
     
     .top-controls.left {
-        top: 40px;
+        top: 35px;
         left: 10px;
         display: flex;
         flex-direction: column;
@@ -575,24 +560,16 @@ button {
 
     #btn-regole {
         position: static !important;
-        right: auto !important;
-        top: auto !important;
         transform: none !important;
     }
 
     .top-controls.right {
-        top: 10px;
+        top: 35px;
         right: 10px;
     }
 
-    /* Tasto ESCI su mobile */
-    #esci-container {
-        top: 40px !important;
-        right: 10px !important;
-    }
-
     #info-giro {
-        margin-top: 70px !important;
+        margin-top: 75px !important;
         font-size: 0.9rem !important;
     }
 
