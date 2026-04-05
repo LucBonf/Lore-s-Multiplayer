@@ -125,7 +125,7 @@ class LucasGame {
 const lobbies = {};
 
 io.on('connection', (socket) => {
-    
+
     socket.on('login', async (dati) => {
         // Controllo profanità universale
         if (dati.nickname && filter.check(dati.nickname)) {
@@ -174,7 +174,7 @@ io.on('connection', (socket) => {
         try {
             let limit = await User.find().sort({ punteggioTotale: -1 }).limit(10);
             socket.emit('classifica_dati', limit);
-        } catch(e) {}
+        } catch (e) { }
     });
 
     socket.on('crea_lobby', (dati) => {
@@ -251,7 +251,7 @@ io.on('connection', (socket) => {
 
         const lobby = lobbies[code];
         if (lobby) {
-            // Rimuovi dalla lobby (lista d'attesa)
+            // Rimuovi dalla lobby (lista d'attesa) Test gits
             const idx = lobby.giocatori.findIndex(p => p.id === socket.id);
             if (idx !== -1) lobby.giocatori.splice(idx, 1);
 
@@ -358,7 +358,7 @@ io.on('connection', (socket) => {
         const game = lobbies[code]?.gameInstance;
         const pIdx = game?.turnoAttuale;
         if (!game || game.players[pIdx].id !== socket.id) return;
-        
+
         // --- MICRO-RITARDO ANTI-GLITCH ---
         if (!game.acceptInput) return;
 
@@ -386,11 +386,11 @@ io.on('connection', (socket) => {
             setTimeout(() => risolviPresa(code), 1500);
         } else {
             game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
-            
+
             // --- MICRO-RITARDO SUL SERVER (Previene carte istantanee) ---
             game.acceptInput = false;
             setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 400);
-            
+
             inviaStato(code);
             gestisciIA(code);
         }
@@ -402,13 +402,13 @@ io.on('connection', (socket) => {
 
         const vincitore = game.calcolaVincitorePresa();
         game.players[vincitore.playerId].preseFatte++;
-        
+
         // --- NOVITÀ: Notifica al client chi ha vinto la presa prima di pulire il tavolo ---
         io.to(code).emit('vincitore_presa', { playerId: vincitore.playerId });
 
         // MEMORIZZAZIONE: Salviamo le carte che sono passate sul tavolo
         game.tavolo.forEach(g => game.carteUscite.push(g.card));
-        
+
         game.tavolo = [];
         game.turnoAttuale = vincitore.playerId;
 
@@ -424,7 +424,7 @@ io.on('connection', (socket) => {
             game.indiceGiro++;
             if (game.indiceGiro >= game.sequenzaTurni.length) {
                 const classificaFinale = [...game.players].sort((a, b) => b.punti - a.punti);
-                
+
                 // --- SALVATAGGIO CLASSIFICHE MONGO DB ---
                 if (dbConnected) {
                     const vincitoreAssoluto = classificaFinale[0].punti;
@@ -434,12 +434,12 @@ io.on('connection', (socket) => {
                                 let isWinner = (p.punti === vincitoreAssoluto) ? 1 : 0;
                                 await User.updateOne(
                                     { uniqueCode: p.uniqueCode },
-                                    { 
+                                    {
                                         $inc: { partiteGiocate: 1, partiteVinte: isWinner, punteggioTotale: p.punti },
                                         $set: { nickname: p.nome } // Sincronizza eventuale nome in caso sia cambiato globalmente (se permetti update)
                                     }
                                 );
-                            } catch(e) { console.error("Errore update user stats:", e); }
+                            } catch (e) { console.error("Errore update user stats:", e); }
                         }
                     });
                 }
@@ -479,12 +479,12 @@ io.on('connection', (socket) => {
                 // --- LOGICA CONTESTUALE (Matrix Training) ---
                 // 1. Adattamento al numero di giocatori
                 const div = (game.numPlayers <= 3) ? 120 : 150;
-                
+
                 // 2. Adattamento alla posizione (chi parla dopo ha più info)
                 const ordineTurno = (game.turnoAttuale - (game.indiceMazziere + 1) + game.numPlayers) % game.numPlayers;
                 const posFactor = 0.85 + (ordineTurno / game.numPlayers) * 0.3; // 0.85x per il primo, 1.15x per l'ultimo
 
-                let s = Math.floor((powerScore / div) * posFactor); 
+                let s = Math.floor((powerScore / div) * posFactor);
                 if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
 
                 if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
@@ -496,7 +496,7 @@ io.on('connection', (socket) => {
                 game.sommaScommesse += s;
                 game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
                 if (game.players.every(pl => pl.dichiarazione !== "-")) game.fase = "gioco";
-                
+
                 inviaStato(code);
                 gestisciIA(code);
             } else {
@@ -549,7 +549,7 @@ io.on('connection', (socket) => {
                     gestisciIA(code);
                 }
             }
-        }, 1200); 
+        }, 1200);
     }
 
     function inviaStato(code) {
