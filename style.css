@@ -455,22 +455,20 @@ button {
 }
 
 
-/* ILLUMINA IL BOX DEL TURNO ATTUALE */
+/* ILLUMINA IL BOX DEL TURNO ATTUALE (Solo bordo e alone, senza scala) */
 .player-block.active-turn {
     border: 3px solid #f1c40f !important;
     box-shadow: 0 0 30px rgba(241, 196, 15, 0.8) !important;
-    animation: turn-pulse 1.5s infinite alternate ease-in-out;
+    animation: turn-glow 1.5s infinite alternate ease-in-out;
     z-index: 30;
 }
 
-@keyframes turn-pulse {
+@keyframes turn-glow {
     from {
-        box-shadow: 0 0 20px rgba(241, 196, 15, 0.5);
-        transform: scale(1.05);
+        box-shadow: 0 0 15px rgba(241, 196, 15, 0.4);
     }
     to {
         box-shadow: 0 0 35px rgba(241, 196, 15, 0.9);
-        transform: scale(1.08);
     }
 }
 
