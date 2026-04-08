@@ -41,18 +41,28 @@ body {
 
 #game-title {
     position: absolute;
-    top: 5px;
-    left: 0;
-    width: 100%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     margin: 0;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 1.8rem;
-    z-index: 50;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    color: rgba(0, 0, 0, 0.12); /* Grigio scuro molto leggero */
+    font-size: 14rem;
+    z-index: 0;
     text-align: center;
     pointer-events: none;
-    font-weight: 700;
-    letter-spacing: 2px;
+    font-weight: 900;
+    letter-spacing: 10px;
+    text-transform: uppercase;
+    user-select: none;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    #game-title {
+        font-size: 4rem;
+        letter-spacing: 4px;
+        color: rgba(0, 0, 0, 0.08);
+    }
 }
 
 /* --- NUOVO: CONTROLLI DI TESTATA --- */
@@ -600,13 +610,6 @@ button {
         padding: 10px;
     }
 
-    #game-title {
-        font-size: 1.1rem;
-        top: 8px;
-        left: 0;
-        width: 100%;
-        text-align: center;
-    }
     
     .top-controls.left {
         top: 35px;
