@@ -8,6 +8,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 import filter from 'leo-profanity';
 
+// Gestione Robustezza: Evita il crash del processo per errori non gestiti
+process.on('uncaughtException', (err) => {
+    console.error('❌ CRITICAL: Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 // Inizializza il filtro con le lingue supportate
 filter.loadDictionary('en');
 filter.add(filter.list('it'));
@@ -155,7 +163,9 @@ io.on('connection', (socket) => {
 
                 // Ricerca case-insensitive per impedire varianti (es: Lùca, lUcA, luca son considerati uguali dal Regex base inglese,
                 // e blocca chi tenta di rubare un nome esistente con un PIN sbagliato o una maiuscola diversa)
-                const existingName = await User.findOne({ nickname: { $regex: new RegExp("^" + dati.nickname + "$", "i") } });
+                // Usiamo l'escape per evitare crash se il nickname contiene caratteri speciali regex (es. "(", "[")
+                const escapedNickname = dati.nickname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const existingName = await User.findOne({ nickname: { $regex: new RegExp("^" + escapedNickname + "$", "i") } });
                 if (existingName) {
                     return socket.emit('login_err', 'Non puoi usare questo username / Hai sbagliato il PIN.');
                 }
@@ -178,11 +188,16 @@ io.on('connection', (socket) => {
     });
 
     socket.on('crea_lobby', (dati) => {
-        const code = Math.random().toString(36).substring(2, 6).toUpperCase();
-        lobbies[code] = { host: socket.id, parametri: dati, giocatori: [{ id: socket.id, nome: dati.nome, token: dati.token, uniqueCode: dati.uniqueCode }] };
-        socket.join(code);
-        socket.roomCode = code; // Aggiungi questa riga!
-        socket.emit('lobby_creata', { code: code, giocatori: lobbies[code].giocatori });
+        try {
+            if (!dati || !dati.nome) return socket.emit('errore', "Dati lobby non validi.");
+            const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+            lobbies[code] = { host: socket.id, parametri: dati, giocatori: [{ id: socket.id, nome: dati.nome, token: dati.token, uniqueCode: dati.uniqueCode }] };
+            socket.join(code);
+            socket.roomCode = code;
+            socket.emit('lobby_creata', { code: code, giocatori: lobbies[code].giocatori });
+        } catch (e) {
+            console.error("Errore crea_lobby:", e);
+        }
     });
 
     function gestisciRiconnessione(socket, code, token) {
@@ -216,94 +231,134 @@ io.on('connection', (socket) => {
     });
 
     socket.on('unisciti_lobby', (dati) => {
-        const lobby = lobbies[dati.code];
-        if (lobby) {
-            let existingPlayer = lobby.giocatori.find(p => p.token && p.token === dati.token);
-            if (existingPlayer) {
-                return gestisciRiconnessione(socket, dati.code, dati.token);
-            }
+        try {
+            if (!dati || !dati.code) return socket.emit('errore', "Codice stanza mancante.");
+            const lobby = lobbies[dati.code];
+            if (lobby) {
+                let existingPlayer = lobby.giocatori.find(p => p.token && p.token === dati.token);
+                if (existingPlayer) {
+                    return gestisciRiconnessione(socket, dati.code, dati.token);
+                }
 
-            if (lobby.giocatori.length >= parseInt(lobby.parametri.numGiocatori)) {
-                return socket.emit('errore', "La lobby è piena!");
+                if (lobby.giocatori.length >= parseInt(lobby.parametri.numGiocatori)) {
+                    return socket.emit('errore', "La lobby è piena!");
+                }
+                if (lobby.giocatori.find(p => p.id === socket.id)) return;
+                lobby.giocatori.push({ id: socket.id, nome: dati.nome, token: dati.token, uniqueCode: dati.uniqueCode });
+                socket.join(dati.code);
+                socket.roomCode = dati.code;
+                io.to(dati.code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: dati.code });
+            } else {
+                socket.emit('errore', "Codice stanza non valido!");
             }
-            if (lobby.giocatori.find(p => p.id === socket.id)) return;
-            lobby.giocatori.push({ id: socket.id, nome: dati.nome, token: dati.token, uniqueCode: dati.uniqueCode });
-            socket.join(dati.code);
-            socket.roomCode = dati.code; // Aggiungi questa riga!
-            io.to(dati.code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: dati.code });
-        } else {
-            socket.emit('errore', "Codice stanza non valido!");
+        } catch (e) {
+            console.error("Errore unisciti_lobby:", e);
         }
     });
 
     socket.on('richiesta_inizio_partita', () => {
-        const code = socket.roomCode;
-        if (code) avviaPartita(code);
+        try {
+            const code = socket.roomCode;
+            if (code) avviaPartita(code);
+        } catch (e) {
+            console.error("Errore richiesta_inizio_partita:", e);
+        }
     });
 
     socket.on('esci_partita', () => {
-        const code = socket.roomCode;
-        if (!code) return;
+        try {
+            const code = socket.roomCode;
+            if (!code) return;
 
-        // --- FIX: Lasciamo la stanza subito per non ricevere l'aggiornamento di stato successivo ---
-        socket.leave(code);
-        socket.roomCode = null;
+            // --- FIX: Lasciamo la stanza subito per non ricevere l'aggiornamento di stato successivo ---
+            socket.leave(code);
+            socket.roomCode = null;
 
-        const lobby = lobbies[code];
-        if (lobby) {
-            // Rimuovi dalla lobby (lista d'attesa) Test gits
-            const idx = lobby.giocatori.findIndex(p => p.id === socket.id);
-            if (idx !== -1) lobby.giocatori.splice(idx, 1);
+            const lobby = lobbies[code];
+            if (lobby) {
+                // Rimuovi dalla lobby (lista d'attesa) Test gits
+                const idx = lobby.giocatori.findIndex(p => p.id === socket.id);
+                if (idx !== -1) lobby.giocatori.splice(idx, 1);
 
-            // Gestione del subentro IA se il gioco è in corso
-            if (lobby.gameInstance) {
-                const game = lobby.gameInstance;
-                const p = game.players.find(pl => pl.id === socket.id);
-                if (p) {
-                    p.isHuman = false;
-                    p.id = null; // Stacca il socketId
-                    p.nome += " (Bot)";
-                    inviaStato(code);
-                    gestisciIA(code);
+                // Gestione del subentro IA se il gioco è in corso
+                if (lobby.gameInstance) {
+                    const game = lobby.gameInstance;
+                    const p = game.players.find(pl => pl.id === socket.id);
+                    if (p) {
+                        p.isHuman = false;
+                        p.id = null; // Stacca il socketId
+                        p.nome += " (Bot)";
+                        inviaStato(code);
+                        gestisciIA(code);
+                    }
+                } else {
+                    // Se era ancora in lobby, aggiorna gli altri
+                    io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
                 }
-            } else {
-                // Se era ancora in lobby, aggiorna gli altri
-                io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
             }
+        } catch (e) {
+            console.error("Errore esci_partita:", e);
         }
     });
 
     socket.on('disconnect', () => {
-        console.log(`Giocatore disconnesso: ${socket.id}`);
+        try {
+            console.log(`Giocatore disconnesso: ${socket.id}`);
 
-        // Cerchiamo in quale lobby si trovava
-        for (const code in lobbies) {
-            const lobby = lobbies[code];
-            const index = lobby.giocatori.findIndex(p => p.id === socket.id);
+            // Cerchiamo in quale lobby si trovava
+            for (const code in lobbies) {
+                const lobby = lobbies[code];
+                const index = lobby.giocatori.findIndex(p => p.id === socket.id);
 
-            // Se lo troviamo in questa lobby...
-            if (index !== -1) {
-                if (lobby.gameInstance) {
-                    // PARTITA IN CORSO: Trasformiamo in CPU
-                    const game = lobby.gameInstance;
-                    const playerIndex = game.players.findIndex(p => p.id === socket.id);
-                    if (playerIndex !== -1) {
-                        game.players[playerIndex].isHuman = false;
-                        game.players[playerIndex].nome += " (Bot)";
-                        inviaStato(code); // Aggiorna i nomi per gli altri
+                // Se lo troviamo in questa lobby...
+                if (index !== -1) {
+                    if (lobby.gameInstance) {
+                        // PARTITA IN CORSO: Aspettiamo un po' prima di trasformare in CPU (grace period per refresh)
+                        const game = lobby.gameInstance;
+                        const playerIndex = game.players.findIndex(p => p.id === socket.id);
+                        
+                        if (playerIndex !== -1) {
+                            const player = game.players[playerIndex];
+                            const playerToken = player.token;
+                            player.id = null; // Segnala disconnessione temporanea nel gioco
+                            
+                            // Segnala disconnessione anche nella lista giocatori della lobby
+                            if (lobby.giocatori[index]) {
+                                lobby.giocatori[index].id = null;
+                            }
+                            
+                            // Opzionale: notifichiamo gli altri che il giocatore è in attesa di riconnessione
+                            inviaStato(code);
 
-                        // Il Bot muove solo se è il suo turno e la presa non è in fase di animazione
-                        if (game.turnoAttuale === playerIndex && game.tavolo.length < game.numPlayers) {
-                            gestisciIA(code);
+                            setTimeout(() => {
+                                const currentLobby = lobbies[code];
+                                if (!currentLobby || !currentLobby.gameInstance) return;
+                                
+                                const p = currentLobby.gameInstance.players.find(pl => pl.token === playerToken);
+                                // Se dopo il timeout non si è riconnesso (id è ancora null) ed è ancora umano
+                                if (p && p.id === null && p.isHuman) {
+                                    p.isHuman = false;
+                                    p.nome += " (Bot)";
+                                    inviaStato(code);
+
+                                    // Il Bot muove solo se è il suo turno
+                                    if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p) && 
+                                        currentLobby.gameInstance.tavolo.length < currentLobby.gameInstance.numPlayers) {
+                                        gestisciIA(code);
+                                    }
+                                }
+                            }, 8000); // 8 secondi di tolleranza per il refresh
                         }
+                    } else {
+                        // LOBBY D'ATTESA: Lo rimuoviamo semplicemente prima che inizi
+                        lobby.giocatori.splice(index, 1);
+                        io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
                     }
-                } else {
-                    // LOBBY D'ATTESA: Lo rimuoviamo semplicemente prima che inizi
-                    lobby.giocatori.splice(index, 1);
-                    io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
+                    break; // Trovato e gestito, fermiamo il ciclo
                 }
-                break; // Trovato e gestito, fermiamo il ciclo
             }
+        } catch (e) {
+            console.error("Errore disconnect:", e);
         }
     });
 
@@ -326,73 +381,81 @@ io.on('connection', (socket) => {
     }
 
     socket.on('invia_scommessa', (valRaw) => {
-        const val = parseInt(valRaw);
-        const code = socket.roomCode;
-        const game = lobbies[code]?.gameInstance;
-        if (!game || game.players[game.turnoAttuale].id !== socket.id) return;
+        try {
+            const val = parseInt(valRaw);
+            const code = socket.roomCode;
+            const game = lobbies[code]?.gameInstance;
+            if (!game || game.players[game.turnoAttuale].id !== socket.id) return socket.emit('errore', "Non è il tuo turno!");
 
-        const qta = game.sequenzaTurni[game.indiceGiro];
+            const qta = game.sequenzaTurni[game.indiceGiro];
 
-        // --- NUOVO VINCOLO: LIMITE MASSIMO ---
-        if (isNaN(val) || val < 0 || val > qta) {
-            return socket.emit('errore', `Dichiarazione non valida! In questo turno puoi dichiarare da 0 a ${qta}.`);
-        }
-
-        // --- VINCOLO DEL MAZZIERE ---
-        if (game.turnoAttuale === game.indiceMazziere) {
-            if (game.sommaScommesse + val === qta) {
-                return socket.emit('errore', `Vincolo Mazziere: la somma non può fare ${qta}!`);
+            // --- NUOVO VINCOLO: LIMITE MASSIMO ---
+            if (isNaN(val) || val < 0 || val > qta) {
+                return socket.emit('errore', `Dichiarazione non valida! In questo turno puoi dichiarare da 0 a ${qta}.`);
             }
-        }
 
-        game.players[game.turnoAttuale].dichiarazione = val;
-        game.sommaScommesse += val;
-        game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
-        if (game.players.every(p => p.dichiarazione !== "-")) game.fase = "gioco";
-        inviaStato(code);
-        gestisciIA(code);
+            // --- VINCOLO DEL MAZZIERE ---
+            if (game.turnoAttuale === game.indiceMazziere) {
+                if (game.sommaScommesse + val === qta) {
+                    return socket.emit('errore', `Vincolo Mazziere: la somma non può fare ${qta}!`);
+                }
+            }
+
+            game.players[game.turnoAttuale].dichiarazione = val;
+            game.sommaScommesse += val;
+            game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
+            if (game.players.every(p => p.dichiarazione !== "-")) game.fase = "gioco";
+            inviaStato(code);
+            gestisciIA(code);
+        } catch (e) {
+            console.error("Errore invia_scommessa:", e);
+        }
     });
 
     socket.on('gioca_carta', (dati) => {
-        const code = socket.roomCode;
-        const game = lobbies[code]?.gameInstance;
-        const pIdx = game?.turnoAttuale;
-        if (!game || game.players[pIdx].id !== socket.id) return;
+        try {
+            const code = socket.roomCode;
+            const game = lobbies[code]?.gameInstance;
+            const pIdx = game?.turnoAttuale;
+            if (!game || game.players[pIdx].id !== socket.id) return socket.emit('errore', "Non è il tuo turno!");
 
-        // --- MICRO-RITARDO ANTI-GLITCH ---
-        if (!game.acceptInput) return;
+            // --- MICRO-RITARDO ANTI-GLITCH ---
+            if (!game.acceptInput) return socket.emit('errore', "Attendi un istante...");
 
-        // --- FIX 1: Evita che si giochino carte mentre la presa si sta già chiudendo (ritardo 1.2s) ---
-        if (game.tavolo.length >= game.numPlayers) return;
+            // --- FIX 1: Evita che si giochino carte mentre la presa si sta già chiudendo (ritardo 1.2s) ---
+            if (game.tavolo.length >= game.numPlayers) return socket.emit('errore', "La presa si sta già chiudendo...");
 
-        const carta = game.players[pIdx].mano[dati.cartaIdx];
+            const carta = game.players[pIdx].mano[dati.cartaIdx];
 
-        // --- FIX 2: Evita i crash se il client invia una carta inesistente o già giocata ---
-        if (!carta || carta.giocata) return;
+            // --- FIX 2: Evita i crash se il client invia una carta inesistente o già giocata ---
+            if (!carta || carta.giocata) return;
 
-        // --- RISPOSTA AL SEME ---
-        if (game.tavolo.length > 0) {
-            const semeU = game.tavolo[0].card.seme;
-            const haSeme = game.players[pIdx].mano.some(c => !c.giocata && c.seme === semeU);
-            if (haSeme && carta.seme !== semeU) return socket.emit('errore', `Devi rispondere a ${semeU}!`);
-        }
+            // --- RISPOSTA AL SEME ---
+            if (game.tavolo.length > 0) {
+                const semeU = game.tavolo[0].card.seme;
+                const haSeme = game.players[pIdx].mano.some(c => !c.giocata && c.seme === semeU);
+                if (haSeme && carta.seme !== semeU) return socket.emit('errore', `Devi rispondere a ${semeU}!`);
+            }
 
-        // ... (il resto della funzione gioca_carta rimane uguale) ...
+            // ... (il resto della funzione gioca_carta rimane uguale) ...
 
-        carta.giocata = true;
-        game.tavolo.push({ playerId: pIdx, card: carta });
-        if (game.tavolo.length === game.numPlayers) {
-            inviaStato(code);
-            setTimeout(() => risolviPresa(code), 1500);
-        } else {
-            game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
+            carta.giocata = true;
+            game.tavolo.push({ playerId: pIdx, card: carta });
+            if (game.tavolo.length === game.numPlayers) {
+                inviaStato(code);
+                setTimeout(() => risolviPresa(code), 1500);
+            } else {
+                game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
 
-            // --- MICRO-RITARDO SUL SERVER (Previene carte istantanee) ---
-            game.acceptInput = false;
-            setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 400);
+                // --- MICRO-RITARDO SUL SERVER (Previene carte istantanee) ---
+                game.acceptInput = false;
+                setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 400);
 
-            inviaStato(code);
-            gestisciIA(code);
+                inviaStato(code);
+                gestisciIA(code);
+            }
+        } catch (e) {
+            console.error("Errore gioca_carta:", e);
         }
     });
 

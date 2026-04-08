@@ -479,7 +479,9 @@ socket.on('conferma_inizio_partita', (dati) => {
     const areaScommessa = document.getElementById('dichiarazione-area');
     if (dati.fase === 'scommesse' && eMioTurno) {
         areaScommessa.style.display = 'block';
-        document.getElementById('bet-input').max = qtaAttuale;
+        const betInput = document.getElementById('bet-input');
+        betInput.max = qtaAttuale;
+        betInput.value = ""; // Svuota il campo per facilitare l'inserimento da mobile
     } else {
         areaScommessa.style.display = 'none';
     }
@@ -506,7 +508,10 @@ function mostraErrore(messaggio) {
     }, 3500);
 }
 
-socket.on('errore', (m) => mostraErrore(m));
+socket.on('errore', (m) => {
+    mostraErrore(m);
+    canPlay = true; // Sblocca l'interfaccia se c'è stato un errore (es. vincolo mazziere)
+});
 socket.on('fine_partita', (cl) => {
     sessionStorage.removeItem('lucas_room');
     
