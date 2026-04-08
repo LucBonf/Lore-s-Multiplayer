@@ -396,6 +396,7 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
             // Clicchi per giocare la carta. 
             // NOTA: Usando mano.indexOf(c) peschiamo l'indice originale corretto anche se le abbiamo riordinate visivamente!
             if (isMyTurn && fase === 'gioco' && canPlay) {
+                nascondiErrore(); // Rimuove eventuali messaggi di errore precedenti
                 canPlay = false; // Blocca click multipli istantanei
                 socket.emit('gioca_carta', { cartaIdx: mano.indexOf(c) });
             }
@@ -421,6 +422,7 @@ window.iniziaPartitaVera = () => socket.emit('richiesta_inizio_partita');
 
 window.inviaDichiarazione = () => {
     if (!canPlay) return;
+    nascondiErrore(); // Rimuove eventuali messaggi di errore precedenti
     const val = parseInt(document.getElementById('bet-input').value);
     if (val > qtaAttuale) {
         alert(`Non puoi dichiarare più di ${qtaAttuale}!`);
@@ -469,6 +471,7 @@ socket.on('aggiorna_lobby', (dati) => {
 });
 
 socket.on('conferma_inizio_partita', (dati) => {
+    nascondiErrore(); // Pulisce messaggi vecchi all'arrivo di un nuovo stato
     qtaAttuale = dati.qtaCarte;
     switchSection('game-area');
 
@@ -496,16 +499,26 @@ socket.on('conferma_inizio_partita', (dati) => {
 });
 
 // Funzione per mostrare banner di errore a schermo
+let errorTimeout = null;
+
 function mostraErrore(messaggio) {
     const banner = document.getElementById('error-banner');
     if (!banner) return;
+    
+    if (errorTimeout) clearTimeout(errorTimeout);
+    
     banner.innerText = "⚠️ " + messaggio;
     banner.classList.add('show');
     
-    // Rimuove la notifica dopo 3.5 secondi
-    setTimeout(() => {
+    errorTimeout = setTimeout(() => {
         banner.classList.remove('show');
     }, 3500);
+}
+
+function nascondiErrore() {
+    const banner = document.getElementById('error-banner');
+    if (banner) banner.classList.remove('show');
+    if (errorTimeout) clearTimeout(errorTimeout);
 }
 
 socket.on('errore', (m) => {
