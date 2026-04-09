@@ -206,8 +206,8 @@ function renderGiocatori(data) {
     }
 
     const posizioniCarteTavoloPerGiocatore = new Map();
-    const raggioCarteX = 18;
-    const raggioCarteY = 15;
+    const raggioCarteX = 26; // Aumentato da 18 per spandere orizzontalmente
+    const raggioCarteY = 18; // Aumentato da 15 per distanziarle verticalmente
 
     for (let i = 0; i < numPlayers; i++) {
         const serverPlayerIndex = (mioIndice + i) % numPlayers;
@@ -300,16 +300,15 @@ function renderGiocatori(data) {
         playersCircle.appendChild(pBlock);
 
         // POSIZIONE CARTE SUL TAVOLO: Coordinate relative per ogni giocatore
-        const angoloRad = angoloGradi * (Math.PI / 180);
         let cartaX, cartaY;
 
         if (isMe) {
             cartaX = 50;
-            cartaY = 62; // Più vicina a "me" ma al centro del tavolo
+            cartaY = 68; // Portata a metà strada (da 62 a 68) tra il box (85) e il centro (circa 50)
         } else {
-            // Le carte degli avversari seguono il loro arco ma più interne
-            cartaX = 50 + raggioCarteX * Math.cos(angoloRad);
-            cartaY = 36 + raggioCarteY * Math.sin(angoloRad);
+            // Distanziate le carte degli avversari per evitare il centro troppo affollato
+            cartaX = 50 + raggioCarteX * Math.cos( angoloGradi * (Math.PI / 180) );
+            cartaY = 42 + raggioCarteY * Math.sin( angoloGradi * (Math.PI / 180) ); // Centro del tavolo carte leggermente abbassato
         }
         posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
     }
