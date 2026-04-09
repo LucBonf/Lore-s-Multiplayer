@@ -137,30 +137,28 @@ body {
 
 /* --- RETRO CARTE CON IMMAGINE CORRETTO (style.css) --- */
 .card-back {
-    /* Manteniamo dimensioni e ombre originali */
-    width: 35px;
-    height: 50px;
-
-    /* Cambiamo il bordo in grigio scuro per adattarlo all'immagine scura */
-    border: 1px solid #333;
+    /* Manteniamo ombre e bordi */
+    border: 1px solid #222;
     border-radius: 4px;
-    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);
     transition: all 0.2s ease;
 
-    /* --- FIX: USIAMO LA TUA IMMAGINE --- */
-    /* Colore di sfondo scuro di sicurezza se l'immagine non carica */
+    /* Colore di sfondo scuro di sicurezza */
     background-color: #1a1a1a;
 
-    /* LA TUA IMMAGINE */
-    background-image: url('https://gist.github.com/user-attachments/assets/05dbc289-791a-40e6-9a80-cbd5ccd95d6d');
+    /* NUOVA IMMAGINE RETRO */
+    background-image: url('https://gist.github.com/user-attachments/assets/203d9d46-8e77-4b4c-8ff3-4d552703abdd');
 
-    /* Centra perfettamente l'immagine (X e Y) */
+    /* Centratura perfetta e adattamento */
     background-position: center;
-
-    /* Fa sì che l'immagine copra tutta la carta ritagliandosi se necessario, senza deformarsi */
-    background-size: cover;
-
+    background-size: cover; 
     background-repeat: no-repeat;
+}
+
+/* Solo se non è una carta 'standard' (es. per mano avversari), applichiamo dimensione ridotta */
+div.card-back:not(.card) {
+    width: 35px;
+    height: 50px;
 }
 
 /* COORDINATE SEMI */
