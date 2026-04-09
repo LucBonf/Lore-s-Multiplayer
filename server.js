@@ -25,8 +25,8 @@ filter.add(filter.list('de'));
 filter.add(filter.list('pt'));
 filter.add(filter.list('ru'));
 
-// Aggiunta manuale di parole volgari italiane comuni per maggiore sicurezza
-const paroleProibite = ['cazzo', 'vaffa', 'stronzo', 'puttana', 'porco', 'bastardo', 'merda', 'coglion'];
+// Aggiunta manuale di parole volgari o inappropriate per maggiore sicurezza
+const paroleProibite = ['cazzo', 'vaffa', 'stronzo', 'puttana', 'porco', 'bastardo', 'merda', 'coglion', 'hezbollah'];
 filter.add(paroleProibite);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -55,7 +55,7 @@ if (process.env.MONGODB_URI) {
             // --- PULIZIA SPECIFICA RICHIESTA: Elimina utenti offensivi ---
             try {
                 const deletedOffensive = await User.deleteMany({ 
-                    nickname: { $regex: new RegExp("^cazzo$", "i") } 
+                    nickname: { $regex: new RegExp("^(cazzo|hezbollah)$", "i") } 
                 });
                 if (deletedOffensive.deletedCount > 0) {
                     console.log(`🗑️ Rimossi ${deletedOffensive.deletedCount} account con nickname offensivo.`);
