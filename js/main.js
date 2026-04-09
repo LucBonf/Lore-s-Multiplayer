@@ -194,7 +194,7 @@ function renderGiocatori(data) {
     const stepAngolo = 360 / numPlayers;
 
     const raggioX = 42;
-    const raggioY = 38;
+    const raggioY = 36; // Ridotto leggermente (da 38) per evitare tagli in basso
     const raggioCarteX = 20;
     const raggioCarteY = 20;
 
@@ -222,7 +222,7 @@ function renderGiocatori(data) {
         const angoloRadianti = angoloGradi * (Math.PI / 180);
 
         const posX = 50 + raggioX * Math.cos(angoloRadianti);
-        const posY = 50 + raggioY * Math.sin(angoloRadianti);
+        const posY = 47 + raggioY * Math.sin(angoloRadianti); // Spostato il centro verso l'alto (da 50 a 47)
 
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
