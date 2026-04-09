@@ -191,17 +191,11 @@ function renderGiocatori(data) {
 
     const numPlayers = data.tuttiGiocatori.length;
     const mioIndice = data.tuttiGiocatori.findIndex(p => p.socketId === socket.id);
-    const stepAngolo = 360 / numPlayers;
 
-    const raggioX = 42;
-    const raggioY = 36; // Ridotto leggermente (da 38) per evitare tagli in basso
-    const raggioCarteX = 20;
-    const raggioCarteY = 20;
-
-    // SCALE DINAMICHE: Rimpiccioliamo le carte se ci sono tanti giocatori
+    // SCALE DINAMICHE: Rimpiccioliamo i box se ci sono tanti giocatori
     const isMobile = window.innerWidth <= 768;
     let scalaPlayerBlock = isMobile ? 1 : 1; 
-    let scalaTableCard = isMobile ? 0.4 : 0.8; // Su mobile le carte al centro devono essere molto piccole
+    let scalaTableCard = isMobile ? 0.4 : 0.8; 
 
     if (numPlayers >= 7) {
         scalaPlayerBlock = isMobile ? 0.65 : 0.7;
@@ -212,23 +206,46 @@ function renderGiocatori(data) {
     }
 
     const posizioniCarteTavoloPerGiocatore = new Map();
+    const raggioCarteX = 18;
+    const raggioCarteY = 15;
 
     for (let i = 0; i < numPlayers; i++) {
         const serverPlayerIndex = (mioIndice + i) % numPlayers;
         const p = data.tuttiGiocatori[serverPlayerIndex];
         const isMe = (p.socketId === socket.id);
 
-        const angoloGradi = 90 + (i * stepAngolo);
-        const angoloRadianti = angoloGradi * (Math.PI / 180);
+        let posX, posY;
+        let angoloGradi;
 
-        const posX = 50 + raggioX * Math.cos(angoloRadianti);
-        const posY = 47 + raggioY * Math.sin(angoloRadianti); // Spostato il centro verso l'alto (da 50 a 47)
+        if (isMe) {
+            // POSIZIONE FISSA IN BASSO PER "ME"
+            posX = 50;
+            posY = 85; 
+            angoloGradi = 90; // La carta lanciata salirà dritta
+        } else {
+            // POSIZIONAMENTO AVVERSARI IN UN ARCO SUPERIORE (160° -> 380°)
+            const indexOpp = i - 1; // 0, 1, 2...
+            const numOpp = numPlayers - 1;
+            
+            if (numOpp === 1) {
+                angoloGradi = 270; // Singolo avversario in alto al centro
+            } else {
+                const startA = 160;
+                const endA = 380;
+                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
+            }
+
+            const angoloRad = angoloGradi * (Math.PI / 180);
+            posX = 50 + 44 * Math.cos(angoloRad);
+            posY = 36 + 32 * Math.sin(angoloRad);
+        }
 
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
         pBlock.setAttribute('data-player-id', serverPlayerIndex);
         if (isMe) pBlock.classList.add('me');
         if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
+        
         pBlock.style.left = `${posX}%`;
         pBlock.style.top = `${posY}%`;
 
@@ -282,8 +299,18 @@ function renderGiocatori(data) {
 
         playersCircle.appendChild(pBlock);
 
-        const cartaX = 50 + raggioCarteX * Math.cos(angoloRadianti);
-        const cartaY = 50 + raggioCarteY * Math.sin(angoloRadianti);
+        // POSIZIONE CARTE SUL TAVOLO: Coordinate relative per ogni giocatore
+        const angoloRad = angoloGradi * (Math.PI / 180);
+        let cartaX, cartaY;
+
+        if (isMe) {
+            cartaX = 50;
+            cartaY = 62; // Più vicina a "me" ma al centro del tavolo
+        } else {
+            // Le carte degli avversari seguono il loro arco ma più interne
+            cartaX = 50 + raggioCarteX * Math.cos(angoloRad);
+            cartaY = 36 + raggioCarteY * Math.sin(angoloRad);
+        }
         posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
     }
 
@@ -359,26 +386,27 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
 
     const numCarte = carteDaDisegnare.length;
 
-    // --- 1. NOVITÀ: SCALA DINAMICA IN BASE AL NUMERO DI CARTE ---
-    // Più carte hai, più diventano piccole (minimo 0.6 su desktop, 0.35 su mobile)
+    // --- NOVITÀ: SCALA PIÙ GENEROSA GRAZIE AL NUOVO SPAZIO ---
     const isMobile = window.innerWidth <= 768;
-    const baseScale = isMobile ? 0.5 : 1.0;
+    const baseScale = isMobile ? 0.65 : 1.0; // Aumentata scala base su mobile (da 0.5 a 0.65)
     
-    // Se hai più di 5 carte, iniziamo a rimpicciolirle
+    // Riduciamo la scala solo se necessario
     let dynamicScale = baseScale;
-    if (numCarte > 5) {
-        // Riduciamo di un 5% per ogni carta oltre la quinta
-        dynamicScale = baseScale * Math.max(0.65, 1 - (numCarte - 5) * 0.06);
+    if (numCarte > 7) {
+        dynamicScale = baseScale * Math.max(0.65, 1 - (numCarte - 7) * 0.05);
     }
 
-    // MATEMATICA: Più carte hai, più si incastrano per non uscire dallo schermo!
+    // MATEMATICA: Margine calcolato per stare nei 98vw
     let marginLeft = 0;
-    if (numCarte > 10) {
-        marginLeft = isMobile ? -35 : -50;
-    } else if (numCarte > 7) {
-        marginLeft = isMobile ? -25 : -35;
-    } else if (numCarte > 4) {
-        marginLeft = isMobile ? -15 : -15;
+    if (isMobile) {
+        // Su mobile cerchiamo di usare tutto lo spazio
+        if (numCarte > 1) {
+            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
+            marginLeft = overlapFactor;
+        }
+    } else {
+        if (numCarte > 10) marginLeft = -35;
+        else if (numCarte > 7) marginLeft = -20;
     }
 
     // Applichiamo la scala e il margine dinamico

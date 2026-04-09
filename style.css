@@ -394,12 +394,11 @@ button {
     z-index: 10;
 }
 
-/* IL TUO BOX: Si allarga dinamicamente senza uscire dallo schermo */
+/* IL TUO BOX: Si allarga dinamicamente per sfruttare tutto lo spazio orizzontale */
 .player-block.me {
     width: auto;
     min-width: 170px;
-    max-width: 85vw;
-    /* Si ferma ai bordi dello schermo */
+    max-width: 98vw; /* Permette di usare quasi tutto lo schermo */
     z-index: 20;
 }
 
