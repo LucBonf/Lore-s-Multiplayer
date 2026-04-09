@@ -146,16 +146,33 @@ window.chiudiClassifica = () => {
 
 socket.on('classifica_dati', (dati) => {
     const container = document.getElementById('leaderboard-list');
-    if (dati.length === 0) {
+    const { top10, userRank } = dati;
+
+    if (!top10 || top10.length === 0) {
         container.innerHTML = "<p style='text-align:center;'>Nessun dato ancora disponibile in classifica.</p>";
         return;
     }
-    container.innerHTML = dati.map((u, i) => `
+
+    let html = top10.map((u, i) => `
         <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #555; padding: 10px 0;">
             <span><strong>${i+1}°.</strong> ${u.nickname}</span>
             <span>${u.punteggioTotale} pt (${u.partiteVinte} Vinte)</span>
         </div>
     `).join('');
+
+    if (userRank) {
+        const formattedPos = userRank.posizione.toLocaleString('it-IT');
+        html += `
+            <div style="margin-top: 20px; border-top: 2px solid #e67e22; padding-top: 15px; background: rgba(230, 126, 34, 0.1); border-radius: 0 0 8px 8px; padding: 15px;">
+                <div style="display:flex; justify-content:space-between; color: #f1c40f; font-weight: bold;">
+                    <span><strong>${formattedPos}°.</strong> ${userRank.nickname} (Tu)</span>
+                    <span>${userRank.punteggioTotale} pt (${userRank.partiteVinte} Vinte)</span>
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
 });
 
 // =========================================

@@ -142,11 +142,13 @@ io.on('connection', (socket) => {
 
         if (!dbConnected) {
             // Modalità simulata in assenza di DB
+            socket.userUniqueCode = dati.uniqueCode;
             return socket.emit('login_ok', { uniqueCode: dati.uniqueCode, nickname: dati.nickname || "Player", partiteVinte: 0, punteggioTotale: 0 });
         }
 
         // --- SKIPA IL DB PER GLI OSPITI ---
         if (dati.uniqueCode && dati.uniqueCode.startsWith("GUEST_")) {
+            socket.userUniqueCode = dati.uniqueCode;
             return socket.emit('login_ok', { uniqueCode: dati.uniqueCode, nickname: dati.nickname, partiteVinte: 0, punteggioTotale: 0 });
         }
 
@@ -173,6 +175,7 @@ io.on('connection', (socket) => {
                 user = new User({ uniqueCode: dati.uniqueCode, nickname: dati.nickname });
                 await user.save();
             }
+            socket.userUniqueCode = user.uniqueCode;
             socket.emit('login_ok', user);
         } catch (e) {
             socket.emit('login_err', 'Errore DB: ' + e.message);
@@ -180,11 +183,32 @@ io.on('connection', (socket) => {
     });
 
     socket.on('richiedi_classifica', async () => {
-        if (!dbConnected) return socket.emit('classifica_dati', []);
+        if (!dbConnected) return socket.emit('classifica_dati', { top10: [], userRank: null });
         try {
-            let limit = await User.find().sort({ punteggioTotale: -1 }).limit(10);
-            socket.emit('classifica_dati', limit);
-        } catch (e) { }
+            let top10 = await User.find().sort({ punteggioTotale: -1 }).limit(10);
+            
+            let userRank = null;
+            if (socket.userUniqueCode) {
+                const user = await User.findOne({ uniqueCode: socket.userUniqueCode });
+                if (user) {
+                    // Verifichiamo se l'utente è già nei primi 10 per ID unico
+                    const isInTop10 = top10.some(u => u.uniqueCode === socket.userUniqueCode);
+                    if (!isInTop10) {
+                        // Conta quanti utenti hanno un punteggio superiore
+                        const count = await User.countDocuments({ punteggioTotale: { $gt: user.punteggioTotale } });
+                        userRank = {
+                            nickname: user.nickname,
+                            punteggioTotale: user.punteggioTotale,
+                            partiteVinte: user.partiteVinte,
+                            posizione: count + 1
+                        };
+                    }
+                }
+            }
+            socket.emit('classifica_dati', { top10, userRank });
+        } catch (e) {
+            console.error("Errore richiedi_classifica:", e);
+        }
     });
 
     socket.on('crea_lobby', (dati) => {
