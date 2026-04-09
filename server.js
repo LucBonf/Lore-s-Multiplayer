@@ -158,9 +158,14 @@ const lobbies = {};
 io.on('connection', (socket) => {
 
     socket.on('login', async (dati) => {
-        // Controllo profanità universale
-        if (dati.nickname && filter.check(dati.nickname)) {
-            return socket.emit('login_err', 'Per favore, usa un nickname rispettoso!');
+        // Controllo profanità universale e aggressivo
+        if (dati.nickname) {
+            // Rimuove spazi, punti e simboli per vedere se l'utente sta barando (es: "d.i.o c.a.n.e" diventa "diocane")
+            const normalizedNickname = dati.nickname.toLowerCase().replace(/[^a-z0-9]/gi, '');
+            
+            if (filter.check(dati.nickname) || filter.check(normalizedNickname)) {
+                return socket.emit('login_err', 'Per favore, usa un nickname rispettoso!');
+            }
         }
 
         if (!dbConnected) {
