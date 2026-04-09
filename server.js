@@ -86,7 +86,7 @@ if (process.env.MONGODB_URI) {
             try {
                 // Rimuove account che contengono parole inaccettabili (cazzo, hezbollah, o radici di bestemmie)
                 const deletedOffensive = await User.deleteMany({ 
-                    nickname: { $regex: new RegExp("(cazzo|hezbollah|diocane|porcodio|madonn|dioporco|diop)", "i") }
+                    nickname: { $regex: new RegExp("(cazzo|hezbollah|diocane|porcodio|madonn|dioporco|diop|mailona26)", "i") }
                 });
                 if (deletedOffensive.deletedCount > 0) {
                     console.log(`🗑️ Rimossi ${deletedOffensive.deletedCount} account con nickname offensivo.`);
