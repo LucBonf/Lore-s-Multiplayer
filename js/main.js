@@ -423,11 +423,18 @@ window.iniziaPartitaVera = () => socket.emit('richiesta_inizio_partita');
 window.inviaDichiarazione = () => {
     if (!canPlay) return;
     nascondiErrore(); // Rimuove eventuali messaggi di errore precedenti
-    const val = parseInt(document.getElementById('bet-input').value);
+    
+    const inputEl = document.getElementById('bet-input');
+    let val = parseInt(inputEl.value);
+    
+    // Se l'input è vuoto o non è un numero, imposta a 0 di default
+    if (isNaN(val)) val = 0;
+    
     if (val > qtaAttuale) {
-        alert(`Non puoi dichiarare più di ${qtaAttuale}!`);
+        mostraErrore(`Non puoi dichiarare più di ${qtaAttuale}!`);
         return;
     }
+    
     canPlay = false; // Blocca click multipli
     socket.emit('invia_scommessa', val);
 };
