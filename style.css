@@ -628,7 +628,7 @@ button {
     }
 
     #info-giro {
-        margin-top: 40px !important; /* Ridotto da 65px */
+        margin-top: 5px !important; /* Spostato molto in alto per evitare i pulsanti */
         font-size: 0.9rem !important;
     }
 

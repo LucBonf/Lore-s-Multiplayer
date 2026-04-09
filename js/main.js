@@ -187,7 +187,7 @@ function renderGiocatori(data) {
     playersCircle.innerHTML = '';
     cardsOnTable.innerHTML = '';
 
-    infoGiro.innerText = `Giro ${data.qtaCarte} carte - Somma Scommesse: ${data.sommaScommesse}`;
+    infoGiro.innerText = `Giro ${data.qtaCarte} | Somma: ${data.sommaScommesse}`;
 
     const numPlayers = data.tuttiGiocatori.length;
     const mioIndice = data.tuttiGiocatori.findIndex(p => p.socketId === socket.id);
@@ -237,7 +237,7 @@ function renderGiocatori(data) {
 
             const angoloRad = angoloGradi * (Math.PI / 180);
             posX = 50 + 44 * Math.cos(angoloRad);
-            posY = 36 + 32 * Math.sin(angoloRad);
+            posY = 40 + 30 * Math.sin(angoloRad);
         }
 
         const pBlock = document.createElement('div');
@@ -308,7 +308,7 @@ function renderGiocatori(data) {
         } else {
             // Distanziate le carte degli avversari per evitare il centro troppo affollato
             cartaX = 50 + raggioCarteX * Math.cos( angoloGradi * (Math.PI / 180) );
-            cartaY = 42 + raggioCarteY * Math.sin( angoloGradi * (Math.PI / 180) ); // Centro del tavolo carte leggermente abbassato
+            cartaY = 44 + raggioCarteY * Math.sin( angoloGradi * (Math.PI / 180) ); // Centro carte abbassato coerentemente (da 42 a 44)
         }
         posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
     }
