@@ -25,6 +25,10 @@ filter.add(filter.list('de'));
 filter.add(filter.list('pt'));
 filter.add(filter.list('ru'));
 
+// Aggiunta manuale di parole volgari italiane comuni per maggiore sicurezza
+const paroleProibite = ['cazzo', 'vaffa', 'stronzo', 'puttana', 'porco', 'bastardo', 'merda', 'coglion'];
+filter.add(paroleProibite);
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
@@ -36,14 +40,30 @@ const userSchema = new mongoose.Schema({
     nickname: { type: String, required: true },
     partiteGiocate: { type: Number, default: 0 },
     partiteVinte: { type: Number, default: 0 },
-    punteggioTotale: { type: Number, default: 0 }
+    punteggioTotale: { type: Number, default: 0 },
+    lastLogin: { type: Date, default: Date.now }
 });
 const User = mongoose.model('User', userSchema);
 
 let dbConnected = false;
 if (process.env.MONGODB_URI) {
     mongoose.connect(process.env.MONGODB_URI)
-        .then(() => { console.log('🔗 Connesso a MongoDB Atlas!'); dbConnected = true; })
+        .then(async () => { 
+            console.log('🔗 Connesso a MongoDB Atlas!'); 
+            dbConnected = true; 
+            
+            // --- PULIZIA SPECIFICA RICHIESTA: Elimina utenti offensivi ---
+            try {
+                const deletedOffensive = await User.deleteMany({ 
+                    nickname: { $regex: new RegExp("^cazzo$", "i") } 
+                });
+                if (deletedOffensive.deletedCount > 0) {
+                    console.log(`🗑️ Rimossi ${deletedOffensive.deletedCount} account con nickname offensivo.`);
+                }
+            } catch (err) {
+                console.error('Errore durante la rimozione automatica:', err);
+            }
+        })
         .catch(err => console.error('Errore connessione MongoDB:', err));
 } else {
     console.log('⚠️ Nessun MONGODB_URI trovato! Classifiche e Login provvisori (non persistenti).');
@@ -174,6 +194,10 @@ io.on('connection', (socket) => {
 
                 user = new User({ uniqueCode: dati.uniqueCode, nickname: dati.nickname });
                 await user.save();
+            } else {
+                // Aggiorna l'ultimo accesso se l'utente esiste già
+                user.lastLogin = new Date();
+                await user.save();
             }
             socket.userUniqueCode = user.uniqueCode;
             socket.emit('login_ok', user);
@@ -181,6 +205,36 @@ io.on('connection', (socket) => {
             socket.emit('login_err', 'Errore DB: ' + e.message);
         }
     });
+
+    // --- PULIZIA ACCOUNT INATTIVI (1 ANNO) ---
+    async function cleanupInactiveAccounts() {
+        if (!dbConnected) return;
+        try {
+            // Per gli account già esistenti senza il campo lastLogin, lo impostiamo a oggi (retroattività)
+            // Così verranno cancellati tra 1 anno esatto da oggi se non rientrano.
+            await User.updateMany(
+                { lastLogin: { $exists: false } },
+                { $set: { lastLogin: new Date() } }
+            );
+
+            const oneYearAgo = new Date();
+            oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+            const result = await User.deleteMany({
+                lastLogin: { $lt: oneYearAgo }
+            });
+
+            if (result.deletedCount > 0) {
+                console.log(`🧹 Pulizia database: rimossi ${result.deletedCount} account inattivi da oltre 1 anno.`);
+            }
+        } catch (e) {
+            console.error("❌ Errore durante la pulizia degli account:", e);
+        }
+    }
+
+    // Esegui la pulizia all'avvio e poi ogni 24 ore
+    setTimeout(cleanupInactiveAccounts, 5000); // 5 secondi dopo il boot
+    setInterval(cleanupInactiveAccounts, 24 * 60 * 60 * 1000); // Ogni 24 ore
 
     socket.on('richiedi_classifica', async () => {
         if (!dbConnected) return socket.emit('classifica_dati', { top10: [], userRank: null });
