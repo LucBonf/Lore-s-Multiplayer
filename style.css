@@ -146,13 +146,14 @@ body {
     /* Colore di sfondo scuro di sicurezza */
     background-color: #1a1a1a;
 
-    /* NUOVA IMMAGINE RETRO */
-    background-image: url('https://gist.github.com/user-attachments/assets/203d9d46-8e77-4b4c-8ff3-4d552703abdd');
+    /* NUOVA IMMAGINE RETRO (Già sbordata dall'utente) */
+    background-image: url('https://gist.github.com/user-attachments/assets/455c0814-2a2a-4a25-84c2-02dc542961ad');
 
-    /* Centratura perfetta e adattamento */
+    /* Centratura perfetta e adattamento standard */
     background-position: center;
     background-size: cover; 
     background-repeat: no-repeat;
+    border: 1px solid #000;
 }
 
 /* Solo se non è una carta 'standard' (es. per mano avversari), applichiamo dimensione ridotta */
