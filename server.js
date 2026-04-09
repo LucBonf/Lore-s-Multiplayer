@@ -52,9 +52,10 @@ async function checkWithAI(nickname) {
 
     try {
         const prompt = `Analizza questo nickname per un gioco di carte: "${nickname}". 
-        È offensivo, volgare, contiene bestemmie (anche camuffate) o riferimenti politici inopportuni? 
-        Rispondi ESCLUSIVAMENTE con la parola "REJECT" se è inaccettabile, oppure "PASS" se va bene. 
-        Non aggiungere altre parole.`;
+        È offensivo, volgare, contiene bestemmie o riferimenti inappropriati? 
+        Fai molta attenzione ai tentativi di camuffamento: scambi di lettere (es. "l" invece di "r" come in "polcodio"), uso di numeri (es. "0" invece di "o"), punti o spazi.
+        Se il nome assomiglia o ammicca chiaramente a una bestemmia o a un insulto, consideralo inaccettabile.
+        Rispondi ESCLUSIVAMENTE con la parola "REJECT" se è inaccettabile, oppure "PASS" se va bene.`;
 
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
             method: 'POST',
@@ -86,7 +87,7 @@ if (process.env.MONGODB_URI) {
             try {
                 // Rimuove account che contengono parole inaccettabili (cazzo, hezbollah, o radici di bestemmie)
                 const deletedOffensive = await User.deleteMany({ 
-                    nickname: { $regex: new RegExp("(cazzo|hezbollah|diocane|porcodio|madonn|dioporco|diop|mailona26)", "i") }
+                    nickname: { $regex: new RegExp("(cazzo|hezbollah|diocane|porcodio|madonn|dioporco|diop|mailona26|polcodio)", "i") }
                 });
                 if (deletedOffensive.deletedCount > 0) {
                     console.log(`🗑️ Rimossi ${deletedOffensive.deletedCount} account con nickname offensivo.`);
