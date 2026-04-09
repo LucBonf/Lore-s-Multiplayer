@@ -45,6 +45,36 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
+// --- INTEGRAZIONE IA (GEMINI API) ---
+async function checkWithAI(nickname) {
+    const API_KEY = process.env.GEMINI_API_KEY;
+    if (!API_KEY) return false;
+
+    try {
+        const prompt = `Analizza questo nickname per un gioco di carte: "${nickname}". 
+        È offensivo, volgare, contiene bestemmie (anche camuffate) o riferimenti politici inopportuni? 
+        Rispondi ESCLUSIVAMENTE con la parola "REJECT" se è inaccettabile, oppure "PASS" se va bene. 
+        Non aggiungere altre parole.`;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
+        });
+
+        const data = await response.json();
+        const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase();
+        
+        console.log(`🤖 IA Mod: [${nickname}] -> ${aiResponse}`);
+        return aiResponse === "REJECT";
+    } catch (e) {
+        console.error("Errore Gemini API:", e);
+    }
+    return false;
+}
+
 let dbConnected = false;
 if (process.env.MONGODB_URI) {
     mongoose.connect(process.env.MONGODB_URI)
@@ -163,6 +193,12 @@ io.on('connection', (socket) => {
             
             if (filter.check(dati.nickname) || filter.check(normalizedNickname)) {
                 return socket.emit('login_err', 'Per favore, usa un nickname rispettoso!');
+            }
+
+            // --- NUOVO CONTROLLO IA (GEMINI) ---
+            const isToxic = await checkWithAI(dati.nickname);
+            if (isToxic) {
+                return socket.emit('login_err', 'L\'IA ha rilevato un nickname non appropriato.');
             }
         }
 
