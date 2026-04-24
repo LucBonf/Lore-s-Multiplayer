@@ -77,6 +77,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }, 3000);
+
+        // --- FIX AUTO-SCALE MOBILE ---
+        const handleResize = () => {
+            if (window.innerWidth <= 768) {
+                const container = document.getElementById('game-container');
+                if (container) {
+                    const vh = window.innerHeight * 0.01;
+                    document.documentElement.style.setProperty('--vh', `${vh}px`);
+                    
+                    // Se lo schermo è basso (es. iPhone SE) o stretto, riduciamo la scala globale
+                    if (window.innerHeight < 750 || window.innerWidth < 380) {
+                        const scale = Math.min(window.innerWidth / 400, window.innerHeight / 800, 0.9);
+                        container.style.transform = `scale(${scale})`;
+                        container.style.transformOrigin = 'center center';
+                    } else {
+                        container.style.transform = 'none';
+                    }
+                }
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        handleResize();
     } catch (err) {
         console.error("Errore fatale in inizializzazione:", err);
         // Fallback estremo: prova a mostrare il login
@@ -392,7 +414,7 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
     // Riduciamo la scala solo se necessario
     let dynamicScale = baseScale;
     if (numCarte > 7) {
-        dynamicScale = baseScale * Math.max(0.65, 1 - (numCarte - 7) * 0.05);
+        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08); // Più aggressivo nella riduzione su mobile
     }
 
     // MATEMATICA: Margine calcolato per stare nei 98vw
