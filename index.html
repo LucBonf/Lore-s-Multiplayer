@@ -45,34 +45,7 @@
         <div class="modal-content">
             <span class="close-btn" onclick="chiudiRegole()">&times;</span>
             <h2 data-i18n="rulesTitle" style="color: #f1c40f; margin-top: 0; text-align: center;">📖 Regolamento: Gioco di Lucas</h2>
-            <div style="line-height: 1.6; font-size: 1.1rem; color: #ddd; text-align: left;">
-                <p><strong>1. Mazzo e Giocatori:</strong> Si gioca con 40 carte. Il sistema calcola automaticamente
-                    quante carte dare e la sequenza delle mani. Le carte avanzate restano coperte nel mazzo.</p>
-                <p><strong>2. Gerarchia dei Semi:</strong><br>
-                    <span style="color:#f1c40f;">1. Ori (🪙)</span> > <span style="color:#3498db;">2. Spade (🗡️)</span>
-                    > <span style="color:#e74c3c;">3. Coppe (🍷)</span> > <span style="color:#2ecc71;">4. Bastoni
-                        (🏏)</span>.<br>
-                    <em>Un seme di livello superiore batte sempre un seme di livello inferiore, anche se non è il seme
-                        di uscita! (Es. Spade batte sempre Coppe)</em>
-                </p>
-                <p><strong>3. Forza delle Carte (nel seme):</strong><br>Asso > 3 > Re > Cavallo > Fante > 7 > 6 > 5 > 4
-                    > 2</p>
-                <p><strong>4. Regole della Presa:</strong> Se hai carte del seme di uscita devi per forza giocarla
-                    ("Rispondere al seme"). Se non puoi rispondere, gioca o scarta un'altra carta. Vince la carta di
-                    gerarchia maggiore del seme più alto giocato nel turno.</p>
-                <p><strong>5. Sequenza delle Mani:</strong> I giri salgono a partire da 2 carte fino al limite massimo
-                    (es. 10 carte a testa per 4 giocatori), dopodiché si ridiscende e torna fino a 2 carte.</p>
-                <p><strong>6. Dichiarazione (Scommesse):</strong> Prima di giocare, dichiari quante prese pensi di fare
-                    in quella fase. <em>Attenzione:</em> chi dichiara per ultimo ha il <em>"Vincolo del Mazziere"</em>,
-                    ovvero il totale delle scommesse dichiarate da tutti non può uguagliare la quantità di carte
-                    distribuite!</p>
-                <p><strong>7. Punteggio:</strong><br>
-                    - Se indovini esattamente la dichiarazione, prendi <strong>+8 punti bonus</strong>.<br>
-                    - Ottieni sempre <strong>+1 punto</strong> per ognuna delle prese vinte realizzate effettivamente.
-                </p>
-                <p><strong>8. Giro Finale Speciale (Fronte):</strong><br>Al termine di tutto c'è la finale speciale a 1
-                    carta: in questo turno la tua carta apparirà coperta, mentre vedrai la carta scoperta di tutti gli
-                    altri giocatori! Scommetterai quindi alla cieca in base a cosa hanno gli altri.</p>
+            <div id="rules-content-body" data-i18n="rulesContent" style="line-height: 1.6; font-size: 1.1rem; color: #ddd; text-align: left;">
             </div>
         </div>
     </div>
