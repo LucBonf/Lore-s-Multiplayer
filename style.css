@@ -123,11 +123,12 @@ body {
     background-image: url('https://gist.github.com/user-attachments/assets/1be959ff-f211-40ab-ac79-46e049cd336a');
     background-repeat: no-repeat;
     background-size: 960px 610px;
-    background-color: white;
-    border-radius: 5px;
+    background-color: #fff;
+    border-radius: 6px;
     border: 1px solid #000;
     cursor: pointer;
     transition: transform 0.2s;
+    background-size: 960px 610px; /* Assicura che la scala sia fissa */
 }
 
 .card:hover {
@@ -485,9 +486,9 @@ button {
 
 /* Stile Carta Visibile standard (Corretto per non cancellare l'immagine) */
 .card {
-    background-color: white;
-    /* Usiamo -color per non sovrascrivere l'immagine! */
+    background-color: #ffffff;
     user-select: none;
+    backface-visibility: hidden; /* Migliora rendering su Chrome/Safari */
 }
 
 /* Assicura che la carta passata col mouse scavalchi le altre */
