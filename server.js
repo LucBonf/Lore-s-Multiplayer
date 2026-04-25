@@ -224,11 +224,11 @@ const authAdmin = (req, res, next) => {
                     <h2>⚠️ ACCESSO RISERVATO</h2>
                     <p>Inserisci il Codice Operatore</p>
                     <form action="/admin-login-verify" method="POST">
-                        <input type="hidden" name="returnUrl" value="\${returnUrl}">
+                        <input type="hidden" name="returnUrl" value="${returnUrl}">
                         <input type="password" name="code" placeholder="******" autofocus required><br>
                         <button type="submit">SBLOCCA SISTEMA</button>
                     </form>
-                    \${req.query.err ? '<p style="font-size:0.8em;">Codice Errato!</p>' : ''}
+                    ${req.query.err ? '<p style="font-size:0.8em;">Codice Errato!</p>' : ''}
                 </div>
             </body>
             </html>
