@@ -1882,6 +1882,7 @@ async function simulazionePartitaSingola() {
                 // Fine mano?
                 if (game.players.every(pl => pl.mano.every(c => c.giocata))) {
                     game.indiceGiro++;
+                    game.fase = "fine_giro"; // Questo fa uscire dal ciclo 'while (game.fase === "gioco")'
                 }
             } else {
                 game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
