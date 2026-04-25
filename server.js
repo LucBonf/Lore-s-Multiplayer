@@ -49,13 +49,16 @@ const User = mongoose.model('User', userSchema);
 const reportSchema = new mongoose.Schema({
     data: { type: Date, default: Date.now },
     nickname: { type: String, default: 'Sconosciuto' },
-    testo: { type: String, required: true }
+    testo: { type: String, required: true },
+    roomCode: { type: String, default: null },
+    matchId: { type: String, default: null }
 });
 const Report = mongoose.model('Report', reportSchema);
  
 // --- NUOVO: Schema per Training AI (Capped Collection 25MB) ---
 const matchLogSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
+    matchId: String,            // ID unico della partita per correlazione
     numPlayers: Number,
     roundCards: Number,
     playerIndex: Number,
@@ -111,18 +114,30 @@ if (process.env.MONGODB_URI) {
             console.log('🔗 Connesso a MongoDB Atlas!'); 
             dbConnected = true; 
             
-            // Inizializza collezione Capped per i LOG AI
+            // Inizializza collezioni Capped (Limite spazio)
             try {
-                const collections = await mongoose.connection.db.listCollections({ name: 'matchlogs' }).toArray();
-                if (collections.length === 0) {
+                // LOG AI (25MB - 100k mosse)
+                const collectionsMatch = await mongoose.connection.db.listCollections({ name: 'matchlogs' }).toArray();
+                if (collectionsMatch.length === 0) {
                     await mongoose.connection.db.createCollection('matchlogs', {
                         capped: true,
-                        size: 25 * 1024 * 1024, // 25 MB (abbondante per milioni di mosse testuali)
-                        max: 100000 // Conserva le ultime 100k mosse
+                        size: 25 * 1024 * 1024,
+                        max: 100000
                     });
-                    console.log("📦 Collezione Capped 'matchlogs' creata.");
+                    console.log("📦 Collezione 'matchlogs' (Capped) creata.");
                 }
-            } catch (e) { console.log("Nota: matchlogs già esistente o gestita."); }
+
+                // REPORT BUG (5MB - 1000 report)
+                const collectionsReports = await mongoose.connection.db.listCollections({ name: 'reports' }).toArray();
+                if (collectionsReports.length === 0) {
+                    await mongoose.connection.db.createCollection('reports', {
+                        capped: true,
+                        size: 5 * 1024 * 1024,
+                        max: 1000
+                    });
+                    console.log("📦 Collezione 'reports' (Capped) creata.");
+                }
+            } catch (e) { console.log("Nota: Inizializzazione collezioni già completata."); }
 
             // --- PULIZIA SPECIFICA RICHIESTA: Elimina utenti offensivi e bestemmie ---
             try {
@@ -175,7 +190,9 @@ app.get('/stata-segreta-report-777', async (req, res) => {
                     <div class="report-card" id="card-${r._id}">
                         <button class="delete-btn" onclick="eliminaReport('${r._id}')">🗑️</button>
                         <span class="report-date">${r.data.toLocaleString('it-IT')}</span> - 
-                        <span class="report-user">Utente: ${r.nickname}</span><br>
+                        <span class="report-user">Utente: ${r.nickname}</span>
+                        ${r.matchId ? `<br><span style="color: #2ecc71; font-size: 0.8rem;">Partita ID: ${r.matchId} (Room: ${r.roomCode})</span>` : ""}
+                        <br>
                         <p style="margin-top: 10px; font-style: italic;">"${r.testo}"</p>
                     </div>`;
                 });
@@ -354,9 +371,13 @@ class LucasGame {
     }
 }
 
+let umaniConnessi = 0;
 const lobbies = {};
 
+
 io.on('connection', (socket) => {
+    umaniConnessi++;
+    console.log(`👤 Umano connesso. Totale: ${umaniConnessi} (Auto-Training sospeso)`);
 
     socket.on('login', async (dati) => {
         // Controllo profanità universale e aggressivo
@@ -654,6 +675,13 @@ io.on('connection', (socket) => {
             }
         } catch (e) {
             console.error("Errore disconnect:", e);
+        } finally {
+            umaniConnessi = Math.max(0, umaniConnessi - 1);
+            console.log(`👤 Umano disconnesso. Rimanenti: ${umaniConnessi}`);
+            if (umaniConnessi === 0) {
+                console.log("💤 Nessun umano connesso. Avvio Auto-Training tra 10 secondi...");
+                setTimeout(avviaAutoTraining, 10000);
+            }
         }
     });
 
@@ -671,6 +699,9 @@ io.on('connection', (socket) => {
             }
         });
         lobby.gameInstance.distribuisci();
+        // Genera un ID unico per la partita (usato per i log)
+        lobby.gameInstance.matchId = "M-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+        
         inviaStato(code);
         gestisciIA(code);
     }
@@ -679,14 +710,21 @@ io.on('connection', (socket) => {
         try {
             let nick = socket.userNickname || "Sconosciuto";
 
+            // RECUPERO CONTESTO PARTITA (Se presente)
+            const roomCode = socket.roomCode;
+            const lobby = roomCode ? lobbies[roomCode] : null;
+            const matchId = lobby?.gameInstance?.matchId || null;
+
             // SALVATAGGIO SU DATABASE (Persistente)
             if (dbConnected) {
                 const nuovoReport = new Report({
                     nickname: nick,
-                    testo: testo.substring(0, 500) // Limite di sicurezza
+                    testo: testo.substring(0, 500), // Limite di sicurezza
+                    roomCode: roomCode,
+                    matchId: matchId
                 });
                 await nuovoReport.save();
-                console.log(`🪲 Report salvato su DB da ${nick}`);
+                console.log(`🪲 Report salvato su DB da ${nick} (Match: ${matchId || 'N/A'})`);
             }
 
             // Backup su file (opzionale, sparirà al commit su Render)
@@ -821,6 +859,7 @@ io.on('connection', (socket) => {
                 const tablePreMossa = game.tavolo.slice(0, indexTavolo).map(t => `${t.card.valore}-${t.card.seme}`).join('|');
 
                 const logEntry = new MatchLog({
+                    matchId: game.matchId,
                     numPlayers: game.numPlayers,
                     roundCards: game.sequenzaTurni[game.indiceGiro],
                     playerIndex: giocata.playerId,
@@ -1060,5 +1099,172 @@ io.on('connection', (socket) => {
     }
 });
 
+// ==========================================
+//   MOTORE DI AUTO-TRAINING (TURBO AI)
+// ==========================================
+
+async function avviaAutoTraining() {
+    if (umaniConnessi > 0) return;
+    if (!dbConnected) return;
+
+    console.log("🚀 [TURBO] Avvio sessione di simulazione...");
+    
+    // Eseguiamo una partita intera
+    try {
+        await simulazionePartitaSingola();
+    } catch (e) {
+        console.error("Errore durante simulazione turbo:", e);
+    }
+
+    // Se ancora nessuno è connesso, programma la prossima partita tra 2 secondi
+    if (umaniConnessi === 0) {
+        setTimeout(avviaAutoTraining, 2000);
+    }
+}
+
+async function simulazionePartitaSingola() {
+    // Crea una partita da 4 Bot (media ideale)
+    const numPlayers = 4;
+    const game = new LucasGame(numPlayers);
+    game.matchId = "TURBO-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    // Inizializza i bot
+    game.players.forEach((p, i) => {
+        p.nome = `Bot-${i}`;
+        p.isHuman = false;
+    });
+
+    // Loop dei Giri
+    while (game.indiceGiro < game.sequenzaTurni.length) {
+        game.distribuisci();
+
+        // 1. Fase Scommesse
+        while (game.fase === "scommesse") {
+            const p = game.players[game.turnoAttuale];
+            const qta = game.sequenzaTurni[game.indiceGiro];
+            
+            // Logica Bot Scommessa (semplificata per velocità)
+            let powerScore = 0;
+            p.mano.forEach(c => {
+                if (c.valore === 'Asso') powerScore += 135;
+                else if (c.valore === '3') powerScore += 115;
+                else if (['Re', 'Cavallo', 'Fante'].includes(c.valore)) powerScore += 10;
+                else powerScore += 2;
+                if (c.seme === 'Ori') powerScore += 40;
+                if (c.seme === 'Spade') powerScore += 15;
+            });
+            const div = (game.numPlayers <= 3) ? 120 : 150;
+            const ordineTurno = (game.turnoAttuale - (game.indiceMazziere + 1) + game.numPlayers) % game.numPlayers;
+            const posFactor = 0.85 + (ordineTurno / game.numPlayers) * 0.3;
+            let s = Math.floor((powerScore / div) * posFactor);
+            if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
+            if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
+                s = (s >= qta / 2) ? s - 1 : s + 1;
+            }
+            s = Math.max(0, Math.min(s, qta));
+
+            p.dichiarazione = s;
+            game.sommaScommesse += s;
+            game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
+            if (game.players.every(pl => pl.dichiarazione !== "-")) game.fase = "gioco";
+        }
+
+        // 2. Fase Gioco
+        while (game.fase === "gioco") {
+            const p = game.players[game.turnoAttuale];
+            const manoV = p.mano.filter(c => !c.giocata);
+            let cartaDaGiocare;
+            const vuoleVincere = p.preseFatte < p.dichiarazione;
+
+            if (game.tavolo.length === 0) {
+                if (vuoleVincere) {
+                    let cartaRegnante = manoV.find(c => {
+                        const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
+                        return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
+                    });
+                    cartaDaGiocare = cartaRegnante || manoV.sort((a, b) => b.forza - a.forza)[Math.floor(manoV.length / 2)];
+                } else {
+                    cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
+                }
+            } else {
+                const semeUscita = game.tavolo[0].card.seme;
+                const carteValide = manoV.filter(c => c.seme === semeUscita);
+                if (carteValide.length > 0) {
+                    const vincenteAttuale = game.calcolaVincitorePresa();
+                    const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
+                    if (vuoleVincere) {
+                        cartaDaGiocare = (carteVincenti.length > 0) ? carteVincenti.sort((a, b) => a.forza - b.forza)[0] : carteValide.sort((a, b) => b.forza - a.forza)[0];
+                    } else {
+                        const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
+                        cartaDaGiocare = (cartePerdenti.length > 0) ? cartePerdenti.sort((a, b) => b.forza - a.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
+                    }
+                } else {
+                    cartaDaGiocare = vuoleVincere ? manoV.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => b.forza - a.forza)[0];
+                }
+            }
+
+            cartaDaGiocare.giocata = true;
+            game.tavolo.push({ playerId: game.turnoAttuale, card: cartaDaGiocare });
+
+            // Risoluzione Presa
+            if (game.tavolo.length === game.numPlayers) {
+                const vincitore = game.calcolaVincitorePresa();
+                const semeUscitaPresa = game.tavolo[0].card.seme;
+
+                // --- LOGGING AI (Lo stesso usato per gli umani) ---
+                const historyStr = game.carteUscite.map(c => `${c.valore}-${c.seme}`).join('|');
+                const voidStr = game.players.map((pl, i) => pl.voidSuits.length > 0 ? `P${i}:${pl.voidSuits.join('&')}` : "").filter(s => s !== "").join('|');
+
+                game.tavolo.forEach((giocata, indexTavolo) => {
+                    const pLog = game.players[giocata.playerId];
+                    if (giocata.card.seme !== semeUscitaPresa && !pLog.voidSuits.includes(semeUscitaPresa)) {
+                        pLog.voidSuits.push(semeUscitaPresa);
+                    }
+                    const handPre = pLog.mano.filter(c => !c.giocata).map(c => `${c.valore}-${c.seme}`);
+                    handPre.push(`${giocata.card.valore}-${giocata.card.seme}`);
+                    const tablePre = game.tavolo.slice(0, indexTavolo).map(t => `${t.card.valore}-${t.card.seme}`).join('|');
+
+                    const logEntry = new MatchLog({
+                        matchId: game.matchId,
+                        numPlayers: game.numPlayers,
+                        roundCards: game.sequenzaTurni[game.indiceGiro],
+                        playerIndex: giocata.playerId,
+                        isHuman: false,
+                        dichiarazione: pLog.dichiarazione,
+                        preseFatte: pLog.preseFatte,
+                        obiettivoRimanente: pLog.dichiarazione - pLog.preseFatte,
+                        hand: handPre.join('|'),
+                        table: tablePre,
+                        history: historyStr,
+                        voidSuits: voidStr,
+                        move: `${giocata.card.valore}-${giocata.card.seme}`,
+                        wonTrick: (giocata.playerId === vincitore.playerId)
+                    });
+                    logEntry.save().catch(() => {});
+                });
+
+                game.players[vincitore.playerId].preseFatte++;
+                game.tavolo.forEach(g => game.carteUscite.push(g.card));
+                game.tavolo = [];
+                game.turnoAttuale = vincitore.playerId;
+
+                // Fine mano?
+                if (game.players.every(pl => pl.mano.every(c => c.giocata))) {
+                    game.indiceGiro++;
+                }
+            } else {
+                game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
+            }
+
+            // SICUREZZA: Se entra un umano mentre simula, interrompi il gioco corrente
+            if (umaniConnessi > 0) return;
+        }
+    }
+}
+
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server attivo sulla porta ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`Server attivo sulla porta ${PORT}`);
+    // Avvia il check iniziale dopo 10 secondi
+    setTimeout(avviaAutoTraining, 10000);
+});
