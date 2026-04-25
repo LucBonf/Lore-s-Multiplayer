@@ -75,6 +75,9 @@ const matchLogSchema = new mongoose.Schema({
 });
 const MatchLog = mongoose.model('MatchLog', matchLogSchema);
 
+// --- NUOVO: Schema per Human Logs (Dati reali preziosi) ---
+const HumanMatchLog = mongoose.model('HumanMatchLog', matchLogSchema, 'humanlogs');
+
 
 // --- INTEGRAZIONE IA (GEMINI API) ---
 async function checkWithAI(nickname) {
@@ -136,6 +139,17 @@ if (process.env.MONGODB_URI) {
                         max: 1000
                     });
                     console.log("📦 Collezione 'reports' (Capped) creata.");
+                }
+
+                // HUMAN LOGS (10MB - Dati umani separati)
+                const collectionsHuman = await mongoose.connection.db.listCollections({ name: 'humanlogs' }).toArray();
+                if (collectionsHuman.length === 0) {
+                    await mongoose.connection.db.createCollection('humanlogs', {
+                        capped: true,
+                        size: 10 * 1024 * 1024,
+                        max: 50000
+                    });
+                    console.log("📦 Collezione 'humanlogs' (Capped) creata.");
                 }
             } catch (e) { console.log("Nota: Inizializzazione collezioni già completata."); }
 
@@ -236,7 +250,11 @@ app.get('/scarica-dataset-lucas-777', async (req, res) => {
     try {
         if (!dbConnected) return res.status(500).send("DB non connesso");
         
-        const logs = await MatchLog.find().sort({ timestamp: 1 });
+        const type = req.query.type || 'turbo';
+        const Model = (type === 'human') ? HumanMatchLog : MatchLog;
+        const filename = (type === 'human') ? 'lucas_HUMAN_data.csv' : 'lucas_TURBO_data.csv';
+
+        const logs = await Model.find().sort({ timestamp: 1 });
         
         let csv = "Timestamp,NumPlayers,RoundCards,PlayerIdx,IsHuman,Decl,Made,Target,Hand,Table,History,VoidSuits,Move,Won\n";
         
@@ -260,7 +278,7 @@ app.get('/scarica-dataset-lucas-777', async (req, res) => {
         });
 
         res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', 'attachment; filename=lucas_ai_training_data.csv');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
         res.status(200).send(csv);
     } catch (err) {
         res.status(500).send("Errore generazione CSV");
@@ -273,9 +291,12 @@ app.get('/stato-allenamento-777', async (req, res) => {
         if (!dbConnected) return res.status(500).send("Database non connesso.");
 
         // Statistiche dal DB
-        const totaleMosse = await MatchLog.countDocuments();
-        const partiteDistinte = await MatchLog.distinct("matchId");
+        const totaleTurbo = await MatchLog.countDocuments();
+        const totaleHuman = await HumanMatchLog.countDocuments();
+        const partiteTurbo = (await MatchLog.distinct("matchId")).length;
+        const partiteHuman = (await HumanMatchLog.distinct("matchId")).length;
         const ultimoLog = await MatchLog.findOne().sort({ timestamp: -1 });
+        const ultimoHuman = await HumanMatchLog.findOne().sort({ timestamp: -1 });
 
         const html = `
         <!DOCTYPE html>
@@ -292,6 +313,7 @@ app.get('/stato-allenamento-777', async (req, res) => {
                 .btn { display: inline-block; margin-top: 20px; padding: 10px 20px; border: 1px solid #00ff00; color: #00ff00; text-decoration: none; cursor: pointer; }
                 .btn:hover { background: #00ff00; color: #000; }
             </style>
+            <script src="/socket.io/socket.io.js"></script>
             <meta http-equiv="refresh" content="5">
         </head>
         <body>
@@ -301,20 +323,45 @@ app.get('/stato-allenamento-777', async (req, res) => {
                 
                 <div class="status">
                     STATO: <span class="${isSimulando ? 'active' : 'paused'}">
-                        ${isSimulando ? '● IN CORSO (Simulazione Turbo)' : '○ IN PAUSA (Presenza Umana)'}
+                        ${isSimulando ? '● IN CORSO (Simulazione Turbo)' : '○ IN PAUSA (Giocatori Reali Online)'}
                     </span>
                 </div>
 
-                <div class="metric">Umani Connessi: ${umaniConnessi}</div>
-                <div class="metric">Mosse Totali nel DB: ${totaleMosse.toLocaleString()} / 100,000</div>
-                <div class="metric">Partite Totali Analizzate: ${partiteDistinte.length}</div>
-                <div class="metric">Ultima Attività: ${ultimoLog ? ultimoLog.timestamp.toLocaleString('it-IT') : 'Nessuna'}</div>
+                <div class="metric">Giocatori Reali Online: ${umaniConnessi - osservatoriAdmin}</div>
+                <div class="metric">Admin in Osservazione: ${osservatoriAdmin}</div>
+                <hr style="border: 0.5px solid #00ff00; opacity: 0.3;">
+                
+                <div style="display: flex; justify-content: space-between;">
+                    <div>
+                        <h3>💾 DATASET TURBO (AI)</h3>
+                        <div class="metric">Mosse: ${totaleTurbo.toLocaleString()} / 100k</div>
+                        <div class="metric">Partite: ${partiteTurbo}</div>
+                        <a href="/scarica-dataset-lucas-777?type=turbo" class="btn">SCARICA TURBO CSV</a>
+                    </div>
+                    <div style="border-left: 1px solid #00ff00; padding-left: 20px;">
+                        <h3>💎 DATASET UMANO</h3>
+                        <div class="metric">Mosse: ${totaleHuman.toLocaleString()} / 50k</div>
+                        <div class="metric">Partite: ${partiteHuman}</div>
+                        <a href="/scarica-dataset-lucas-777?type=human" class="btn">SCARICA HUMAN CSV</a>
+                    </div>
+                </div>
                 
                 <br>
-                <a href="/scarica-dataset-lucas-777" class="btn">SCARICA DATASET (CSV)</a>
+                <div class="metric">Ultimo Log (AI): ${ultimoLog ? ultimoLog.timestamp.toLocaleString('it-IT') : '---'}</div>
+                <div class="metric">Ultimo Log (Umano): ${ultimoHuman ? ultimoHuman.timestamp.toLocaleString('it-IT') : '---'}</div>
+                
+                <br>
                 <a href="/stata-segreta-report-777" class="btn">VEDI BUG REPORT</a>
             </div>
             <p style="font-size: 0.8rem; margin-top: 20px;">Aggiornamento automatico ogni 5 secondi...</p>
+
+            <script>
+                const socket = io();
+                socket.on('connect', () => {
+                    socket.emit('admin_obs');
+                    console.log('Modalità Osservatore Attivata');
+                });
+            </script>
         </body>
         </html>
         `;
@@ -429,13 +476,20 @@ class LucasGame {
 }
 
 let umaniConnessi = 0;
+let osservatoriAdmin = 0;
 let isSimulando = false;
 const lobbies = {};
 
 
 io.on('connection', (socket) => {
     umaniConnessi++;
-    console.log(`👤 Umano connesso. Totale: ${umaniConnessi} (Auto-Training sospeso)`);
+    
+    // Gestione speciale per chi guarda la dashboard
+    socket.on('admin_obs', () => {
+        socket.isAdminObs = true;
+        osservatoriAdmin++;
+        console.log(`📡 Dashboard Admin collegata. Osservatori: ${osservatoriAdmin}`);
+    });
 
     socket.on('login', async (dati) => {
         // Controllo profanità universale e aggressivo
@@ -734,11 +788,15 @@ io.on('connection', (socket) => {
         } catch (e) {
             console.error("Errore disconnect:", e);
         } finally {
+            if (socket.isAdminObs) {
+                osservatoriAdmin = Math.max(0, osservatoriAdmin - 1);
+            }
             umaniConnessi = Math.max(0, umaniConnessi - 1);
-            console.log(`👤 Umano disconnesso. Rimanenti: ${umaniConnessi}`);
-            if (umaniConnessi === 0) {
-                console.log("💤 Nessun umano connesso. Avvio Auto-Training tra 10 secondi...");
-                setTimeout(avviaAutoTraining, 10000);
+            
+            const umaniReali = umaniConnessi - osservatoriAdmin;
+            if (umaniReali <= 0) {
+                console.log("💤 Nessun giocatore reale. Avvio Auto-Training...");
+                setTimeout(avviaAutoTraining, 5000);
             }
         }
     });
@@ -899,6 +957,10 @@ io.on('connection', (socket) => {
             const voidStr = game.players.map((p, i) => p.voidSuits.length > 0 ? `P${i}:${p.voidSuits.join('&')}` : "").filter(s => s !== "").join('|');
             const tableStr = game.tavolo.map(t => `${t.card.valore}-${t.card.seme}`).join('|');
 
+            // Determina in quale collezione salvare: se c'è un umano, salviamo in HumanMatchLog
+            const isHumanGame = game.players.some(p => p.isHuman);
+            const LogModel = isHumanGame ? HumanMatchLog : MatchLog;
+
             game.tavolo.forEach((giocata, indexTavolo) => {
                 const player = game.players[giocata.playerId];
                 const card = giocata.card;
@@ -909,14 +971,12 @@ io.on('connection', (socket) => {
                 }
 
                 // Costruiamo la mano che aveva *prima* di giocare questa carta
-                // (le carte ancora non giocate + questa carta stessa)
                 const handPreMossa = player.mano.filter(c => !c.giocata).map(c => `${c.valore}-${c.seme}`);
                 handPreMossa.push(`${card.valore}-${card.seme}`);
 
-                // Cosa c'era a terra *prima* che giocasse lui?
                 const tablePreMossa = game.tavolo.slice(0, indexTavolo).map(t => `${t.card.valore}-${t.card.seme}`).join('|');
 
-                const logEntry = new MatchLog({
+                const logEntry = new LogModel({
                     matchId: game.matchId,
                     numPlayers: game.numPlayers,
                     roundCards: game.sequenzaTurni[game.indiceGiro],
@@ -1162,7 +1222,8 @@ io.on('connection', (socket) => {
 // ==========================================
 
 async function avviaAutoTraining() {
-    if (umaniConnessi > 0) return;
+    const umaniReali = umaniConnessi - osservatoriAdmin;
+    if (umaniReali > 0) return;
     if (!dbConnected) return;
 
     console.log("🚀 [TURBO] Avvio sessione di simulazione...");
@@ -1285,6 +1346,7 @@ async function simulazionePartitaSingola() {
                     handPre.push(`${giocata.card.valore}-${giocata.card.seme}`);
                     const tablePre = game.tavolo.slice(0, indexTavolo).map(t => `${t.card.valore}-${t.card.seme}`).join('|');
 
+                    // Nelle simulazioni turbo salviamo sempre in MatchLog
                     const logEntry = new MatchLog({
                         matchId: game.matchId,
                         numPlayers: game.numPlayers,
@@ -1317,8 +1379,9 @@ async function simulazionePartitaSingola() {
                 game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
             }
 
-            // SICUREZZA: Se entra un umano mentre simula, interrompi il gioco corrente
-            if (umaniConnessi > 0) return;
+            // SICUREZZA: Se entra un umano vero mentre simula, interrompi
+            const umaniRealiCheck = umaniConnessi - osservatoriAdmin;
+            if (umaniRealiCheck > 0) return;
         }
     }
 }
