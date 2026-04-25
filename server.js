@@ -205,6 +205,7 @@ const authAdmin = (req, res, next) => {
     }
 
     // Se non autenticato, mostra la pagina di login
+    const returnUrl = req.originalUrl || '/stato-allenamento-777';
     res.send(`
             <!DOCTYPE html>
             <html>
@@ -223,6 +224,7 @@ const authAdmin = (req, res, next) => {
                     <h2>⚠️ ACCESSO RISERVATO</h2>
                     <p>Inserisci il Codice Operatore</p>
                     <form action="/admin-login-verify" method="POST">
+                        <input type="hidden" name="returnUrl" value="\${returnUrl}">
                         <input type="password" name="code" placeholder="******" autofocus required><br>
                         <button type="submit">SBLOCCA SISTEMA</button>
                     </form>
@@ -235,12 +237,15 @@ const authAdmin = (req, res, next) => {
 
 // Rotta per verificare il login
 app.post('/admin-login-verify', express.urlencoded({ extended: true }), (req, res) => {
-    const { code } = req.body;
-    if (code === ADMIN_KEY) {
-        res.cookie('admin_session', ADMIN_KEY, { maxAge: 86400000, httpOnly: true }); // Scade in 24h
-        res.redirect('/stato-allenamento-777');
+    const code = req.body.code ? req.body.code.trim() : "";
+    const adminKey = ADMIN_KEY ? ADMIN_KEY.trim() : "";
+    const returnUrl = req.body.returnUrl || '/stato-allenamento-777';
+    
+    if (code === adminKey) {
+        res.cookie('admin_session', adminKey, { maxAge: 86400000, httpOnly: true, path: '/' }); // Scade in 24h
+        res.redirect(returnUrl);
     } else {
-        res.redirect('/stato-allenamento-777?err=1');
+        res.redirect(returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'err=1');
     }
 });
 
