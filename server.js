@@ -63,6 +63,7 @@ const matchLogSchema = new mongoose.Schema({
     roundCards: Number,
     playerIndex: Number,
     isHuman: Boolean,
+    aiVersion: { type: Number, default: 0 }, // 0=Umano, 1-4=Livello AI
     dichiarazione: Number,
     preseFatte: Number,
     obiettivoRimanente: Number, // Prese mancanti per fare la dichiarazione
@@ -276,15 +277,17 @@ app.get('/scarica-dataset-lucas-777', async (req, res) => {
 
         const logs = await Model.find().sort({ timestamp: 1 });
         
-        let csv = "Timestamp,NumPlayers,RoundCards,PlayerIdx,IsHuman,Decl,Made,Target,Hand,Table,History,VoidSuits,Move,Won\n";
+        let csv = "Timestamp,MatchId,NumPlayers,RoundCards,PlayerIdx,IsHuman,AIVersion,Decl,Made,Target,Hand,Table,History,VoidSuits,Move,Won\n";
         
         logs.forEach(l => {
             csv += [
                 l.timestamp.toISOString(),
+                l.matchId,
                 l.numPlayers,
                 l.roundCards,
                 l.playerIndex,
                 l.isHuman ? 1 : 0,
+                l.aiVersion || 0,
                 l.dichiarazione,
                 l.preseFatte,
                 l.obiettivoRimanente,
@@ -444,6 +447,7 @@ class Player {
         this.id = id;
         this.nome = nome;
         this.isHuman = isHuman;
+        this.aiVersion = isHuman ? 0 : Math.floor(Math.random() * 4) + 1; // Assegna un livello casuale se è bot
         this.token = token;
         this.uniqueCode = uniqueCode;
         this.mano = [];
@@ -1021,6 +1025,7 @@ io.on('connection', (socket) => {
                     roundCards: game.sequenzaTurni[game.indiceGiro],
                     playerIndex: giocata.playerId,
                     isHuman: player.isHuman,
+                    aiVersion: player.aiVersion || 0,
                     dichiarazione: player.dichiarazione,
                     preseFatte: player.preseFatte,
                     obiettivoRimanente: player.dichiarazione - player.preseFatte,
@@ -1352,32 +1357,72 @@ async function simulazionePartitaSingola() {
             let cartaDaGiocare;
             const vuoleVincere = p.preseFatte < p.dichiarazione;
 
-            if (game.tavolo.length === 0) {
-                if (vuoleVincere) {
-                    let cartaRegnante = manoV.find(c => {
-                        const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
-                        return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
-                    });
-                    cartaDaGiocare = cartaRegnante || manoV.sort((a, b) => b.forza - a.forza)[Math.floor(manoV.length / 2)];
-                } else {
-                    cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
-                }
-            } else {
-                const semeUscita = game.tavolo[0].card.seme;
-                const carteValide = manoV.filter(c => c.seme === semeUscita);
-                if (carteValide.length > 0) {
-                    const vincenteAttuale = game.calcolaVincitorePresa();
-                    const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
+            // --- NUOVA LOGICA MULTI-LIVELLO ---
+            if (p.aiVersion === 1) {
+                // V1: Casuale
+                cartaDaGiocare = manoV[Math.floor(Math.random() * manoV.length)];
+            } else if (p.aiVersion === 2 || p.aiVersion === 3 || p.aiVersion === 4) {
+                // Logica Comune (V2-V4)
+                if (game.tavolo.length === 0) {
                     if (vuoleVincere) {
-                        cartaDaGiocare = (carteVincenti.length > 0) ? carteVincenti.sort((a, b) => a.forza - b.forza)[0] : carteValide.sort((a, b) => b.forza - a.forza)[0];
+                        // V3-V4 cercano carte regnanti o alte
+                        let cartaRegnante = manoV.find(c => {
+                            const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
+                            return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
+                        });
+                        if (p.aiVersion >= 3 && cartaRegnante) {
+                            cartaDaGiocare = cartaRegnante;
+                        } else {
+                            cartaDaGiocare = manoV.sort((a, b) => b.forza - a.forza)[0];
+                        }
                     } else {
-                        const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
-                        cartaDaGiocare = (cartePerdenti.length > 0) ? cartePerdenti.sort((a, b) => b.forza - a.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
+                        cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
                     }
                 } else {
-                    cartaDaGiocare = vuoleVincere ? manoV.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => b.forza - a.forza)[0];
+                    const semeUscita = game.tavolo[0].card.seme;
+                    const carteValide = manoV.filter(c => c.seme === semeUscita);
+                    const vincenteAttuale = game.calcolaVincitorePresa();
+
+                    if (carteValide.length > 0) {
+                        const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
+                        if (vuoleVincere) {
+                            // V4: Se siamo ultimi, usiamo la carta minima necessaria per vincere
+                            if (p.aiVersion >= 4 && game.tavolo.length === game.numPlayers - 1 && carteVincenti.length > 0) {
+                                cartaDaGiocare = carteVincenti.sort((a, b) => a.forza - b.forza)[0];
+                            } else {
+                                cartaDaGiocare = (carteVincenti.length > 0) ? carteVincenti.sort((a, b) => a.forza - b.forza)[0] : carteValide.sort((a, b) => b.forza - a.forza)[0];
+                            }
+                        } else {
+                            const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
+                            // V3-V4: Scartano la più alta tra le perdenti per "pulirsi" la mano
+                            if (p.aiVersion >= 3 && cartePerdenti.length > 0) {
+                                cartaDaGiocare = cartePerdenti.sort((a, b) => b.forza - a.forza)[0];
+                            } else {
+                                cartaDaGiocare = (cartePerdenti.length > 0) ? cartePerdenti.sort((a, b) => b.forza - a.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
+                            }
+                        }
+                    } else {
+                        // Non ha il seme
+                        if (vuoleVincere) {
+                            // Se può tagliare con Ori
+                            const briscole = manoV.filter(c => c.seme === 'Ori');
+                            if (p.aiVersion >= 3 && briscole.length > 0) {
+                                // V3-V4 tagliano solo se necessario
+                                const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
+                                const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
+                                cartaDaGiocare = (briscoleUtili.length > 0) ? briscoleUtili.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
+                            } else {
+                                cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
+                            }
+                        } else {
+                            // Vuole perdere: scarta la più alta (V3+) o la più bassa (V2)
+                            cartaDaGiocare = (p.aiVersion >= 3) ? manoV.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
+                        }
+                    }
                 }
             }
+
+            if (!cartaDaGiocare) cartaDaGiocare = manoV[0];
 
             cartaDaGiocare.giocata = true;
             game.tavolo.push({ playerId: game.turnoAttuale, card: cartaDaGiocare });
@@ -1407,6 +1452,7 @@ async function simulazionePartitaSingola() {
                         roundCards: game.sequenzaTurni[game.indiceGiro],
                         playerIndex: giocata.playerId,
                         isHuman: false,
+                        aiVersion: pLog.aiVersion || 0,
                         dichiarazione: pLog.dichiarazione,
                         preseFatte: pLog.preseFatte,
                         obiettivoRimanente: pLog.dichiarazione - pLog.preseFatte,
