@@ -267,6 +267,63 @@ app.get('/scarica-dataset-lucas-777', async (req, res) => {
     }
 });
 
+// ROTTA SEGRETA: DASHBOARD MONITORAGGIO AI
+app.get('/stato-allenamento-777', async (req, res) => {
+    try {
+        if (!dbConnected) return res.status(500).send("Database non connesso.");
+
+        // Statistiche dal DB
+        const totaleMosse = await MatchLog.countDocuments();
+        const partiteDistinte = await MatchLog.distinct("matchId");
+        const ultimoLog = await MatchLog.findOne().sort({ timestamp: -1 });
+
+        const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Lucas AI - Monitor</title>
+            <style>
+                body { background: #0f0f0f; color: #00ff00; font-family: 'Courier New', Courier, monospace; padding: 40px; }
+                .panel { border: 1px solid #00ff00; padding: 20px; border-radius: 10px; box-shadow: 0 0 15px rgba(0,255,0,0.2); }
+                .status { font-size: 1.5rem; font-weight: bold; margin-bottom: 20px; }
+                .active { color: #00ff00; }
+                .paused { color: #ff0000; }
+                .metric { margin: 10px 0; font-size: 1.2rem; }
+                .btn { display: inline-block; margin-top: 20px; padding: 10px 20px; border: 1px solid #00ff00; color: #00ff00; text-decoration: none; cursor: pointer; }
+                .btn:hover { background: #00ff00; color: #000; }
+            </style>
+            <meta http-equiv="refresh" content="5">
+        </head>
+        <body>
+            <div class="panel">
+                <h1>🤖 LUCAS AI - MONITORING CENTER</h1>
+                <hr style="border: 0.5px solid #00ff00;">
+                
+                <div class="status">
+                    STATO: <span class="${isSimulando ? 'active' : 'paused'}">
+                        ${isSimulando ? '● IN CORSO (Simulazione Turbo)' : '○ IN PAUSA (Presenza Umana)'}
+                    </span>
+                </div>
+
+                <div class="metric">Umani Connessi: ${umaniConnessi}</div>
+                <div class="metric">Mosse Totali nel DB: ${totaleMosse.toLocaleString()} / 100,000</div>
+                <div class="metric">Partite Totali Analizzate: ${partiteDistinte.length}</div>
+                <div class="metric">Ultima Attività: ${ultimoLog ? ultimoLog.timestamp.toLocaleString('it-IT') : 'Nessuna'}</div>
+                
+                <br>
+                <a href="/scarica-dataset-lucas-777" class="btn">SCARICA DATASET (CSV)</a>
+                <a href="/stata-segreta-report-777" class="btn">VEDI BUG REPORT</a>
+            </div>
+            <p style="font-size: 0.8rem; margin-top: 20px;">Aggiornamento automatico ogni 5 secondi...</p>
+        </body>
+        </html>
+        `;
+        res.send(html);
+    } catch (e) {
+        res.status(500).send("Errore nel recupero delle statistiche.");
+    }
+});
+
 // ROTTA PER ELIMINARE I REPORT
 app.post('/elimina-report-777', express.json(), async (req, res) => {
     try {
@@ -372,6 +429,7 @@ class LucasGame {
 }
 
 let umaniConnessi = 0;
+let isSimulando = false;
 const lobbies = {};
 
 
@@ -1108,12 +1166,15 @@ async function avviaAutoTraining() {
     if (!dbConnected) return;
 
     console.log("🚀 [TURBO] Avvio sessione di simulazione...");
+    isSimulando = true;
     
     // Eseguiamo una partita intera
     try {
         await simulazionePartitaSingola();
     } catch (e) {
         console.error("Errore durante simulazione turbo:", e);
+    } finally {
+        isSimulando = false;
     }
 
     // Se ancora nessuno è connesso, programma la prossima partita tra 2 secondi
