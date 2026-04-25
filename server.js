@@ -1222,7 +1222,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    function risolviPresa(code) {
+    async function risolviPresa(code) {
         const game = lobbies[code]?.gameInstance;
         if (!game) return;
 
