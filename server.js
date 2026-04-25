@@ -176,6 +176,45 @@ if (process.env.MONGODB_URI) {
 
 app.use(express.static(__dirname));
 
+// --- NUOVA ROTTA: CERCA UTENTE PER ADMIN ---
+app.get('/api/admin/find-user/:query', async (req, res) => {
+    if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
+    try {
+        const query = req.params.query;
+        // Cerca per nickname (esatto) o per uniqueCode
+        const user = await User.findOne({ $or: [{ nickname: query }, { uniqueCode: query }] });
+        if (!user) return res.json({ success: false, error: "Utente non trovato" });
+        res.json({ success: true, user });
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+// --- NUOVA ROTTA: LISTA COMPLETA UTENTI ---
+app.get('/api/admin/all-users', async (req, res) => {
+    if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
+    try {
+        // Recuperiamo tutti gli utenti ordinati per ultimo accesso
+        const users = await User.find().sort({ lastLogin: -1 });
+        res.json({ success: true, users });
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+// --- NUOVA ROTTA: ELIMINA UTENTE PER ADMIN ---
+app.get('/api/admin/delete-user/:uniqueCode', async (req, res) => {
+    if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
+    try {
+        const code = req.params.uniqueCode;
+        const result = await User.deleteOne({ uniqueCode: code });
+        if (result.deletedCount === 0) return res.json({ success: false, error: "Nessun utente eliminato" });
+        res.json({ success: true });
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
 // ROTTA SEGRETA PER LEGGERE I REPORT (Sia da DB che da file se esiste)
 app.get('/stata-segreta-report-777', async (req, res) => {
     try {
@@ -331,15 +370,16 @@ app.get('/stato-allenamento-777', async (req, res) => {
             <style>
                 body { background: #0f0f0f; color: #00ff00; font-family: 'Courier New', Courier, monospace; padding: 40px; }
                 .panel { border: 1px solid #00ff00; padding: 20px; border-radius: 10px; box-shadow: 0 0 15px rgba(0,255,0,0.2); }
+                .card { border: 1px solid #333; padding: 15px; margin-top: 15px; border-radius: 8px; }
                 .status { font-size: 1.5rem; font-weight: bold; margin-bottom: 20px; }
                 .active { color: #00ff00; }
                 .paused { color: #ff0000; }
                 .metric { margin: 10px 0; font-size: 1.2rem; }
-                .btn { display: inline-block; margin-top: 20px; padding: 10px 20px; border: 1px solid #00ff00; color: #00ff00; text-decoration: none; cursor: pointer; }
+                .btn { display: inline-block; margin-top: 20px; padding: 10px 20px; border: 1px solid #00ff00; color: #00ff00; text-decoration: none; cursor: pointer; background: transparent; }
+                .btn-danger { border-color: #ff0000; color: #ff0000; }
                 .btn:hover { background: #00ff00; color: #000; }
             </style>
             <script src="/socket.io/socket.io.js"></script>
-            <meta http-equiv="refresh" content="5">
         </head>
         <body>
             <div class="panel">
@@ -354,15 +394,50 @@ app.get('/stato-allenamento-777', async (req, res) => {
 
                 <div class="metric">Giocatori Reali Online: ${umaniConnessi - osservatoriAdmin}</div>
                 <div class="metric">Admin in Osservazione: ${osservatoriAdmin}</div>
-                <hr style="border: 0.5px solid #00ff00; opacity: 0.3;">
                 
-                <div style="display: flex; justify-content: space-between;">
+                <div class="card">
+                    <h2>⚙️ Gestione Log</h2>
+                    <p>Attenzione: l'operazione è irreversibile.</p>
+                    <button class="btn btn-danger" onclick="confermaSvuota()">🗑️ SVUOTA LOG TURBO</button>
+                </div>
+
+                <div class="card">
+                    <h2>👤 Gestione Utente</h2>
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <input type="text" id="user-query" placeholder="Nickname o UniqueID..." style="flex-grow:1; padding:8px; border-radius:5px; border:1px solid #444; background:#222; color:white;">
+                        <button class="btn" onclick="cercaUtente()">🔍 Cerca</button>
+                        <button class="btn" onclick="caricaTuttiUtenti()">📋 Lista Completa</button>
+                    </div>
+                    <div id="user-info-box" style="display:none; background:rgba(0,0,0,0.3); padding:10px; border-radius:5px; font-size:0.9em; border:1px solid #555; margin-bottom: 10px;">
+                        <p><strong>Nome:</strong> <span id="info-nick">-</span></p>
+                        <p><strong>ID:</strong> <span id="info-code">-</span></p>
+                        <p><strong>Partite:</strong> <span id="info-matches">-</span></p>
+                        <button class="btn btn-danger" id="btn-delete-user" style="width:100%; margin-top:10px;">❌ ELIMINA ACCOUNT</button>
+                    </div>
+
+                    <div id="all-users-container" style="display:none; max-height:400px; overflow-y:auto; border:1px solid #333; margin-top:10px;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.8em;">
+                            <thead style="background:#111; position:sticky; top:0;">
+                                <tr>
+                                    <th style="padding:5px; border:1px solid #333;">Nick</th>
+                                    <th style="padding:5px; border:1px solid #333;">Punti</th>
+                                    <th style="padding:5px; border:1px solid #333;">ELO</th>
+                                    <th style="padding:5px; border:1px solid #333;">Giocate</th>
+                                    <th style="padding:5px; border:1px solid #333;">Vinte</th>
+                                    <th style="padding:5px; border:1px solid #333;">Last Login</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-top: 20px;">
                     <div>
                         <h3>💾 DATASET TURBO (AI)</h3>
                         <div class="metric">Mosse: ${totaleTurbo.toLocaleString()} / 400k</div>
                         <div class="metric">Partite: ${partiteTurbo}</div>
                         <a href="/scarica-dataset-lucas-777?type=turbo" class="btn">SCARICA TURBO CSV</a>
-                        <button onclick="resetTurbo()" class="btn" style="border-color: #ff0000; color: #ff0000;">🗑️ SVUOTA TURBO</button>
                     </div>
                     <div style="border-left: 1px solid #00ff00; padding-left: 20px;">
                         <h3>💎 DATASET UMANO</h3>
@@ -379,32 +454,79 @@ app.get('/stato-allenamento-777', async (req, res) => {
                 <br>
                 <a href="/stata-segreta-report-777" class="btn">VEDI BUG REPORT</a>
             </div>
-            <p style="font-size: 0.8rem; margin-top: 20px;">Aggiornamento automatico ogni 5 secondi...</p>
 
             <script>
-                // Passiamo il ruolo 'admin' nella query di connessione per identificarci istantaneamente
-                const socket = io({
-                    query: { role: 'admin' }
-                });
-                socket.on('connect', () => {
-                    console.log('Modalità Osservatore Attivata (Handshake)');
-                });
+                const socket = io({ query: { role: 'admin' } });
 
-                async function resetTurbo() {
-                    if (!confirm("ATTENZIONE: Stai per eliminare TUTTI i log Turbo (AI). L'azione è irreversibile. Procedere?")) return;
-                    
-                    try {
-                        const res = await fetch('/reset-turbo-logs-777', { method: 'POST' });
-                        const data = await res.json();
-                        if (data.ok) {
-                            alert('Archivio Turbo svuotato con successo!');
-                            location.reload();
-                        } else {
-                            alert('Errore durante il reset.');
-                        }
-                    } catch (e) {
-                        alert('Errore di connessione.');
+                function confermaSvuota() {
+                    if (confirm("ATTENZIONE: Stai per eliminare TUTTI i log Turbo (AI). L'azione è irreversibile. Procedere?")) {
+                        fetch('/reset-turbo-logs-777', { method: 'POST' }).then(res => res.json()).then(data => {
+                            if (data.ok) { alert('Archivio Turbo svuotato!'); location.reload(); }
+                            else alert('Errore durante il reset.');
+                        });
                     }
+                }
+
+                async function cercaUtente() {
+                    const q = document.getElementById('user-query').value;
+                    if (!q) return;
+                    const res = await fetch('/api/admin/find-user/' + encodeURIComponent(q));
+                    const data = await res.json();
+                    const box = document.getElementById('user-info-box');
+                    
+                    if (data.success) {
+                        box.style.display = 'block';
+                        document.getElementById('info-nick').innerText = data.user.nickname;
+                        document.getElementById('info-code').innerText = data.user.uniqueCode;
+                        document.getElementById('info-matches').innerText = data.user.partiteGiocate;
+                        
+                        document.getElementById('btn-delete-user').onclick = async () => {
+                            if (confirm("Sei sicuro di voler eliminare l'utente " + data.user.nickname + "? I log delle partite NON saranno cancellati.")) {
+                                const delRes = await fetch('/api/admin/delete-user/' + data.user.uniqueCode);
+                                const delData = await delRes.json();
+                                if (delData.success) {
+                                    alert("Utente eliminato correttamente.");
+                                    box.style.display = 'none';
+                                    document.getElementById('user-query').value = '';
+                                } else {
+                                    alert("Errore: " + delData.error);
+                                }
+                            }
+                        };
+                    } else {
+                        alert("Utente non trovato!");
+                        box.style.display = 'none';
+                    }
+                }
+
+                async function caricaTuttiUtenti() {
+                    const res = await fetch('/api/admin/all-users');
+                    const data = await res.json();
+                    if (!data.success) return alert("Errore caricamento utenti");
+
+                    const container = document.getElementById('all-users-container');
+                    const tbody = document.getElementById('users-tbody');
+                    container.style.display = 'block';
+                    tbody.innerHTML = '';
+
+                    data.users.forEach(u => {
+                        const tr = document.createElement('tr');
+                        const lastDate = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'N/A';
+                        tr.innerHTML = `
+                            <td style="padding:5px; border:1px solid #333; color:#f1c40f; cursor:pointer;" onclick="setSearch('${u.uniqueCode}')">${u.nickname}</td>
+                            <td style="padding:5px; border:1px solid #333; text-align:center;">${u.punteggioTotale}</td>
+                            <td style="padding:5px; border:1px solid #333; text-align:center; color:#00ff00;">${u.elo || 1000}</td>
+                            <td style="padding:5px; border:1px solid #333; text-align:center;">${u.partiteGiocate}</td>
+                            <td style="padding:5px; border:1px solid #333; text-align:center;">${u.partiteVinte}</td>
+                            <td style="padding:5px; border:1px solid #333; text-align:center; font-size:0.8em;">${lastDate}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                function setSearch(code) {
+                    document.getElementById('user-query').value = code;
+                    cercaUtente();
                 }
             </script>
         </body>
