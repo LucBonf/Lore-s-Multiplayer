@@ -1,4 +1,7 @@
+import dictionary from './i18n.js';
+
 const socket = io();
+
 let qtaAttuale = 0; // Per validazione locale
 let canPlay = true;
 
@@ -120,14 +123,16 @@ document.addEventListener('DOMContentLoaded', () => {
 let userProfile = null;
 
 window.eseguiLogin = () => {
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const d = dictionary[lang];
     const nickname = document.getElementById('login-nickname').value.trim();
     const pin = document.getElementById('login-pin').value.trim();
     if (!nickname) {
-        mostraErrore("Devi inserire un Nickname!");
+        mostraErrore(d.errNickname);
         return;
     }
     if (!pin || pin.length !== 4 || isNaN(pin)) {
-        mostraErrore("Devi inserire un PIN numerico di 4 cifre!");
+        mostraErrore(d.errPin);
         return;
     }
     const code = nickname.toLowerCase() + "_" + pin;
@@ -153,12 +158,15 @@ socket.on('login_ok', (profile) => {
     // Mostriamo i dati dell'utente nel menu setup
     const welcome = document.getElementById('welcome-message');
     if (welcome) {
+        const lang = localStorage.getItem('lucas_lang') || 'it';
+        const d = dictionary[lang];
         welcome.innerHTML = `
-            Benvenuto, ${profile.nickname}! 
-            <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">Partite Vinte: ${profile.partiteVinte} | Punti: ${profile.punteggioTotale}</div>
+            ${d.welcome} ${profile.nickname}! 
+            <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">${d.wins}: ${profile.partiteVinte} | ${d.pts}: ${profile.punteggioTotale}</div>
         `;
     }
 });
+
 
 socket.on('login_err', (msg) => {
     mostraErrore(msg);
@@ -176,16 +184,18 @@ window.chiudiClassifica = () => {
 socket.on('classifica_dati', (dati) => {
     const container = document.getElementById('leaderboard-list');
     const { top10, userRank } = dati;
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const d = dictionary[lang];
 
     if (!top10 || top10.length === 0) {
-        container.innerHTML = "<p style='text-align:center;'>Nessun dato ancora disponibile in classifica.</p>";
+        container.innerHTML = `<p style='text-align:center;'>${d.noDataLeaderboard}</p>`;
         return;
     }
 
     let html = top10.map((u, i) => `
         <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #555; padding: 10px 0;">
             <span><strong>${i+1}°.</strong> ${u.nickname}</span>
-            <span>${u.punteggioTotale} pt (${u.partiteVinte} Vinte)</span>
+            <span>${u.punteggioTotale} ${d.points} (${u.partiteVinte} ${d.wins})</span>
         </div>
     `).join('');
 
@@ -194,8 +204,8 @@ socket.on('classifica_dati', (dati) => {
         html += `
             <div style="margin-top: 20px; border-top: 2px solid #e67e22; padding-top: 15px; background: rgba(230, 126, 34, 0.1); border-radius: 0 0 8px 8px; padding: 15px;">
                 <div style="display:flex; justify-content:space-between; color: #f1c40f; font-weight: bold;">
-                    <span><strong>${formattedPos}°.</strong> ${userRank.nickname} (Tu)</span>
-                    <span>${userRank.punteggioTotale} pt (${userRank.partiteVinte} Vinte)</span>
+                    <span><strong>${formattedPos}°.</strong> ${userRank.nickname} (${d.you})</span>
+                    <span>${userRank.punteggioTotale} ${d.points} (${userRank.partiteVinte} ${d.wins})</span>
                 </div>
             </div>
         `;
@@ -216,10 +226,12 @@ function renderGiocatori(data) {
     playersCircle.innerHTML = '';
     cardsOnTable.innerHTML = '';
 
-    infoGiro.innerText = `Giro ${data.qtaCarte} | Somma: ${data.sommaScommesse}`;
-
     const numPlayers = data.tuttiGiocatori.length;
     const mioIndice = data.tuttiGiocatori.findIndex(p => p.socketId === socket.id);
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const d = dictionary[lang];
+
+    infoGiro.innerText = `${d.turn} ${data.qtaCarte} | ${d.sum}: ${data.sommaScommesse}`;
 
     // SCALE DINAMICHE: Rimpiccioliamo i box se ci sono tanti giocatori
     const isMobile = window.innerWidth <= 768;
@@ -278,13 +290,16 @@ function renderGiocatori(data) {
         pBlock.style.left = `${posX}%`;
         pBlock.style.top = `${posY}%`;
 
+        const lang = localStorage.getItem('lucas_lang') || 'it';
+        const d = dictionary[lang];
+        
         // Usiamo la scala dinamica per i box
         pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
 
-        const ruolo = p.isMazziere ? " (M)" : "";
+        const ruolo = p.isMazziere ? ` ${d.roleDealer}` : "";
         pBlock.innerHTML = `
             <div class="name">${p.nome}${ruolo}</div>
-            <div class="stats">Punti: ${p.punti} | Dich: ${p.dichiarazione} | Prese: ${p.prese}</div>
+            <div class="stats">${d.pts}: ${p.punti} | ${d.betLabel}: ${p.dichiarazione} | ${d.tricks}: ${p.prese}</div>
         `;
 
         if (isMe) {
@@ -497,17 +512,20 @@ window.inviaDichiarazione = () => {
     if (!canPlay) return;
     nascondiErrore();
     
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const d = dictionary[lang];
+    
     const inputEl = document.getElementById('bet-input');
     let val = parseInt(inputEl.value);
     
     // Se l'input è vuoto o non è un numero, mostriamo errore invece di mettere 0 di default
     if (isNaN(val)) {
-        mostraErrore("Inserisci un numero per dichiarare!");
+        mostraErrore(d.errBetNumber);
         return;
     }
     
     if (val < 0 || val > qtaAttuale) {
-        mostraErrore(`Dichiarazione non valida! Puoi dichiarare da 0 a ${qtaAttuale}.`);
+        mostraErrore(`${d.errBetInvalid} ${qtaAttuale}.`);
         return;
     }
     
@@ -574,10 +592,12 @@ socket.on('conferma_inizio_partita', (dati) => {
 
         // Controllo se sono il mazziere per mostrare il vincolo
         const me = dati.tuttiGiocatori.find(p => p.socketId === socket.id);
+        const lang = localStorage.getItem('lucas_lang') || 'it';
+        const d = dictionary[lang];
         if (me && me.isMazziere) {
             const forbidden = dati.qtaCarte - dati.sommaScommesse;
             if (forbidden >= 0 && forbidden <= dati.qtaCarte) {
-                mazziereWarning.innerText = `⚠️ VINCOLO MAZZIERE: Non puoi dichiarare ${forbidden}!`;
+                mazziereWarning.innerText = `${d.errDealerConstraint} ${forbidden}!`;
                 mazziereWarning.style.display = 'block';
             } else {
                 mazziereWarning.style.display = 'none';
@@ -629,13 +649,16 @@ socket.on('errore', (m) => {
 socket.on('fine_partita', (cl) => {
     sessionStorage.removeItem('lucas_room');
     
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const d = dictionary[lang];
+    
     // Popola la classifica della stanza nel modal
     const listHtml = cl.map((p, i) => {
         let pos = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : `${i + 1}°`));
         let pts = p.punti;
         return `<div style="display: flex; justify-content: space-between; border-bottom: 1px solid #7f8c8d; padding: 5px 0;">
                     <span>${pos} ${p.nome}</span>
-                    <span style="color: #f1c40f; font-weight: bold;">${pts} pt</span>
+                    <span style="color: #f1c40f; font-weight: bold;">${pts} ${d.points}</span>
                 </div>`;
     }).join('');
     
@@ -689,9 +712,36 @@ window.setLanguage = (lang) => {
     console.log(`🌐 Lingua impostata su: ${lang}`);
     
     chiudiLingua();
-    // Salva la preferenza per il futuro
     localStorage.setItem('lucas_lang', lang);
+    translatePage(lang);
 };
+
+function translatePage(lang) {
+    if(!dictionary[lang]) return;
+    const d = dictionary[lang];
+    
+    const elements = document.querySelectorAll('[data-i18n]');
+    elements.forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (d[key]) {
+            if (el.tagName === 'INPUT' && el.type === 'text' || el.type === 'password' || el.type === 'number') {
+                 el.placeholder = d[key];
+            } else {
+                 el.innerHTML = d[key];
+            }
+        }
+    });
+
+    // Aggiornamento label select players se esiste
+    const s = document.getElementById('select-players');
+    if (s) {
+       for(let i = 0; i<s.options.length; i++) {
+           let val = s.options[i].value;
+           let key = 'players' + val;
+           if(d[key]) s.options[i].text = d[key];
+       }
+    }
+}
 
 // Recupero lingua salvata all'avvio
 document.addEventListener('DOMContentLoaded', () => {
@@ -701,6 +751,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const flagsMap = { 'it': '🇮🇹', 'en': '🇬🇧', 'fr': '🇫🇷', 'es': '🇪🇸', 'de': '🇩🇪' };
             const flagEl = document.getElementById('current-flag-container');
             if (flagEl) flagEl.innerText = flagsMap[savedLang] || '🇮🇹';
+            translatePage(savedLang);
         }, 100);
+    } else {
+        translatePage('it'); // default
     }
 });

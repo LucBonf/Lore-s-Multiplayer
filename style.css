@@ -626,6 +626,7 @@ button {
     justify-content: center;
     align-items: center;
     font-size: 1.8rem;
+    font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
