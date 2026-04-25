@@ -258,35 +258,17 @@ app.get('/api/admin/find-user/:query', authAdmin, async (req, res) => {
     }
 });
 
-// --- NUOVA ROTTA: LISTA COMPLETA UTENTI (OTTIMIZZATA CON STREAMING) ---
+// --- NUOVA ROTTA: LISTA COMPLETA UTENTI (OTTIMIZZATA CON INDICI) ---
 app.get('/api/admin/all-users', authAdmin, async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
     
     try {
-        res.setHeader('Content-Type', 'application/json');
-        res.write('{"success":true,"users":[');
-        
-        const cursor = User.find().sort({ lastLogin: -1 }).cursor();
-        let first = true;
-        
-        cursor.on('data', (user) => {
-            if (!first) res.write(',');
-            res.write(JSON.stringify(user));
-            first = false;
-        });
-        
-        cursor.on('end', () => {
-            res.write(']}');
-            res.end();
-        });
-        
-        cursor.on('error', (err) => {
-            console.error("Errore streaming utenti:", err);
-            res.end();
-        });
+        // Grazie agli indici aggiunti prima, questa query è velocissima anche con molti utenti
+        const users = await User.find().sort({ lastLogin: -1 }).limit(1000); 
+        res.json({ success: true, users });
     } catch (e) {
         console.error("Errore rotta all-users:", e);
-        if (!res.headersSent) res.json({ success: false, error: e.message });
+        res.json({ success: false, error: e.message });
     }
 });
 
@@ -604,27 +586,35 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                 }
 
                 async function caricaTuttiUtenti() {
-                    const res = await fetch('/api/admin/all-users');
-                    const data = await res.json();
-                    if (!data.success) return alert("Errore caricamento utenti");
+                    try {
+                        const res = await fetch('/api/admin/all-users');
+                        if (res.status === 401) {
+                            alert("Sessione scaduta! Ricarica la pagina per effettuare nuovamente il login.");
+                            return location.reload();
+                        }
+                        const data = await res.json();
+                        if (!data.success) return alert("Errore: " + data.error);
 
-                    const container = document.getElementById('all-users-container');
-                    const tbody = document.getElementById('users-tbody');
-                    container.style.display = 'block';
-                    tbody.innerHTML = '';
+                        const container = document.getElementById('all-users-container');
+                        const tbody = document.getElementById('users-tbody');
+                        container.style.display = 'block';
+                        tbody.innerHTML = '';
 
-                    data.users.forEach(u => {
-                        const tr = document.createElement('tr');
-                        const lastDate = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'N/A';
-                        const elo = u.elo || 1000;
-                        tr.innerHTML = '<td style="padding:5px; border:1px solid #333; color:#f1c40f; cursor:pointer;" onclick="setSearch(\'' + u.uniqueCode + '\')">' + u.nickname + '</td>' +
-                                       '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.punteggioTotale + '</td>' +
-                                       '<td style="padding:5px; border:1px solid #333; text-align:center; color:#00ff00;">' + elo + '</td>' +
-                                       '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.partiteGiocate + '</td>' +
-                                       '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.partiteVinte + '</td>' +
-                                       '<td style="padding:5px; border:1px solid #333; text-align:center; font-size:0.8em;">' + lastDate + '</td>';
-                        tbody.appendChild(tr);
-                    });
+                        data.users.forEach(u => {
+                            const tr = document.createElement('tr');
+                            const lastDate = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'N/A';
+                            const elo = u.elo || 1000;
+                            tr.innerHTML = '<td style="padding:5px; border:1px solid #333; color:#f1c40f; cursor:pointer;" onclick="setSearch(\'' + u.uniqueCode + '\')">' + u.nickname + '</td>' +
+                                           '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.punteggioTotale + '</td>' +
+                                           '<td style="padding:5px; border:1px solid #333; text-align:center; color:#00ff00;">' + elo + '</td>' +
+                                           '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.partiteGiocate + '</td>' +
+                                           '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.partiteVinte + '</td>' +
+                                           '<td style="padding:5px; border:1px solid #333; text-align:center; font-size:0.8em;">' + lastDate + '</td>';
+                            tbody.appendChild(tr);
+                        });
+                    } catch (err) {
+                        alert("Errore di connessione al server: " + err.message);
+                    }
                 }
 
                 function setSearch(code) {
