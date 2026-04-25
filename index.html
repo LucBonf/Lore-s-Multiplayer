@@ -16,6 +16,28 @@
 <body>
     <!-- Toast Banner per gli Errori -->
     <div id="error-banner"></div>
+    
+    <!-- Selettore Lingua Flottante -->
+    <div id="language-selector-container">
+        <div id="language-btn" onclick="toggleLanguageModal()">
+            <span id="current-flag">🇮🇹</span>
+        </div>
+    </div>
+
+    <!-- Modal Scelta Lingua -->
+    <div id="modal-lingua" class="modal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <span class="close-btn" onclick="chiudiLingua()">&times;</span>
+            <h2 style="color: #f1c40f; margin-top: 0;">Scegli Lingua / Choose Language</h2>
+            <div id="language-options" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px;">
+                <div class="lang-opt" onclick="setLanguage('it')">🇮🇹 Italiano</div>
+                <div class="lang-opt" onclick="setLanguage('en')">🇬🇧 English</div>
+                <div class="lang-opt" onclick="setLanguage('fr')">🇫🇷 Français</div>
+                <div class="lang-opt" onclick="setLanguage('es')">🇪🇸 Español</div>
+                <div class="lang-opt" onclick="setLanguage('de')">🇩🇪 Deutsch</div>
+            </div>
+        </div>
+    </div>
 
 
 

@@ -43,6 +43,13 @@ function switchSection(activeId) {
     } catch (e) {
         console.error("Errore in switchSection:", e);
     }
+
+    // Gestione visibilità selettore lingua
+    const langSelector = document.getElementById('language-selector-container');
+    if (langSelector) {
+        const showLang = ['login-menu', 'setup-menu', 'lobby-wait'].includes(activeId);
+        langSelector.style.display = showLang ? 'block' : 'none';
+    }
 }
 window.switchSection = switchSection;
 
