@@ -1197,28 +1197,38 @@ io.on('connection', (socket) => {
 
         const avgHumanElo = humanElos.length > 0 ? humanElos.reduce((a, b) => a + b, 0) / humanElos.length : 1000;
 
-        // 2. Determiniamo il livello target dell'IA in base all'ELO umano
-        let targetAILevel = 2;
-        if (avgHumanElo < 900) targetAILevel = 1;
-        else if (avgHumanElo < 1100) targetAILevel = 2;
-        else if (avgHumanElo < 1350) targetAILevel = 3;
-        else targetAILevel = 4;
-
-        // 3. Applichiamo il livello ai bot con una piccola variazione casuale
+        // 2. Creiamo i BOT usando le migliori statistiche ricavate dall'analisi del dataset
         lobby.gameInstance.players.forEach(p => {
             if (!p.isHuman) {
-                // Il bot può essere di livello target, o uno sopra/sotto (min 1, max 4)
-                const variation = Math.floor(Math.random() * 3) - 1; // -1, 0, 1
-                const finalLevel = Math.max(1, Math.min(4, targetAILevel + variation));
+                // Il bot sceglie il suo stile "ottimizzato" in base all'ELO medio del tavolo
+                if (avgHumanElo < 900) {
+                    // LIVELLO 1: Novellino (Scarta a caso, molto aggressivo e sprecone, si difende poco)
+                    p.aiLevel = 1;
+                    p.aiParams = { agg: 85, cons: 20, sca: 90 };
+                    p.aiVariant = "AI_Novellino";
+                } else if (avgHumanElo < 1100) {
+                    // LIVELLO 2: Principiante (Decente, ma rischia spesso inutilmente)
+                    p.aiLevel = 2;
+                    p.aiParams = { agg: 65, cons: 40, sca: 60 };
+                    p.aiVariant = "AI_Principiante";
+                } else if (avgHumanElo < 1300) {
+                    // LIVELLO 3: Intermedio (Conserva meglio, sa scartare quasi bene)
+                    p.aiLevel = 3;
+                    p.aiParams = { agg: 45, cons: 65, sca: 35 };
+                    p.aiVariant = "AI_Intermedio";
+                } else {
+                    // LIVELLO 4: Esperto (Calcolatore, conservativo, ottimizza lo scarto)
+                    p.aiLevel = 4;
+                    p.aiParams = { agg: 25, cons: 85, sca: 10 };
+                    p.aiVariant = "AI_Esperto";
+                }
                 
-                // Rigeneriamo il DNA del bot in base al nuovo livello
-                const agg = Math.floor(Math.random() * 101);
-                const cons = Math.floor(Math.random() * 101);
-                const sca = Math.floor(Math.random() * 101);
-                p.aiLevel = finalLevel;
-                p.aiParams = { agg, cons, sca };
-                p.aiVariant = `V${finalLevel}_A${agg}_C${cons}_S${sca}`;
-                p.nome = `Bot ${p.aiVariant}`; // Per trasparenza durante i test (puoi rimuoverlo dopo)
+                // Aggiungiamo un 10% di variazione casuale per rendere le partite imprevedibili (Umano-like)
+                p.aiParams.agg = Math.max(0, Math.min(100, p.aiParams.agg + (Math.floor(Math.random() * 21) - 10)));
+                p.aiParams.cons = Math.max(0, Math.min(100, p.aiParams.cons + (Math.floor(Math.random() * 21) - 10)));
+                p.aiParams.sca = Math.max(0, Math.min(100, p.aiParams.sca + (Math.floor(Math.random() * 21) - 10)));
+                
+                p.nome = p.aiVariant.replace("AI_", "Bot "); // Es: "Bot Intermedio"
             }
         });
 
