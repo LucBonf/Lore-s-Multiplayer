@@ -119,15 +119,15 @@ if (process.env.MONGODB_URI) {
             
             // Inizializza collezioni Capped (Limite spazio)
             try {
-                // LOG AI (25MB - 100k mosse)
+                // LOG AI (100MB - ~400k mosse)
                 const collectionsMatch = await mongoose.connection.db.listCollections({ name: 'matchlogs' }).toArray();
                 if (collectionsMatch.length === 0) {
                     await mongoose.connection.db.createCollection('matchlogs', {
                         capped: true,
-                        size: 25 * 1024 * 1024,
-                        max: 100000
+                        size: 100 * 1024 * 1024,
+                        max: 400000
                     });
-                    console.log("📦 Collezione 'matchlogs' (Capped) creata.");
+                    console.log("📦 Collezione 'matchlogs' (Capped 100MB) creata.");
                 }
 
                 // REPORT BUG (5MB - 1000 report)
@@ -254,8 +254,8 @@ app.post('/reset-turbo-logs-777', express.json(), async (req, res) => {
         await mongoose.connection.db.collection('matchlogs').drop();
         await mongoose.connection.db.createCollection('matchlogs', {
             capped: true,
-            size: 25 * 1024 * 1024,
-            max: 100000
+            size: 100 * 1024 * 1024,
+            max: 400000
         });
         
         res.json({ ok: true });
@@ -354,7 +354,7 @@ app.get('/stato-allenamento-777', async (req, res) => {
                 <div style="display: flex; justify-content: space-between;">
                     <div>
                         <h3>💾 DATASET TURBO (AI)</h3>
-                        <div class="metric">Mosse: ${totaleTurbo.toLocaleString()} / 100k</div>
+                        <div class="metric">Mosse: ${totaleTurbo.toLocaleString()} / 400k</div>
                         <div class="metric">Partite: ${partiteTurbo}</div>
                         <a href="/scarica-dataset-lucas-777?type=turbo" class="btn">SCARICA TURBO CSV</a>
                         <button onclick="resetTurbo()" class="btn" style="border-color: #ff0000; color: #ff0000;">🗑️ SVUOTA TURBO</button>
@@ -1270,9 +1270,13 @@ async function avviaAutoTraining() {
 
     isSimulando = true;
     
-    // Eseguiamo una partita intera
+    // Eseguiamo 3 partite contemporaneamente per velocizzare
     try {
-        await simulazionePartitaSingola();
+        await Promise.all([
+            simulazionePartitaSingola(),
+            simulazionePartitaSingola(),
+            simulazionePartitaSingola()
+        ]);
     } catch (e) {
         console.error("Errore durante simulazione turbo:", e);
     }
@@ -1282,7 +1286,8 @@ async function avviaAutoTraining() {
     if (umaniRealiCheck <= 0) {
         try {
             const count = await MatchLog.countDocuments();
-            const delay = (count >= 99000) ? 1000 * 60 * 30 : 2000;
+            // Se siamo vicini al limite (400k), rallenta
+            const delay = (count >= 395000) ? 1000 * 60 * 30 : 1000;
             setTimeout(avviaAutoTraining, delay);
         } catch (e) {
             setTimeout(avviaAutoTraining, 2000);
