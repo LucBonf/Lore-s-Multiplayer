@@ -363,7 +363,7 @@ app.post('/reset-turbo-logs-777', express.json(), async (req, res) => {
     }
 });
 
-// ROTTA SEGRETA PER SCARICARE I LOG AI IN FORMATO EXCEL (CSV)
+// ROTTA SEGRETA PER SCARICARE I LOG AI IN FORMATO EXCEL (CSV) - OTTIMIZZATA CON STREAMING
 app.get('/scarica-dataset-lucas-777', authAdmin, async (req, res) => {
     try {
         if (!dbConnected) return res.status(500).send("DB non connesso");
@@ -372,13 +372,19 @@ app.get('/scarica-dataset-lucas-777', authAdmin, async (req, res) => {
         const Model = (type === 'human') ? HumanMatchLog : MatchLog;
         const filename = (type === 'human') ? 'lucas_HUMAN_data.csv' : 'lucas_TURBO_data.csv';
 
-        const logs = await Model.find().sort({ timestamp: 1 });
-        
-        let csv = "Timestamp,MatchId,NumPlayers,RoundCards,PlayerIdx,IsHuman,AIVariant,Decl,Made,Target,Hand,Table,History,VoidSuits,Move,Won\n";
-        
-        logs.forEach(l => {
-            csv += [
-                l.timestamp.toISOString(),
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+
+        // Scriviamo l'intestazione
+        res.write("Timestamp,MatchId,NumPlayers,RoundCards,PlayerIdx,IsHuman,AIVariant,Decl,Made,Target,Hand,Table,History,VoidSuits,Move,Won\n");
+
+        // Usiamo un CURSORE per leggere i dati uno alla volta (Streaming)
+        // Questo evita di saturare la RAM del server con 400k+ documenti
+        const cursor = Model.find().sort({ timestamp: 1 }).cursor();
+
+        cursor.on('data', (l) => {
+            const row = [
+                l.timestamp ? l.timestamp.toISOString() : '',
                 l.matchId,
                 l.numPlayers,
                 l.roundCards,
@@ -388,20 +394,30 @@ app.get('/scarica-dataset-lucas-777', authAdmin, async (req, res) => {
                 l.dichiarazione,
                 l.preseFatte,
                 l.obiettivoRimanente,
-                `"${l.hand}"`,
-                `"${l.table}"`,
-                `"${l.history}"`,
-                `"${l.voidSuits}"`,
+                `"${l.hand || ''}"`,
+                `"${l.table || ''}"`,
+                `"${l.history || ''}"`,
+                `"${l.voidSuits || ''}"`,
                 l.move,
                 l.wonTrick ? 1 : 0
             ].join(',') + "\n";
+            
+            res.write(row);
         });
 
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-        res.status(200).send(csv);
+        cursor.on('end', () => {
+            res.end();
+        });
+
+        cursor.on('error', (err) => {
+            console.error("Errore durante lo streaming CSV:", err);
+            if (!res.headersSent) res.status(500).send("Errore durante il download");
+            res.end();
+        });
+
     } catch (err) {
-        res.status(500).send("Errore generazione CSV");
+        console.error("Errore generale download CSV:", err);
+        if (!res.headersSent) res.status(500).send("Errore generazione CSV");
     }
 });
 
