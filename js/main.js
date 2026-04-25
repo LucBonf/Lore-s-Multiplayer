@@ -488,16 +488,19 @@ window.iniziaPartitaVera = () => socket.emit('richiesta_inizio_partita');
 
 window.inviaDichiarazione = () => {
     if (!canPlay) return;
-    nascondiErrore(); // Rimuove eventuali messaggi di errore precedenti
+    nascondiErrore();
     
     const inputEl = document.getElementById('bet-input');
     let val = parseInt(inputEl.value);
     
-    // Se l'input è vuoto o non è un numero, imposta a 0 di default
-    if (isNaN(val)) val = 0;
+    // Se l'input è vuoto o non è un numero, mostriamo errore invece di mettere 0 di default
+    if (isNaN(val)) {
+        mostraErrore("Inserisci un numero per dichiarare!");
+        return;
+    }
     
-    if (val > qtaAttuale) {
-        mostraErrore(`Non puoi dichiarare più di ${qtaAttuale}!`);
+    if (val < 0 || val > qtaAttuale) {
+        mostraErrore(`Dichiarazione non valida! Puoi dichiarare da 0 a ${qtaAttuale}.`);
         return;
     }
     
@@ -553,13 +556,31 @@ socket.on('conferma_inizio_partita', (dati) => {
 
     // Gestione comparsa riquadro scommesse
     const areaScommessa = document.getElementById('dichiarazione-area');
+    const mazziereWarning = document.getElementById('mazziere-warning');
+
     if (dati.fase === 'scommesse' && eMioTurno) {
         areaScommessa.style.display = 'block';
         const betInput = document.getElementById('bet-input');
         betInput.max = qtaAttuale;
-        betInput.value = ""; // Svuota il campo per facilitare l'inserimento da mobile
+        betInput.value = ""; 
+        betInput.focus();
+
+        // Controllo se sono il mazziere per mostrare il vincolo
+        const me = dati.tuttiGiocatori.find(p => p.socketId === socket.id);
+        if (me && me.isMazziere) {
+            const forbidden = dati.qtaCarte - dati.sommaScommesse;
+            if (forbidden >= 0 && forbidden <= dati.qtaCarte) {
+                mazziereWarning.innerText = `⚠️ VINCOLO MAZZIERE: Non puoi dichiarare ${forbidden}!`;
+                mazziereWarning.style.display = 'block';
+            } else {
+                mazziereWarning.style.display = 'none';
+            }
+        } else {
+            mazziereWarning.style.display = 'none';
+        }
     } else {
         areaScommessa.style.display = 'none';
+        if (mazziereWarning) mazziereWarning.style.display = 'none';
     }
 
     // CHIAMIAMO LA MAGIA CIRCOLARE QUI!

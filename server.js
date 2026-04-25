@@ -148,6 +148,7 @@ class LucasGame {
         this.sommaScommesse = 0;
         this.acceptInput = true;
         this.carteUscite = []; // MEMORIA: tiene traccia di tutte le carte giocate nel giro attuale
+        this.botThinking = false; // FLAG di sicurezza per evitare IA multiple concorrenti
 
         let seq = [];
         for (let i = 2; i <= this.maxCarte; i++) seq.push(i);
@@ -160,11 +161,19 @@ class LucasGame {
     distribuisci() {
         let mazzo = [];
         SEMI.forEach(s => VALORI.forEach(v => mazzo.push(new Card(v, s))));
-        mazzo.sort(() => Math.random() - 0.5);
+        // Shuffle migliorato (Fisher-Yates)
+        for (let i = mazzo.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [mazzo[i], mazzo[j]] = [mazzo[j], mazzo[i]];
+        }
+
         let qta = this.sequenzaTurni[this.indiceGiro];
         this.players.forEach(p => {
             p.resetGiro();
-            for (let i = 0; i < qta; i++) p.mano.push(mazzo.pop());
+            for (let i = 0; i < qta; i++) {
+                const c = mazzo.pop();
+                if (c) p.mano.push(c);
+            }
         });
         this.fase = "scommesse";
         this.turnoAttuale = (this.indiceMazziere + 1) % this.players.length;
@@ -641,13 +650,24 @@ io.on('connection', (socket) => {
 
     function gestisciIA(code) {
         const game = lobbies[code]?.gameInstance;
-        if (!game || game.players[game.turnoAttuale].isHuman) return;
+        // Impedisce all'IA di agire se: non c'è il gioco, è il turno di un umano, o l'IA sta già elaborando
+        if (!game || game.players[game.turnoAttuale].isHuman || game.botThinking) return;
+
+        game.botThinking = true;
 
         setTimeout(() => {
-            const p = game.players[game.turnoAttuale];
-            const qta = game.sequenzaTurni[game.indiceGiro];
+            const currentGame = lobbies[code]?.gameInstance;
+            if (!currentGame) return;
 
-            if (game.fase === "scommesse") {
+            // Verifichiamo di nuovo che sia ancora il turno di un Bot prima di procedere
+            const p = currentGame.players[currentGame.turnoAttuale];
+            if (!p || p.isHuman) {
+                currentGame.botThinking = false;
+                return;
+            }
+            const qta = currentGame.sequenzaTurni[currentGame.indiceGiro];
+
+            if (currentGame.fase === "scommesse") {
                 // SCOMMESSA AVANZATA (Power Scoring)
                 let powerScore = 0;
                 p.mano.forEach(c => {
@@ -662,25 +682,27 @@ io.on('connection', (socket) => {
 
                 // --- LOGICA CONTESTUALE (Matrix Training) ---
                 // 1. Adattamento al numero di giocatori
-                const div = (game.numPlayers <= 3) ? 120 : 150;
+                const div = (currentGame.numPlayers <= 3) ? 120 : 150;
 
                 // 2. Adattamento alla posizione (chi parla dopo ha più info)
-                const ordineTurno = (game.turnoAttuale - (game.indiceMazziere + 1) + game.numPlayers) % game.numPlayers;
-                const posFactor = 0.85 + (ordineTurno / game.numPlayers) * 0.3; // 0.85x per il primo, 1.15x per l'ultimo
+                const ordineTurno = (currentGame.turnoAttuale - (currentGame.indiceMazziere + 1) + currentGame.numPlayers) % currentGame.numPlayers;
+                const posFactor = 0.85 + (ordineTurno / currentGame.numPlayers) * 0.3; // 0.85x per il primo, 1.15x per l'ultimo
 
                 let s = Math.floor((powerScore / div) * posFactor);
                 if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
 
-                if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
+                if (currentGame.turnoAttuale === currentGame.indiceMazziere && (currentGame.sommaScommesse + s === qta)) {
                     s = (s >= qta / 2) ? s - 1 : s + 1;
                 }
                 s = Math.max(0, Math.min(s, qta));
 
                 p.dichiarazione = s;
-                game.sommaScommesse += s;
-                game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
-                if (game.players.every(pl => pl.dichiarazione !== "-")) game.fase = "gioco";
+                currentGame.sommaScommesse += s;
+                currentGame.turnoAttuale = (currentGame.turnoAttuale + 1) % currentGame.numPlayers;
+                if (currentGame.players.every(pl => pl.dichiarazione !== "-")) currentGame.fase = "gioco";
 
+                // Sblocca il flag prima di triggerare il prossimo bot
+                currentGame.botThinking = false;
                 inviaStato(code);
                 gestisciIA(code);
             } else {
@@ -689,12 +711,12 @@ io.on('connection', (socket) => {
                 let cartaDaGiocare;
                 const vuoleVincere = p.preseFatte < p.dichiarazione;
 
-                if (game.tavolo.length === 0) {
+                if (currentGame.tavolo.length === 0) {
                     // LEAD: Il Bot lancia per primo
                     if (vuoleVincere) {
                         let cartaRegnante = manoV.find(c => {
                             const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
-                            return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
+                            return superiori.every(sr => currentGame.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
                         });
                         cartaDaGiocare = cartaRegnante || manoV.sort((a, b) => b.forza - a.forza)[Math.floor(manoV.length / 2)];
                     } else {
@@ -702,11 +724,11 @@ io.on('connection', (socket) => {
                     }
                 } else {
                     // RISPOSTA: Deve seguire il seme
-                    const semeUscita = game.tavolo[0].card.seme;
+                    const semeUscita = currentGame.tavolo[0].card.seme;
                     const carteValide = manoV.filter(c => c.seme === semeUscita);
 
                     if (carteValide.length > 0) {
-                        const vincenteAttuale = game.calcolaVincitorePresa();
+                        const vincenteAttuale = currentGame.calcolaVincitorePresa();
                         const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
 
                         if (vuoleVincere) {
@@ -715,20 +737,35 @@ io.on('connection', (socket) => {
                             const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
                             cartaDaGiocare = (cartePerdenti.length > 0) ? cartePerdenti.sort((a, b) => b.forza - a.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
                         }
+
+                        // ULTIMA SICUREZZA: Se per qualche motivo l'IA ha scelto una carta di seme diverso ma aveva il seme, forziamo il seme.
+                        if (cartaDaGiocare.seme !== semeUscita) {
+                            console.error(`⚠️ IA Error: Il bot ha provato a giocare ${cartaDaGiocare.seme} invece di ${semeUscita}. Correzione forzata.`);
+                            cartaDaGiocare = carteValide[0];
+                        }
                     } else {
-                        // SCARTO: Non ha il seme
+                        // SCARTO: Non ha il seme. Se vuole perdere, scarta la carta più alta di un altro seme per "scaricarsi".
+                        // Se vuole vincere, scarta la più bassa.
                         cartaDaGiocare = vuoleVincere ? manoV.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => b.forza - a.forza)[0];
                     }
                 }
 
-                cartaDaGiocare.giocata = true;
-                game.tavolo.push({ playerId: game.turnoAttuale, card: cartaDaGiocare });
+                // Sblocca il flag prima di eseguire la mossa (che potrebbe triggerare un altro gestisciIA)
+                currentGame.botThinking = false;
 
-                if (game.tavolo.length === game.numPlayers) {
+                if (!cartaDaGiocare) {
+                    console.error("❌ CRITICAL: Il Bot non ha trovato carte da giocare!");
+                    return;
+                }
+
+                cartaDaGiocare.giocata = true;
+                currentGame.tavolo.push({ playerId: currentGame.turnoAttuale, card: cartaDaGiocare });
+
+                if (currentGame.tavolo.length === currentGame.numPlayers) {
                     inviaStato(code);
                     setTimeout(() => risolviPresa(code), 1500);
                 } else {
-                    game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
+                    currentGame.turnoAttuale = (currentGame.turnoAttuale + 1) % currentGame.numPlayers;
                     inviaStato(code);
                     gestisciIA(code);
                 }
