@@ -312,12 +312,13 @@ app.get('/stato-segreta-report-777', authAdmin, async (req, res) => {
                 html += "<p>Nessuna segnalazione nel database.</p>";
             } else {
                 reports.forEach(r => {
+                    const matchInfo = r.matchId ? '<br><span style="color: #2ecc71; font-size: 0.8rem;">Partita ID: ' + r.matchId + ' (Room: ' + r.roomCode + ')</span>' : '';
                     html += `
                     <div class="report-card" id="card-${r._id}">
                         <button class="delete-btn" onclick="eliminaReport('${r._id}')">🗑️</button>
                         <span class="report-date">${r.data.toLocaleString('it-IT')}</span> - 
                         <span class="report-user">Utente: ${r.nickname}</span>
-                        ${r.matchId ? `<br><span style="color: #2ecc71; font-size: 0.8rem;">Partita ID: ${r.matchId} (Room: ${r.roomCode})</span>` : ""}
+                        ${matchInfo}
                         <br>
                         <p style="margin-top: 10px; font-style: italic;">"${r.testo}"</p>
                     </div>`;
@@ -554,35 +555,50 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                 }
 
                 async function cercaUtente() {
-                    const q = document.getElementById('user-query').value;
-                    if (!q) return;
-                    const res = await fetch('/api/admin/find-user/' + encodeURIComponent(q));
-                    const data = await res.json();
-                    const box = document.getElementById('user-info-box');
-                    
-                    if (data.success) {
-                        box.style.display = 'block';
-                        document.getElementById('info-nick').innerText = data.user.nickname;
-                        document.getElementById('info-code').innerText = data.user.uniqueCode;
-                        document.getElementById('info-matches').innerText = data.user.partiteGiocate;
+                    try {
+                        const q = document.getElementById('user-query').value;
+                        if (!q) return;
+                        const res = await fetch('/api/admin/find-user/' + encodeURIComponent(q));
                         
-                        document.getElementById('btn-delete-user').onclick = async () => {
-                            if (confirm("Sei sicuro di voler eliminare l'utente " + data.user.nickname + "? I log delle partite NON saranno cancellati.")) {
-                                const delRes = await fetch('/api/admin/delete-user/' + data.user.uniqueCode);
-                                const delData = await delRes.json();
-                                if (delData.success) {
-                                    alert("Utente eliminato correttamente.");
-                                    box.style.display = 'none';
-                                    document.getElementById('user-query').value = '';
-                                } else {
-                                    alert("Errore: " + delData.error);
+                        if (res.status === 401) {
+                            alert("Sessione scaduta! Ricarica la pagina.");
+                            return location.reload();
+                        }
+                        
+                        const data = await res.json();
+                        const box = document.getElementById('user-info-box');
+                        
+                        if (data.success) {
+                            box.style.display = 'block';
+                            document.getElementById('info-nick').innerText = data.user.nickname;
+                            document.getElementById('info-code').innerText = data.user.uniqueCode;
+                            document.getElementById('info-matches').innerText = data.user.partiteGiocate;
+                            
+                            document.getElementById('btn-delete-user').onclick = async () => {
+                                if (confirm("Sei sicuro di voler eliminare l'utente " + data.user.nickname + "? I log delle partite NON saranno cancellati.")) {
+                                    try {
+                                        const delRes = await fetch('/api/admin/delete-user/' + data.user.uniqueCode);
+                                        if (delRes.status === 401) return location.reload();
+                                        
+                                        const delData = await delRes.json();
+                                        if (delData.success) {
+                                            alert("Utente eliminato correttamente.");
+                                            box.style.display = 'none';
+                                            document.getElementById('user-query').value = '';
+                                            if (document.getElementById('all-users-container').style.display !== 'none') {
+                                                caricaTuttiUtenti(); // Ricarica la lista se è aperta
+                                            }
+                                        } else {
+                                            alert("Errore: " + delData.error);
+                                        }
+                                    } catch(e) { alert("Errore connessione durante eliminazione"); }
                                 }
-                            }
-                        };
-                    } else {
-                        alert("Utente non trovato!");
-                        box.style.display = 'none';
-                    }
+                            };
+                        } else {
+                            alert("Utente non trovato!");
+                            box.style.display = 'none';
+                        }
+                    } catch(e) { alert("Errore durante la ricerca"); }
                 }
 
                 async function caricaTuttiUtenti() {
