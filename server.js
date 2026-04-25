@@ -184,10 +184,16 @@ app.use(cookieParser());
 const authAdmin = (req, res, next) => {
     const authCookie = req.cookies.admin_session;
     if (authCookie === ADMIN_KEY) {
-        next();
-    } else {
-        // Se non autenticato, mostra la pagina di login
-        res.send(`
+        return next();
+    }
+    
+    // Se è una chiamata API, restituisci un errore JSON invece dell'HTML di login
+    if (req.path.startsWith('/api/')) {
+        return res.status(401).json({ success: false, error: "Sessione scaduta o non autorizzata. Ricarica la pagina." });
+    }
+
+    // Se non autenticato, mostra la pagina di login
+    res.send(`
             <!DOCTYPE html>
             <html>
             <head>
@@ -267,7 +273,7 @@ app.get('/api/admin/delete-user/:uniqueCode', authAdmin, async (req, res) => {
 });
 
 // ROTTA SEGRETA PER LEGGERE I REPORT (Sia da DB che da file se esiste)
-app.get('/stata-segreta-report-777', authAdmin, async (req, res) => {
+app.get('/stato-segreta-report-777', authAdmin, async (req, res) => {
     try {
         let html = `
         <!DOCTYPE html>
