@@ -219,7 +219,6 @@ const authAdmin = (req, res, next) => {
             </body>
             </html>
         `);
-    }
 };
 
 // Rotta per verificare il login
