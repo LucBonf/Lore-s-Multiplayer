@@ -264,9 +264,9 @@ function renderGiocatori(data) {
                 angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
             }
 
-            const angoloRad = angoloGradi * (Math.PI / 180);
-            posX = 50 + 44 * Math.cos(angoloRad);
-            posY = 40 + 30 * Math.sin(angoloRad);
+            const radiotherapy = angoloGradi * (Math.PI / 180);
+            posX = 50 + 44 * Math.cos(radiotherapy);
+            posY = 40 + 30 * Math.sin(radiotherapy);
         }
 
         const pBlock = document.createElement('div');
@@ -656,10 +656,51 @@ window.chiudiRegole = () => {
 window.onclick = (event) => {
     const modalRegole = document.getElementById('modal-regole');
     const modalClassifica = document.getElementById('modal-classifica');
-    if (event.target === modalRegole) {
-        modalRegole.style.display = 'none';
-    }
-    if (event.target === modalClassifica) {
-        modalClassifica.style.display = 'none';
-    }
+    const modalLingua = document.getElementById('modal-lingua');
+
+    if (event.target === modalRegole) modalRegole.style.display = 'none';
+    if (event.target === modalClassifica) modalClassifica.style.display = 'none';
+    if (event.target === modalLingua) chiudiLingua();
 };
+
+// =========================================
+//   INTERNAZIONALIZZAZIONE (UI)
+// =========================================
+
+window.toggleLanguageModal = () => {
+    const modal = document.getElementById('modal-lingua');
+    if (modal) modal.style.display = 'block';
+};
+
+window.chiudiLingua = () => {
+    const modal = document.getElementById('modal-lingua');
+    if (modal) modal.style.display = 'none';
+};
+
+window.setLanguage = (lang) => {
+    const flags = {
+        'it': '🇮🇹', 'en': '🇬🇧', 'fr': '🇫🇷', 'es': '🇪🇸', 'de': '🇩🇪'
+    };
+    
+    const flag = flags[lang] || '🇮🇹';
+    const flagEl = document.getElementById('current-flag');
+    if (flagEl) flagEl.innerText = flag;
+    
+    console.log(`🌐 Lingua impostata su: ${lang}`);
+    
+    chiudiLingua();
+    // Salva la preferenza per il futuro
+    localStorage.setItem('lucas_lang', lang);
+};
+
+// Recupero lingua salvata all'avvio
+document.addEventListener('DOMContentLoaded', () => {
+    const savedLang = localStorage.getItem('lucas_lang');
+    if (savedLang) {
+        setTimeout(() => {
+            const flags = { 'it': '🇮🇹', 'en': '🇬🇧', 'fr': '🇫🇷', 'es': '🇪🇸', 'de': '🇩🇪' };
+            const flagEl = document.getElementById('current-flag');
+            if (flagEl) flagEl.innerText = flags[savedLang] || '🇮🇹';
+        }, 100);
+    }
+});
