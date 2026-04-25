@@ -678,13 +678,13 @@ window.chiudiLingua = () => {
 };
 
 window.setLanguage = (lang) => {
-    const labels = {
-        'it': 'IT 🇮🇹', 'en': 'EN 🇬🇧', 'fr': 'FR 🇫🇷', 'es': 'ES 🇪🇸', 'de': 'DE 🇩🇪'
+    const flags = {
+        'it': '🇮🇹', 'en': '🇬🇧', 'fr': '🇫🇷', 'es': '🇪🇸', 'de': '🇩🇪'
     };
     
-    const label = labels[lang] || 'IT 🇮🇹';
+    const flag = flags[lang] || '🇮🇹';
     const flagEl = document.getElementById('current-flag-container');
-    if (flagEl) flagEl.innerText = label;
+    if (flagEl) flagEl.innerText = flag;
     
     console.log(`🌐 Lingua impostata su: ${lang}`);
     
@@ -698,9 +698,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedLang = localStorage.getItem('lucas_lang');
     if (savedLang) {
         setTimeout(() => {
-            const labelsMap = { 'it': 'IT 🇮🇹', 'en': 'EN 🇬🇧', 'fr': 'FR 🇫🇷', 'es': 'ES 🇪🇸', 'de': 'DE 🇩🇪' };
+            const flagsMap = { 'it': '🇮🇹', 'en': '🇬🇧', 'fr': '🇫🇷', 'es': '🇪🇸', 'de': '🇩🇪' };
             const flagEl = document.getElementById('current-flag-container');
-            if (flagEl) flagEl.innerText = labelsMap[savedLang] || 'IT 🇮🇹';
+            if (flagEl) flagEl.innerText = flagsMap[savedLang] || '🇮🇹';
         }, 100);
     }
 });
