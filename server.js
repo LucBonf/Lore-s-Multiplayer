@@ -41,6 +41,7 @@ const userSchema = new mongoose.Schema({
     partiteGiocate: { type: Number, default: 0 },
     partiteVinte: { type: Number, default: 0 },
     punteggioTotale: { type: Number, default: 0 },
+    elo: { type: Number, default: 1000 },
     lastLogin: { type: Date, default: Date.now }
 });
 const User = mongoose.model('User', userSchema);
@@ -63,6 +64,7 @@ const matchLogSchema = new mongoose.Schema({
     roundCards: Number,
     playerIndex: Number,
     isHuman: Boolean,
+    elo: { type: Number, default: 1000 },
     aiVariant: { type: String, default: "Human" }, // Es: V4_A80_C20_S50
     dichiarazione: Number,
     preseFatte: Number,
@@ -447,6 +449,7 @@ class Player {
         this.id = id;
         this.nome = nome;
         this.isHuman = isHuman;
+        this.eloMomentaneo = 1000; // Valore predefinito, sovrascritto al login/join
         if (!isHuman) {
             const level = Math.floor(Math.random() * 4) + 1;
             const agg = Math.floor(Math.random() * 101);
@@ -604,6 +607,7 @@ io.on('connection', (socket) => {
             }
             socket.userUniqueCode = user.uniqueCode;
             socket.userNickname = user.nickname;
+            socket.userElo = user.elo || 1000;
             socket.emit('login_ok', user);
         } catch (e) {
             socket.emit('login_err', 'Errore DB: ' + e.message);
@@ -673,7 +677,17 @@ io.on('connection', (socket) => {
         try {
             if (!dati || !dati.nome) return socket.emit('errore', "Dati lobby non validi.");
             const code = Math.random().toString(36).substring(2, 6).toUpperCase();
-            lobbies[code] = { host: socket.id, parametri: dati, giocatori: [{ id: socket.id, nome: dati.nome, token: dati.token, uniqueCode: dati.uniqueCode }] };
+            lobbies[code] = { 
+                host: socket.id, 
+                parametri: dati, 
+                giocatori: [{ 
+                    id: socket.id, 
+                    nome: dati.nome, 
+                    token: dati.token, 
+                    uniqueCode: dati.uniqueCode,
+                    elo: socket.userElo || 1000 
+                }] 
+            };
             socket.join(code);
             socket.roomCode = code;
             socket.emit('lobby_creata', { code: code, giocatori: lobbies[code].giocatori });
@@ -726,7 +740,13 @@ io.on('connection', (socket) => {
                     return socket.emit('errore', "La lobby è piena!");
                 }
                 if (lobby.giocatori.find(p => p.id === socket.id)) return;
-                lobby.giocatori.push({ id: socket.id, nome: dati.nome, token: dati.token, uniqueCode: dati.uniqueCode });
+                lobby.giocatori.push({ 
+                    id: socket.id, 
+                    nome: dati.nome, 
+                    token: dati.token, 
+                    uniqueCode: dati.uniqueCode,
+                    elo: socket.userElo || 1000 
+                });
                 socket.join(dati.code);
                 socket.roomCode = dati.code;
                 io.to(dati.code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: dati.code });
@@ -865,6 +885,7 @@ io.on('connection', (socket) => {
                 p.isHuman = true;
                 p.token = lobby.giocatori[i].token;
                 p.uniqueCode = lobby.giocatori[i].uniqueCode;
+                p.eloMomentaneo = lobby.giocatori[i].elo || 1000;
             }
         });
         lobby.gameInstance.distribuisci();
@@ -1035,6 +1056,7 @@ io.on('connection', (socket) => {
                     roundCards: game.sequenzaTurni[game.indiceGiro],
                     playerIndex: giocata.playerId,
                     isHuman: player.isHuman,
+                    elo: player.isHuman ? (player.eloMomentaneo || 1000) : 1000,
                     aiVariant: player.aiVariant || "N/A",
                     dichiarazione: player.dichiarazione,
                     preseFatte: player.preseFatte,
@@ -1074,23 +1096,65 @@ io.on('connection', (socket) => {
             if (game.indiceGiro >= game.sequenzaTurni.length) {
                 const classificaFinale = [...game.players].sort((a, b) => b.punti - a.punti);
 
-                // --- SALVATAGGIO CLASSIFICHE MONGO DB ---
+                // --- CALCOLO E AGGIORNAMENTO ELO ---
                 if (dbConnected) {
-                    const vincitoreAssoluto = classificaFinale[0].punti;
-                    game.players.forEach(async (p) => {
-                        if (p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_")) {
-                            try {
-                                let isWinner = (p.punti === vincitoreAssoluto) ? 1 : 0;
+                    const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
+                    if (humanPlayers.length > 0) {
+                        try {
+                            // Recuperiamo i profili attuali per avere l'ELO precedente
+                            const userProfiles = await User.find({ uniqueCode: { $in: humanPlayers.map(p => p.uniqueCode) } });
+                            
+                            // Mappa dei profili per accesso rapido
+                            const profileMap = {};
+                            userProfiles.forEach(u => profileMap[u.uniqueCode] = u);
+
+                            // Calcolo ELO per ogni umano
+                            for (let p of humanPlayers) {
+                                const currentElo = profileMap[p.uniqueCode]?.elo || 1000;
+                                const otherElos = game.players.filter(pl => pl.id !== p.id).map(pl => {
+                                    if (pl.isHuman && profileMap[pl.uniqueCode]) return profileMap[pl.uniqueCode].elo;
+                                    return 1000; // Valore base per bot o guest
+                                });
+                                const avgOpponentElo = otherElos.reduce((a, b) => a + b, 0) / otherElos.length;
+
+                                // Punteggio basato sulla posizione (1.0 = Primo, 0.0 = Ultimo)
+                                const rank = classificaFinale.findIndex(cf => cf.id === p.id);
+                                const actualScore = (game.numPlayers - 1 - rank) / (game.numPlayers - 1);
+
+                                // Expected Score (Formula standard ELO)
+                                const expectedScore = 1 / (1 + Math.pow(10, (avgOpponentElo - currentElo) / 400));
+
+                                // K-Factor (Più alto per chi ha giocato poche partite)
+                                const matchesPlayed = profileMap[p.uniqueCode]?.partiteGiocate || 0;
+                                const K = matchesPlayed < 20 ? 40 : 20;
+
+                                // Calcolo variazione base
+                                let eloChange = Math.round(K * (actualScore - expectedScore));
+
+                                // BONUS PRECISIONE: +2 punti se hai azzeccato molte scommesse
+                                // (Diciamo se hai fatto almeno l'80% dei punti tramite bonus scommessa)
+                                // Questo premia la "bravura" oltre alla fortuna delle carte
+                                const accuracyRatio = p.punti > 0 ? (p.preseFatte === p.dichiarazione ? 1 : 0) : 0; 
+                                // Nota: qui potremmo affinare tenendo traccia dei giri vinti, ma per ora usiamo il finale
+                                if (p.preseFatte === p.dichiarazione) eloChange += 2;
+
+                                let isWinner = (p.punti === classificaFinale[0].punti) ? 1 : 0;
+
                                 await User.updateOne(
                                     { uniqueCode: p.uniqueCode },
                                     {
-                                        $inc: { partiteGiocate: 1, partiteVinte: isWinner, punteggioTotale: p.punti },
-                                        $set: { nickname: p.nome } // Sincronizza eventuale nome in caso sia cambiato globalmente (se permetti update)
+                                        $inc: { 
+                                            partiteGiocate: 1, 
+                                            partiteVinte: isWinner, 
+                                            punteggioTotale: p.punti,
+                                            elo: eloChange
+                                        },
+                                        $set: { nickname: p.nome }
                                     }
                                 );
-                            } catch (e) { console.error("Errore update user stats:", e); }
-                        }
-                    });
+                            }
+                        } catch (e) { console.error("Errore aggiornamento ELO:", e); }
+                    }
                 }
 
                 io.to(code).emit('fine_partita', classificaFinale);
@@ -1365,25 +1429,36 @@ async function simulazionePartitaSingola() {
             const p = game.players[game.turnoAttuale];
             const manoV = p.mano.filter(c => !c.giocata);
             let cartaDaGiocare;
-            const vuoleVincere = p.preseFatte < p.dichiarazione;
+            const wantsToWin = p.preseFatte < p.dichiarazione;
             const { agg, cons, sca } = p.aiParams || { agg: 50, cons: 50, sca: 50 };
+            
+            // --- NUOVO: CROWD FACTOR (Pressione del numero giocatori) ---
+            // Più giocatori ci sono, più è probabile che un carico venga "tagliato" da una briscola.
+            const crowdFactor = game.numPlayers / 4; // 3 players = 0.75, 8 players = 2.0
 
             // --- LOGICA GENETICA ---
             if (p.aiLevel === 1) {
                 cartaDaGiocare = manoV[Math.floor(Math.random() * manoV.length)];
             } else {
                 if (game.tavolo.length === 0) {
-                    if (vuoleVincere) {
-                        // Aggressività influenza la scelta tra carta regnante o carico
+                    if (wantsToWin) {
+                        // In tavoli affollati, aprire con un carico è rischioso (rischio taglio alto)
+                        const riskThreshold = 30 * crowdFactor; 
+                        
                         let cartaRegnante = manoV.find(c => {
                             const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
                             return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
                         });
+
                         if (cartaRegnante && agg > 20) {
                             cartaDaGiocare = cartaRegnante;
                         } else {
-                            // Se molto aggressivo, butta il carico subito
-                            cartaDaGiocare = (agg > 70) ? manoV.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => b.forza - a.forza)[Math.floor(manoV.length / 2)];
+                            // Se il tavolo è affollato e non siamo sicuri, giochiamo coperti (carta media/bassa)
+                            if (crowdFactor > 1.5 && agg < 80) {
+                                cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[Math.floor(manoV.length / 3)];
+                            } else {
+                                cartaDaGiocare = (agg > 70) ? manoV.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => b.forza - a.forza)[Math.floor(manoV.length / 2)];
+                            }
                         }
                     } else {
                         cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
@@ -1392,25 +1467,31 @@ async function simulazionePartitaSingola() {
                     const semeUscita = game.tavolo[0].card.seme;
                     const carteValide = manoV.filter(c => c.seme === semeUscita);
                     const vincenteAttuale = game.calcolaVincitorePresa();
+                    const numMancanti = game.numPlayers - 1 - game.tavolo.length;
 
                     if (carteValide.length > 0) {
                         const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
-                        if (vuoleVincere) {
-                            // Prudenza influenza l'uso di carte alte se non siamo gli ultimi
-                            const siamoUltimi = game.tavolo.length === game.numPlayers - 1;
+                        if (wantsToWin) {
+                            const siamoUltimi = numMancanti === 0;
                             if (carteVincenti.length > 0) {
                                 if (siamoUltimi) {
+                                    // Se siamo ultimi, usiamo la carta più bassa per vincere (efficienza)
                                     cartaDaGiocare = carteVincenti.sort((a, b) => a.forza - b.forza)[0];
                                 } else {
-                                    // Se prudente, non rischia carichi se non è l'ultimo
-                                    cartaDaGiocare = (cons > 60) ? carteVincenti.sort((a, b) => a.forza - b.forza)[0] : carteVincenti.sort((a, b) => b.forza - a.forza)[0];
+                                    // Se NON siamo ultimi, il rischio che qualcuno dopo di noi tagli è proporzionale a numMancanti
+                                    const rischioTaglio = numMancanti * 0.15 * crowdFactor;
+                                    if (cons > (80 - rischioTaglio * 100)) {
+                                        // Troppo rischioso, giochiamo una carta bassa per ora
+                                        cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                                    } else {
+                                        cartaDaGiocare = carteVincenti.sort((a, b) => b.forza - a.forza)[0];
+                                    }
                                 }
                             } else {
                                 cartaDaGiocare = carteValide.sort((a, b) => b.forza - a.forza)[0];
                             }
                         } else {
                             const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
-                            // Scarto influenza se buttare via carte alte inutili
                             if (cartePerdenti.length > 0) {
                                 cartaDaGiocare = (sca > 50) ? cartePerdenti.sort((a, b) => b.forza - a.forza)[0] : cartePerdenti.sort((a, b) => a.forza - b.forza)[0];
                             } else {
@@ -1418,16 +1499,22 @@ async function simulazionePartitaSingola() {
                             }
                         }
                     } else {
-                        // Non ha il seme
-                        if (vuoleVincere) {
+                        // Non ha il seme: valutiamo il taglio con Ori
+                        if (wantsToWin) {
                             const briscole = manoV.filter(c => c.seme === 'Ori');
                             if (briscole.length > 0) {
                                 const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
                                 const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
+                                
                                 if (briscoleUtili.length > 0) {
-                                    // Se prudente, taglia solo se il carico a terra vale la pena
-                                    const valoreTavolo = game.tavolo.reduce((acc, curr) => acc + (PESO_VALORE[curr.card.valore] > 0 ? 1 : 0), 0);
-                                    if (cons > 70 && valoreTavolo < 1) {
+                                    const siamoUltimi = numMancanti === 0;
+                                    const valoreTavolo = game.tavolo.reduce((acc, curr) => acc + (PESO_VALORE[curr.card.valore] >= 10 ? 2 : 1), 0);
+                                    
+                                    // Valutiamo se il gioco vale la candela (il taglio)
+                                    // Se mancano molte persone, il rischio che qualcuno controtagli con un Oro più alto è alto
+                                    const rischioControtaglio = numMancanti * 0.2 * crowdFactor;
+
+                                    if (!siamoUltimi && (cons > (70 - rischioControtaglio * 100)) && valoreTavolo < 2) {
                                         cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
                                     } else {
                                         cartaDaGiocare = briscoleUtili.sort((a, b) => a.forza - b.forza)[0];
@@ -1439,7 +1526,6 @@ async function simulazionePartitaSingola() {
                                 cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
                             }
                         } else {
-                            // Scarto alto se vogliamo perdere (Sca influenza questa scelta)
                             cartaDaGiocare = (sca > 30) ? manoV.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                         }
                     }
