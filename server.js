@@ -878,6 +878,9 @@ io.on('connection', (socket) => {
         const lobby = lobbies[code];
         if (!lobby || lobby.gameInstance) return;
         lobby.gameInstance = new LucasGame(parseInt(lobby.parametri.numGiocatori));
+        
+        // 1. Identifichiamo gli umani e calcoliamo il loro ELO medio
+        const humanElos = [];
         lobby.gameInstance.players.forEach((p, i) => {
             if (lobby.giocatori[i]) {
                 p.nome = lobby.giocatori[i].nome;
@@ -886,8 +889,37 @@ io.on('connection', (socket) => {
                 p.token = lobby.giocatori[i].token;
                 p.uniqueCode = lobby.giocatori[i].uniqueCode;
                 p.eloMomentaneo = lobby.giocatori[i].elo || 1000;
+                humanElos.push(p.eloMomentaneo);
             }
         });
+
+        const avgHumanElo = humanElos.length > 0 ? humanElos.reduce((a, b) => a + b, 0) / humanElos.length : 1000;
+
+        // 2. Determiniamo il livello target dell'IA in base all'ELO umano
+        let targetAILevel = 2;
+        if (avgHumanElo < 900) targetAILevel = 1;
+        else if (avgHumanElo < 1100) targetAILevel = 2;
+        else if (avgHumanElo < 1350) targetAILevel = 3;
+        else targetAILevel = 4;
+
+        // 3. Applichiamo il livello ai bot con una piccola variazione casuale
+        lobby.gameInstance.players.forEach(p => {
+            if (!p.isHuman) {
+                // Il bot può essere di livello target, o uno sopra/sotto (min 1, max 4)
+                const variation = Math.floor(Math.random() * 3) - 1; // -1, 0, 1
+                const finalLevel = Math.max(1, Math.min(4, targetAILevel + variation));
+                
+                // Rigeneriamo il DNA del bot in base al nuovo livello
+                const agg = Math.floor(Math.random() * 101);
+                const cons = Math.floor(Math.random() * 101);
+                const sca = Math.floor(Math.random() * 101);
+                p.aiLevel = finalLevel;
+                p.aiParams = { agg, cons, sca };
+                p.aiVariant = `V${finalLevel}_A${agg}_C${cons}_S${sca}`;
+                p.nome = `Bot ${p.aiVariant}`; // Per trasparenza durante i test (puoi rimuoverlo dopo)
+            }
+        });
+
         lobby.gameInstance.distribuisci();
         // Genera un ID unico per la partita (usato per i log)
         lobby.gameInstance.matchId = "M-" + Math.random().toString(36).substring(2, 9).toUpperCase();
@@ -1349,9 +1381,11 @@ async function avviaAutoTraining() {
 
     isSimulando = true;
     
-    // Eseguiamo 3 partite contemporaneamente per velocizzare
+    // Eseguiamo 5 partite contemporaneamente per massimizzare il rendimento
     try {
         await Promise.all([
+            simulazionePartitaSingola(),
+            simulazionePartitaSingola(),
             simulazionePartitaSingola(),
             simulazionePartitaSingola(),
             simulazionePartitaSingola()
@@ -1364,7 +1398,7 @@ async function avviaAutoTraining() {
     const umaniRealiCheck = umaniConnessi - osservatoriAdmin;
     if (umaniRealiCheck <= 0) {
         try {
-            const count = await MatchLog.countDocuments();
+            const count = await MatchLog.estimatedDocumentCount();
             // Se siamo vicini al limite (400k), rallenta
             const delay = (count >= 395000) ? 1000 * 60 * 30 : 1000;
             setTimeout(avviaAutoTraining, delay);
@@ -1388,6 +1422,8 @@ async function simulazionePartitaSingola() {
         p.nome = `Bot-${i}`;
         p.isHuman = false;
     });
+
+    const batchLogs = [];
 
     // Loop dei Giri
     while (game.indiceGiro < game.sequenzaTurni.length) {
@@ -1542,7 +1578,7 @@ async function simulazionePartitaSingola() {
                 const vincitore = game.calcolaVincitorePresa();
                 const semeUscitaPresa = game.tavolo[0].card.seme;
 
-                // --- LOGGING AI (Lo stesso usato per gli umani) ---
+                // --- LOGGING AI (Bufferizzato) ---
                 const historyStr = game.carteUscite.map(c => `${c.valore}-${c.seme}`).join('|');
                 const voidStr = game.players.map((pl, i) => pl.voidSuits.length > 0 ? `P${i}:${pl.voidSuits.join('&')}` : "").filter(s => s !== "").join('|');
 
@@ -1555,8 +1591,7 @@ async function simulazionePartitaSingola() {
                     handPre.push(`${giocata.card.valore}-${giocata.card.seme}`);
                     const tablePre = game.tavolo.slice(0, indexTavolo).map(t => `${t.card.valore}-${t.card.seme}`).join('|');
 
-                    // Nelle simulazioni turbo salviamo sempre in MatchLog
-                    const logEntry = new MatchLog({
+                    batchLogs.push({
                         matchId: game.matchId,
                         numPlayers: game.numPlayers,
                         roundCards: game.sequenzaTurni[game.indiceGiro],
@@ -1573,7 +1608,6 @@ async function simulazionePartitaSingola() {
                         move: `${giocata.card.valore}-${giocata.card.seme}`,
                         wonTrick: (giocata.playerId === vincitore.playerId)
                     });
-                    logEntry.save().catch(() => {});
                 });
 
                 game.players[vincitore.playerId].preseFatte++;
@@ -1593,6 +1627,11 @@ async function simulazionePartitaSingola() {
             const umaniRealiCheck = umaniConnessi - osservatoriAdmin;
             if (umaniRealiCheck > 0) return;
         }
+    }
+
+    // SALVATAGGIO IN BLOCCO FINALE
+    if (dbConnected && batchLogs.length > 0) {
+        MatchLog.insertMany(batchLogs).catch(err => console.error("Errore bulk turbo:", err));
     }
 }
 
