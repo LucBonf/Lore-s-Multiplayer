@@ -743,17 +743,25 @@ function translatePage(lang) {
     }
 }
 
-// Recupero lingua salvata all'avvio
+// Recupero o Rilevamento lingua all'avvio
 document.addEventListener('DOMContentLoaded', () => {
-    const savedLang = localStorage.getItem('lucas_lang');
-    if (savedLang) {
-        setTimeout(() => {
-            const flagsMap = { 'it': '🇮🇹', 'en': '🇬🇧', 'fr': '🇫🇷', 'es': '🇪🇸', 'de': '🇩🇪' };
-            const flagEl = document.getElementById('current-flag-container');
-            if (flagEl) flagEl.innerText = flagsMap[savedLang] || '🇮🇹';
-            translatePage(savedLang);
-        }, 100);
-    } else {
-        translatePage('it'); // default
+    let savedLang = localStorage.getItem('lucas_lang');
+    
+    if (!savedLang) {
+        // Se è il primo accesso, rileviamo la lingua del browser
+        const browserLang = (navigator.language || navigator.userLanguage || 'en').split('-')[0].toLowerCase();
+        const supported = ['it', 'en', 'fr', 'es', 'de'];
+        savedLang = supported.includes(browserLang) ? browserLang : 'en';
+        
+        // Salviamo la preferenza rilevata in automatico
+        localStorage.setItem('lucas_lang', savedLang);
+        console.log(`🌐 Lingua rilevata automaticamente: \${savedLang}`);
     }
+
+    setTimeout(() => {
+        const flagsMap = { 'it': '🇮🇹', 'en': '🇬🇧', 'fr': '🇫🇷', 'es': '🇪🇸', 'de': '🇩🇪' };
+        const flagEl = document.getElementById('current-flag-container');
+        if (flagEl) flagEl.innerText = flagsMap[savedLang] || '🇬🇧';
+        translatePage(savedLang);
+    }, 100);
 });
