@@ -123,12 +123,19 @@ body {
     background-image: url('https://gist.github.com/user-attachments/assets/1be959ff-f211-40ab-ac79-46e049cd336a');
     background-repeat: no-repeat;
     background-size: 960px 610px;
-    background-color: #fff;
+    background-color: #f8f8f8; /* Off-white per distinguere dal vuoto totale */
     border-radius: 6px;
     border: 1px solid #000;
     cursor: pointer;
-    transition: transform 0.2s;
-    background-size: 960px 610px; /* Assicura che la scala sia fissa */
+    transition: transform 0.2s, box-shadow 0.2s;
+    background-size: 960px 610px;
+    
+    /* FIX RENDERING: Forza l'uso della GPU per evitare carte bianche */
+    transform: translateZ(0); 
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    image-rendering: -webkit-optimize-contrast;
+    backface-visibility: hidden;
 }
 
 .card:hover {

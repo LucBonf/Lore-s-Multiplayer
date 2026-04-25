@@ -520,8 +520,7 @@ window.inviaDichiarazione = () => {
     
     // Se l'input è vuoto o non è un numero, mostriamo errore invece di mettere 0 di default
     if (isNaN(val)) {
-        mostraErrore(d.errBetNumber);
-        return;
+        val = 0;
     }
     
     if (val < 0 || val > qtaAttuale) {
@@ -604,6 +603,17 @@ socket.on('conferma_inizio_partita', (dati) => {
             }
         } else {
             mazziereWarning.style.display = 'none';
+        }
+
+        // --- MICRO-RITARDO SICUREZZA PULSANTE ---
+        const btnBet = areaScommessa.querySelector('button');
+        if (btnBet) {
+            btnBet.style.opacity = '0.5';
+            btnBet.style.pointerEvents = 'none';
+            setTimeout(() => {
+                btnBet.style.opacity = '1';
+                btnBet.style.pointerEvents = 'auto';
+            }, 100);
         }
     } else {
         areaScommessa.style.display = 'none';
