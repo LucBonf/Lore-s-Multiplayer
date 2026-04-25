@@ -7,6 +7,9 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 dotenv.config();
 import filter from 'leo-profanity';
+import cookieParser from 'cookie-parser';
+
+const ADMIN_KEY = process.env.ADMIN_KEY || "Lucas2024!"; // Cambiala nel file .env
 
 // Gestione Robustezza: Evita il crash del processo per errori non gestiti
 process.on('uncaughtException', (err) => {
@@ -175,9 +178,57 @@ if (process.env.MONGODB_URI) {
 }
 
 app.use(express.static(__dirname));
+app.use(cookieParser());
 
-// --- NUOVA ROTTA: CERCA UTENTE PER ADMIN ---
-app.get('/api/admin/find-user/:query', async (req, res) => {
+// --- MIDDLEWARE DI PROTEZIONE ADMIN ---
+const authAdmin = (req, res, next) => {
+    const authCookie = req.cookies.admin_session;
+    if (authCookie === ADMIN_KEY) {
+        next();
+    } else {
+        // Se non autenticato, mostra la pagina di login
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Area Protetta</title>
+                <style>
+                    body { background: #0f0f0f; color: #ff0000; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                    .login-box { border: 1px solid #ff0000; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 0 20px rgba(255,0,0,0.2); }
+                    input { background: #1a1a1a; border: 1px solid #ff0000; color: white; padding: 10px; margin: 10px 0; width: 200px; text-align: center; }
+                    button { background: #ff0000; color: black; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; }
+                    button:hover { background: white; }
+                </style>
+            </head>
+            <body>
+                <div class="login-box">
+                    <h2>⚠️ ACCESSO RISERVATO</h2>
+                    <p>Inserisci il Codice Operatore</p>
+                    <form action="/admin-login-verify" method="POST">
+                        <input type="password" name="code" placeholder="******" autofocus required><br>
+                        <button type="submit">SBLOCCA SISTEMA</button>
+                    </form>
+                    \${req.query.err ? '<p style="font-size:0.8em;">Codice Errato!</p>' : ''}
+                </div>
+            </body>
+            </html>
+        `);
+    }
+};
+
+// Rotta per verificare il login
+app.post('/admin-login-verify', express.urlencoded({ extended: true }), (req, res) => {
+    const { code } = req.body;
+    if (code === ADMIN_KEY) {
+        res.cookie('admin_session', ADMIN_KEY, { maxAge: 86400000, httpOnly: true }); // Scade in 24h
+        res.redirect('/stato-allenamento-777');
+    } else {
+        res.redirect('/stato-allenamento-777?err=1');
+    }
+});
+
+// --- ROTTE PROTETTE DA authAdmin ---
+app.get('/api/admin/find-user/:query', authAdmin, async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
     try {
         const query = req.params.query;
@@ -191,7 +242,7 @@ app.get('/api/admin/find-user/:query', async (req, res) => {
 });
 
 // --- NUOVA ROTTA: LISTA COMPLETA UTENTI ---
-app.get('/api/admin/all-users', async (req, res) => {
+app.get('/api/admin/all-users', authAdmin, async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
     try {
         // Recuperiamo tutti gli utenti ordinati per ultimo accesso
@@ -203,7 +254,7 @@ app.get('/api/admin/all-users', async (req, res) => {
 });
 
 // --- NUOVA ROTTA: ELIMINA UTENTE PER ADMIN ---
-app.get('/api/admin/delete-user/:uniqueCode', async (req, res) => {
+app.get('/api/admin/delete-user/:uniqueCode', authAdmin, async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
     try {
         const code = req.params.uniqueCode;
@@ -216,7 +267,7 @@ app.get('/api/admin/delete-user/:uniqueCode', async (req, res) => {
 });
 
 // ROTTA SEGRETA PER LEGGERE I REPORT (Sia da DB che da file se esiste)
-app.get('/stata-segreta-report-777', async (req, res) => {
+app.get('/stata-segreta-report-777', authAdmin, async (req, res) => {
     try {
         let html = `
         <!DOCTYPE html>
@@ -308,7 +359,7 @@ app.post('/reset-turbo-logs-777', express.json(), async (req, res) => {
 });
 
 // ROTTA SEGRETA PER SCARICARE I LOG AI IN FORMATO EXCEL (CSV)
-app.get('/scarica-dataset-lucas-777', async (req, res) => {
+app.get('/scarica-dataset-lucas-777', authAdmin, async (req, res) => {
     try {
         if (!dbConnected) return res.status(500).send("DB non connesso");
         
@@ -350,7 +401,7 @@ app.get('/scarica-dataset-lucas-777', async (req, res) => {
 });
 
 // ROTTA SEGRETA: DASHBOARD MONITORAGGIO AI
-app.get('/stato-allenamento-777', async (req, res) => {
+app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
     try {
         if (!dbConnected) return res.status(500).send("Database non connesso.");
 
@@ -538,7 +589,7 @@ app.get('/stato-allenamento-777', async (req, res) => {
 });
 
 // ROTTA PER ELIMINARE I REPORT
-app.post('/elimina-report-777', express.json(), async (req, res) => {
+app.post('/elimina-report-777', authAdmin, express.json(), async (req, res) => {
     try {
         if (!dbConnected) return res.json({ ok: false, msg: "DB non connesso" });
         const { id } = req.body;
