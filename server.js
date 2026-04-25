@@ -290,6 +290,17 @@ app.get('/api/admin/delete-user/:uniqueCode', authAdmin, async (req, res) => {
     }
 });
 
+// --- NUOVA ROTTA: TOGGLE MASTER AI ---
+app.post('/api/admin/toggle-turbo', authAdmin, (req, res) => {
+    turboEnabled = !turboEnabled;
+    if (turboEnabled) {
+        avviaAutoTraining(); // Riavvia subito se viene acceso
+    } else {
+        isSimulando = false;
+    }
+    res.json({ success: true, enabled: turboEnabled });
+});
+
 // ROTTA SEGRETA PER LEGGERE I REPORT (Sia da DB che da file se esiste)
 app.get('/stato-segreta-report-777', authAdmin, async (req, res) => {
     try {
@@ -488,6 +499,13 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                 <div class="metric">Admin in Osservazione: ${osservatoriAdmin}</div>
                 
                 <div class="card">
+                    <h2>⚙️ Gestione Auto-Training</h2>
+                    <p>Stato Simulatore AI: <strong id="master-ai-status">${turboEnabled ? '<span style="color:#00ff00;">ACCESO</span>' : '<span style="color:#ff0000;">SPENTO</span>'}</strong></p>
+                    <button class="btn" style="border-color:#3498db; color:#3498db;" onclick="toggleTurbo()">Attiva / Disattiva Auto-Training</button>
+                    <p style="font-size: 0.8em; color: #888; margin-top: 10px;">Nota: Anche se ACCESO, il simulatore si ferma se ci sono umani online per non appesantire il server.</p>
+                </div>
+
+                <div class="card">
                     <h2>⚙️ Gestione Log</h2>
                     <p>Attenzione: l'operazione è irreversibile.</p>
                     <button class="btn btn-danger" onclick="confermaSvuota()">🗑️ SVUOTA LOG TURBO</button>
@@ -549,6 +567,19 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
 
             <script>
                 const socket = io({ query: { role: 'admin' } });
+
+                async function toggleTurbo() {
+                    try {
+                        const res = await fetch('/api/admin/toggle-turbo', { method: 'POST' });
+                        if (res.status === 401) return location.reload();
+                        const data = await res.json();
+                        if (data.success) {
+                            location.reload();
+                        }
+                    } catch (e) {
+                        alert("Errore di rete");
+                    }
+                }
 
                 function confermaSvuota() {
                     if (confirm("ATTENZIONE: Stai per eliminare TUTTI i log Turbo (AI). L'azione è irreversibile. Procedere?")) {
@@ -799,6 +830,7 @@ class LucasGame {
 let umaniConnessi = 0;
 let osservatoriAdmin = 0;
 let isSimulando = false;
+let turboEnabled = false; // Interruttore Maestro AI
 const lobbies = {};
 
 
@@ -1636,21 +1668,24 @@ io.on('connection', (socket) => {
 // ==========================================
 
 async function avviaAutoTraining() {
+    if (!turboEnabled) {
+        isSimulando = false;
+        return;
+    }
+
     const umaniReali = umaniConnessi - osservatoriAdmin;
     if (umaniReali > 0) {
         isSimulando = false;
+        setTimeout(avviaAutoTraining, 10000); // Check meno frequente
         return;
     }
     if (!dbConnected) return;
 
     isSimulando = true;
     
-    // Eseguiamo 5 partite contemporaneamente per massimizzare il rendimento
+    // Eseguiamo solo 2 partite contemporaneamente per non appesantire troppo il server
     try {
         await Promise.all([
-            simulazionePartitaSingola(),
-            simulazionePartitaSingola(),
-            simulazionePartitaSingola(),
             simulazionePartitaSingola(),
             simulazionePartitaSingola()
         ]);
@@ -1658,19 +1693,25 @@ async function avviaAutoTraining() {
         console.error("Errore durante simulazione turbo:", e);
     }
 
+    if (!turboEnabled) {
+        isSimulando = false;
+        return;
+    }
+
     // Ricontrolla se siamo ancora soli
     const umaniRealiCheck = umaniConnessi - osservatoriAdmin;
     if (umaniRealiCheck <= 0) {
         try {
             const count = await MatchLog.estimatedDocumentCount();
-            // Se siamo vicini al limite (400k), rallenta
-            const delay = (count >= 395000) ? 1000 * 60 * 30 : 1000;
+            // Se siamo vicini al limite (400k), rallenta moltissimo
+            const delay = (count >= 395000) ? 1000 * 60 * 30 : 2000; // 2 secondi tra batch invece di 1
             setTimeout(avviaAutoTraining, delay);
         } catch (e) {
-            setTimeout(avviaAutoTraining, 2000);
+            setTimeout(avviaAutoTraining, 5000);
         }
     } else {
         isSimulando = false;
+        setTimeout(avviaAutoTraining, 10000);
     }
 }
 
