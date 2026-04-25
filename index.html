@@ -23,6 +23,13 @@
         </div>
     </div>
 
+    <!-- Pulsante Segnalazioni -->
+    <div id="report-btn-container">
+        <div id="report-btn" onclick="apriReport()">
+            🐞
+        </div>
+    </div>
+
     <!-- Modal Scelta Lingua -->
     <div id="modal-lingua" class="modal">
         <div class="modal-content" style="max-width: 400px; text-align: center;">
@@ -35,6 +42,16 @@
                 <div class="lang-opt" onclick="setLanguage('es')">Español</div>
                 <div class="lang-opt" onclick="setLanguage('de')">Deutsch</div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal Segnala Problema -->
+    <div id="modal-report" class="modal">
+        <div class="modal-content" style="max-width: 500px; text-align: center;">
+            <span class="close-btn" onclick="chiudiReport()">&times;</span>
+            <h2 data-i18n="reportTitle" style="color: #e74c3c; margin-top: 0;">Segnala un Problema</h2>
+            <textarea id="valore-report" data-i18n="reportPlaceholder" placeholder="Descrivi il problema in dettaglio..." style="width: 100%; height: 150px; margin-top: 15px; padding: 10px; border-radius: 8px; border: 1px solid #7f8c8d; background:#2c3e50; color:#fff; font-family: 'Outfit', sans-serif; resize: none;"></textarea>
+            <button data-i18n="reportSubmit" onclick="inviaSegnalazione()" style="margin-top: 15px; padding: 10px 20px; font-weight: bold; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1rem; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">Invia Segnalazione</button>
         </div>
     </div>
 

@@ -45,6 +45,15 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
+// Schema Segnalazioni Bug
+const reportSchema = new mongoose.Schema({
+    data: { type: Date, default: Date.now },
+    nickname: { type: String, default: 'Sconosciuto' },
+    testo: { type: String, required: true }
+});
+const Report = mongoose.model('Report', reportSchema);
+
+
 // --- INTEGRAZIONE IA (GEMINI API) ---
 async function checkWithAI(nickname) {
     const API_KEY = process.env.GEMINI_API_KEY;
@@ -102,6 +111,38 @@ if (process.env.MONGODB_URI) {
 }
 
 app.use(express.static(__dirname));
+
+// ROTTA SEGRETA PER LEGGERE I REPORT (Sia da DB che da file se esiste)
+app.get('/stata-segreta-report-777', async (req, res) => {
+    try {
+        let html = `<body style="background: #1a1a1a; color: #eee; font-family: sans-serif; padding: 20px;">
+                    <h1 style="color: #e74c3c;">🪲 Segnalazioni Bug Ricevute</h1>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">`;
+
+        if (dbConnected) {
+            const reports = await Report.find().sort({ data: -1 });
+            if (reports.length === 0) {
+                html += "<p>Nessun report nel database.</p>";
+            } else {
+                reports.forEach(r => {
+                    html += `<div style="background: #2c3e50; padding: 15px; border-radius: 8px; border-left: 5px solid #e74c3c;">
+                                <strong style="color: #f1c40f;">${r.data.toLocaleString('it-IT')}</strong> - 
+                                <span style="color: #3498db;">Utente: ${r.nickname}</span><br>
+                                <p style="margin-top: 10px; font-style: italic;">"${r.testo}"</p>
+                             </div>`;
+                });
+            }
+        } else {
+            html += "<p style='color: orange;'>⚠️ Database non connesso. Impossibile leggere i report persistenti.</p>";
+        }
+
+        html += `</div></body>`;
+        res.send(html);
+    } catch (err) {
+        res.status(500).send("Errore nel recupero dei report.");
+    }
+});
+
 
 const SEMI = ["Coppe", "Ori", "Bastoni", "Spade"];
 const VALORI = ["Asso", "2", "3", "4", "5", "6", "7", "Fante", "Cavallo", "Re"];
@@ -509,6 +550,35 @@ io.on('connection', (socket) => {
         inviaStato(code);
         gestisciIA(code);
     }
+
+    socket.on('bug_report', async (testo) => {
+        try {
+            let nick = "Sconosciuto";
+            if (socket.userToken && utentiDb[socket.userToken]) {
+                nick = utentiDb[socket.userToken].nickname;
+            }
+
+            // SALVATAGGIO SU DATABASE (Persistente)
+            if (dbConnected) {
+                const nuovoReport = new Report({
+                    nickname: nick,
+                    testo: testo
+                });
+                await nuovoReport.save();
+                console.log(`🪲 Report salvato su DB da ${nick}`);
+            }
+
+            // Backup su file (opzionale, sparirà al commit su Render)
+            const fs = require('fs');
+            const logEntry = `\n--- BUG REPORT ---\nData: ${new Date().toISOString()}\nUtente: ${nick}\nTesto: ${testo}\n`;
+            fs.appendFile('bug_reports.txt', logEntry, (err) => {
+                if (err) console.error("Errore backup file:", err);
+            });
+
+        } catch (e) {
+            console.error("Errore gestione bug_report:", e);
+        }
+    });
 
     socket.on('invia_scommessa', (valRaw) => {
         try {

@@ -680,10 +680,12 @@ window.onclick = (event) => {
     const modalRegole = document.getElementById('modal-regole');
     const modalClassifica = document.getElementById('modal-classifica');
     const modalLingua = document.getElementById('modal-lingua');
+    const modalReport = document.getElementById('modal-report');
 
     if (event.target === modalRegole) modalRegole.style.display = 'none';
     if (event.target === modalClassifica) modalClassifica.style.display = 'none';
     if (event.target === modalLingua) chiudiLingua();
+    if (event.target === modalReport) chiudiReport();
 };
 
 // =========================================
@@ -698,6 +700,41 @@ window.toggleLanguageModal = () => {
 window.chiudiLingua = () => {
     const modal = document.getElementById('modal-lingua');
     if (modal) modal.style.display = 'none';
+};
+
+window.apriReport = () => {
+    const modal = document.getElementById('modal-report');
+    if (modal) modal.style.display = 'block';
+};
+
+window.chiudiReport = () => {
+    const modal = document.getElementById('modal-report');
+    if (modal) {
+        modal.style.display = 'none';
+        const ta = document.getElementById('valore-report');
+        if (ta) ta.value = '';
+    }
+};
+
+window.inviaSegnalazione = () => {
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const d = dictionary[lang];
+    const ta = document.getElementById('valore-report');
+    if (!ta) return;
+    
+    const text = ta.value.trim();
+    if (!text) {
+        mostraErrore(d.reportEmpty);
+        return;
+    }
+    
+    socket.emit('bug_report', text);
+    chiudiReport();
+    
+    // Mostriamo un avviso testuale di successo usando window.alert 
+    // per semplicità dato che cambia da 'mostraErrore' (che è rosso).
+    // Alternativamente potremmo clonare mostraErrore in verde, ma alert è okay per feedback non distruttivo.
+    setTimeout(() => { alert(d.reportSuccess); }, 100);
 };
 
 window.setLanguage = (lang) => {
@@ -724,13 +761,20 @@ function translatePage(lang) {
     elements.forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (d[key]) {
-            if (el.tagName === 'INPUT' && el.type === 'text' || el.type === 'password' || el.type === 'number') {
+            if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'password' || el.type === 'number')) {
+                 el.placeholder = d[key];
+            } else if (el.tagName === 'TEXTAREA') {
                  el.placeholder = d[key];
             } else {
                  el.innerHTML = d[key];
             }
         }
     });
+
+    const reportBtn = document.getElementById('report-btn');
+    if (reportBtn && d.reportBtnTooltip) {
+        reportBtn.title = d.reportBtnTooltip;
+    }
 
     // Aggiornamento label select players se esiste
     const s = document.getElementById('select-players');

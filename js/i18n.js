@@ -71,7 +71,14 @@ const dictionary = {
         'players5': '5 Giocatori',
         'players6': '6 Giocatori',
         'players7': '7 Giocatori',
-        'players8': '8 Giocatori'
+        'players8': '8 Giocatori',
+        // Bug Report
+        'reportBtnTooltip': 'Segnala un Problema',
+        'reportTitle': 'Segnala un Problema',
+        'reportPlaceholder': 'Descrivi il problema in dettaglio...',
+        'reportSubmit': 'Invia Segnalazione',
+        'reportSuccess': 'Segnalazione inviata con successo! Grazie.',
+        'reportEmpty': 'Il testo della segnalazione non può essere vuoto.'
     },
     'en': {
         'chooseLanguage': 'Choose Language',
@@ -137,7 +144,14 @@ const dictionary = {
         'players5': '5 Players',
         'players6': '6 Players',
         'players7': '7 Players',
-        'players8': '8 Players'
+        'players8': '8 Players',
+        // Bug Report
+        'reportBtnTooltip': 'Report a Problem',
+        'reportTitle': 'Report a Problem',
+        'reportPlaceholder': 'Describe the problem in detail...',
+        'reportSubmit': 'Submit Report',
+        'reportSuccess': 'Report submitted successfully! Thank you.',
+        'reportEmpty': 'The report text cannot be empty.'
     },
     'fr': {
         'chooseLanguage': 'Choisissez la Langue',
@@ -203,7 +217,14 @@ const dictionary = {
         'players5': '5 Joueurs',
         'players6': '6 Joueurs',
         'players7': '7 Joueurs',
-        'players8': '8 Joueurs'
+        'players8': '8 Joueurs',
+        // Bug Report
+        'reportBtnTooltip': 'Signaler un problème',
+        'reportTitle': 'Signaler un problème',
+        'reportPlaceholder': 'Décrivez le problème en détail...',
+        'reportSubmit': 'Envoyer le rapport',
+        'reportSuccess': 'Rapport envoyé avec succès ! Merci.',
+        'reportEmpty': 'Le texte du rapport ne peut pas être vide.'
     },
     'es': {
         'chooseLanguage': 'Elige el Idioma',
@@ -269,7 +290,14 @@ const dictionary = {
         'players5': '5 Jugadores',
         'players6': '6 Jugadores',
         'players7': '7 Jugadores',
-        'players8': '8 Jugadores'
+        'players8': '8 Jugadores',
+        // Bug Report
+        'reportBtnTooltip': 'Reportar un problema',
+        'reportTitle': 'Reportar un problema',
+        'reportPlaceholder': 'Describe el problema en detalle...',
+        'reportSubmit': 'Enviar informe',
+        'reportSuccess': '¡Informe enviado con éxito! Gracias.',
+        'reportEmpty': 'El texto del informe no puede estar vacío.'
     },
     'de': {
         'chooseLanguage': 'Sprache Wählen',
@@ -335,7 +363,14 @@ const dictionary = {
         'players5': '5 Spieler',
         'players6': '6 Spieler',
         'players7': '7 Spieler',
-        'players8': '8 Spieler'
+        'players8': '8 Spieler',
+        // Bug Report
+        'reportBtnTooltip': 'Ein Problem melden',
+        'reportTitle': 'Ein Problem melden',
+        'reportPlaceholder': 'Beschreibe das Problem im Detail...',
+        'reportSubmit': 'Bericht senden',
+        'reportSuccess': 'Bericht erfolgreich gesendet! Vielen Dank.',
+        'reportEmpty': 'Der Text des Berichts darf nicht leer sein.'
     }
 };
 

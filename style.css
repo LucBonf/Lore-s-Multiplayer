@@ -638,6 +638,36 @@ button {
     border-color: #f1c40f;
 }
 
+#report-btn-container {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 4000;
+}
+
+#report-btn {
+    width: 50px;
+    height: 50px;
+    background: rgba(231, 76, 60, 0.2);
+    backdrop-filter: blur(8px);
+    border: 2px solid rgba(231, 76, 60, 0.5);
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.8rem;
+    font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
+}
+
+#report-btn:hover {
+    transform: scale(1.1) rotate(-5deg);
+    background: rgba(231, 76, 60, 0.4);
+    border-color: #e74c3c;
+}
+
 .lang-opt {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -666,6 +696,15 @@ button {
         right: 15px;
     }
     #language-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 1.5rem;
+    }
+    #report-btn-container {
+        bottom: 15px;
+        left: 15px;
+    }
+    #report-btn {
         width: 45px;
         height: 45px;
         font-size: 1.5rem;
