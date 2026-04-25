@@ -52,6 +52,25 @@ const reportSchema = new mongoose.Schema({
     testo: { type: String, required: true }
 });
 const Report = mongoose.model('Report', reportSchema);
+ 
+// --- NUOVO: Schema per Training AI (Capped Collection 25MB) ---
+const matchLogSchema = new mongoose.Schema({
+    timestamp: { type: Date, default: Date.now },
+    numPlayers: Number,
+    roundCards: Number,
+    playerIndex: Number,
+    isHuman: Boolean,
+    dichiarazione: Number,
+    preseFatte: Number,
+    obiettivoRimanente: Number, // Prese mancanti per fare la dichiarazione
+    hand: String,               // Carte in mano separate da |
+    table: String,              // Carte già sul tavolo
+    history: String,            // Carte già uscite nel giro
+    voidSuits: String,          // Info sui semi finiti (es: "P1:Spade,P2:Coppe")
+    move: String,               // Carta giocata
+    wonTrick: Boolean           // Ha vinto la presa?
+});
+const MatchLog = mongoose.model('MatchLog', matchLogSchema);
 
 
 // --- INTEGRAZIONE IA (GEMINI API) ---
@@ -92,6 +111,19 @@ if (process.env.MONGODB_URI) {
             console.log('🔗 Connesso a MongoDB Atlas!'); 
             dbConnected = true; 
             
+            // Inizializza collezione Capped per i LOG AI
+            try {
+                const collections = await mongoose.connection.db.listCollections({ name: 'matchlogs' }).toArray();
+                if (collections.length === 0) {
+                    await mongoose.connection.db.createCollection('matchlogs', {
+                        capped: true,
+                        size: 25 * 1024 * 1024, // 25 MB (abbondante per milioni di mosse testuali)
+                        max: 100000 // Conserva le ultime 100k mosse
+                    });
+                    console.log("📦 Collezione Capped 'matchlogs' creata.");
+                }
+            } catch (e) { console.log("Nota: matchlogs già esistente o gestita."); }
+
             // --- PULIZIA SPECIFICA RICHIESTA: Elimina utenti offensivi e bestemmie ---
             try {
                 // Rimuove account che contengono parole inaccettabili (cazzo, hezbollah, o radici di bestemmie)
@@ -182,6 +214,42 @@ app.get('/stata-segreta-report-777', async (req, res) => {
     }
 });
 
+// ROTTA SEGRETA PER SCARICARE I LOG AI IN FORMATO EXCEL (CSV)
+app.get('/scarica-dataset-lucas-777', async (req, res) => {
+    try {
+        if (!dbConnected) return res.status(500).send("DB non connesso");
+        
+        const logs = await MatchLog.find().sort({ timestamp: 1 });
+        
+        let csv = "Timestamp,NumPlayers,RoundCards,PlayerIdx,IsHuman,Decl,Made,Target,Hand,Table,History,VoidSuits,Move,Won\n";
+        
+        logs.forEach(l => {
+            csv += [
+                l.timestamp.toISOString(),
+                l.numPlayers,
+                l.roundCards,
+                l.playerIndex,
+                l.isHuman ? 1 : 0,
+                l.dichiarazione,
+                l.preseFatte,
+                l.obiettivoRimanente,
+                `"${l.hand}"`,
+                `"${l.table}"`,
+                `"${l.history}"`,
+                `"${l.voidSuits}"`,
+                l.move,
+                l.wonTrick ? 1 : 0
+            ].join(',') + "\n";
+        });
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename=lucas_ai_training_data.csv');
+        res.status(200).send(csv);
+    } catch (err) {
+        res.status(500).send("Errore generazione CSV");
+    }
+});
+
 // ROTTA PER ELIMINARE I REPORT
 app.post('/elimina-report-777', express.json(), async (req, res) => {
     try {
@@ -221,11 +289,13 @@ class Player {
         this.punti = 0;
         this.dichiarazione = "-";
         this.preseFatte = 0;
+        this.voidSuits = []; // Semi che il giocatore ha terminato (scoperti durante il gioco)
     }
     resetGiro() {
         this.mano = [];
         this.dichiarazione = "-";
         this.preseFatte = 0;
+        this.voidSuits = [];
     }
 }
 
@@ -722,9 +792,53 @@ io.on('connection', (socket) => {
 
     function risolviPresa(code) {
         const game = lobbies[code]?.gameInstance;
-        if (!game) return; // Sicurezza anti-crash aggiuntiva
+        if (!game) return;
 
         const vincitore = game.calcolaVincitorePresa();
+        const semeUscita = game.tavolo[0].card.seme;
+
+        // --- LOGGING PER TRAINING AI ---
+        if (dbConnected) {
+            const historyStr = game.carteUscite.map(c => `${c.valore}-${c.seme}`).join('|');
+            const voidStr = game.players.map((p, i) => p.voidSuits.length > 0 ? `P${i}:${p.voidSuits.join('&')}` : "").filter(s => s !== "").join('|');
+            const tableStr = game.tavolo.map(t => `${t.card.valore}-${t.card.seme}`).join('|');
+
+            game.tavolo.forEach((giocata, indexTavolo) => {
+                const player = game.players[giocata.playerId];
+                const card = giocata.card;
+                
+                // Se non ha risposto al seme, registriamo il "Void"
+                if (card.seme !== semeUscita && !player.voidSuits.includes(semeUscita)) {
+                    player.voidSuits.push(semeUscita);
+                }
+
+                // Costruiamo la mano che aveva *prima* di giocare questa carta
+                // (le carte ancora non giocate + questa carta stessa)
+                const handPreMossa = player.mano.filter(c => !c.giocata).map(c => `${c.valore}-${c.seme}`);
+                handPreMossa.push(`${card.valore}-${card.seme}`);
+
+                // Cosa c'era a terra *prima* che giocasse lui?
+                const tablePreMossa = game.tavolo.slice(0, indexTavolo).map(t => `${t.card.valore}-${t.card.seme}`).join('|');
+
+                const logEntry = new MatchLog({
+                    numPlayers: game.numPlayers,
+                    roundCards: game.sequenzaTurni[game.indiceGiro],
+                    playerIndex: giocata.playerId,
+                    isHuman: player.isHuman,
+                    dichiarazione: player.dichiarazione,
+                    preseFatte: player.preseFatte,
+                    obiettivoRimanente: player.dichiarazione - player.preseFatte,
+                    hand: handPreMossa.join('|'),
+                    table: tablePreMossa,
+                    history: historyStr,
+                    voidSuits: voidStr,
+                    move: `${card.valore}-${card.seme}`,
+                    wonTrick: (giocata.playerId === vincitore.playerId)
+                });
+                logEntry.save().catch(e => console.error("Errore log AI:", e));
+            });
+        }
+
         game.players[vincitore.playerId].preseFatte++;
 
         // --- NOVITÀ: Notifica al client chi ha vinto la presa prima di pulire il tavolo ---
