@@ -47,6 +47,13 @@ const userSchema = new mongoose.Schema({
     elo: { type: Number, default: 1000 },
     lastLogin: { type: Date, default: Date.now }
 });
+
+// INDICI PER PERFORMANCE (Classifiche e Ricerche istantanee)
+userSchema.index({ punteggioTotale: -1 });
+userSchema.index({ elo: -1 });
+userSchema.index({ lastLogin: -1 });
+userSchema.index({ nickname: 'text' }); // Per ricerca veloce per nome
+
 const User = mongoose.model('User', userSchema);
 
 // Schema Segnalazioni Bug
@@ -79,6 +86,11 @@ const matchLogSchema = new mongoose.Schema({
     move: String,               // Carta giocata
     wonTrick: Boolean           // Ha vinto la presa?
 });
+
+// INDICI PER PERFORMANCE (Log e Statistiche)
+matchLogSchema.index({ timestamp: -1 });
+matchLogSchema.index({ matchId: 1 });
+
 const MatchLog = mongoose.model('MatchLog', matchLogSchema);
 
 // --- NUOVO: Schema per Human Logs (Dati reali preziosi) ---
@@ -246,15 +258,35 @@ app.get('/api/admin/find-user/:query', authAdmin, async (req, res) => {
     }
 });
 
-// --- NUOVA ROTTA: LISTA COMPLETA UTENTI ---
+// --- NUOVA ROTTA: LISTA COMPLETA UTENTI (OTTIMIZZATA CON STREAMING) ---
 app.get('/api/admin/all-users', authAdmin, async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
+    
     try {
-        // Recuperiamo tutti gli utenti ordinati per ultimo accesso
-        const users = await User.find().sort({ lastLogin: -1 });
-        res.json({ success: true, users });
+        res.setHeader('Content-Type', 'application/json');
+        res.write('{"success":true,"users":[');
+        
+        const cursor = User.find().sort({ lastLogin: -1 }).cursor();
+        let first = true;
+        
+        cursor.on('data', (user) => {
+            if (!first) res.write(',');
+            res.write(JSON.stringify(user));
+            first = false;
+        });
+        
+        cursor.on('end', () => {
+            res.write(']}');
+            res.end();
+        });
+        
+        cursor.on('error', (err) => {
+            console.error("Errore streaming utenti:", err);
+            res.end();
+        });
     } catch (e) {
-        res.json({ success: false, error: e.message });
+        console.error("Errore rotta all-users:", e);
+        if (!res.headersSent) res.json({ success: false, error: e.message });
     }
 });
 
