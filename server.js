@@ -245,6 +245,26 @@ app.get('/stata-segreta-report-777', async (req, res) => {
     }
 });
 
+// ROTTA SEGRETA: RESET LOG TURBO
+app.post('/reset-turbo-logs-777', express.json(), async (req, res) => {
+    try {
+        if (!dbConnected) return res.status(500).json({ ok: false, msg: "DB non connesso" });
+        
+        console.log("⚠️ RESET RICHIESTO: Svuotamento log Turbo...");
+        await mongoose.connection.db.collection('matchlogs').drop();
+        await mongoose.connection.db.createCollection('matchlogs', {
+            capped: true,
+            size: 25 * 1024 * 1024,
+            max: 100000
+        });
+        
+        res.json({ ok: true });
+    } catch (err) {
+        console.error("Errore reset turbo:", err);
+        res.status(500).json({ ok: false });
+    }
+});
+
 // ROTTA SEGRETA PER SCARICARE I LOG AI IN FORMATO EXCEL (CSV)
 app.get('/scarica-dataset-lucas-777', async (req, res) => {
     try {
@@ -337,6 +357,7 @@ app.get('/stato-allenamento-777', async (req, res) => {
                         <div class="metric">Mosse: ${totaleTurbo.toLocaleString()} / 100k</div>
                         <div class="metric">Partite: ${partiteTurbo}</div>
                         <a href="/scarica-dataset-lucas-777?type=turbo" class="btn">SCARICA TURBO CSV</a>
+                        <button onclick="resetTurbo()" class="btn" style="border-color: #ff0000; color: #ff0000;">🗑️ SVUOTA TURBO</button>
                     </div>
                     <div style="border-left: 1px solid #00ff00; padding-left: 20px;">
                         <h3>💎 DATASET UMANO</h3>
@@ -361,6 +382,23 @@ app.get('/stato-allenamento-777', async (req, res) => {
                     socket.emit('admin_obs');
                     console.log('Modalità Osservatore Attivata');
                 });
+
+                async function resetTurbo() {
+                    if (!confirm("ATTENZIONE: Stai per eliminare TUTTI i log Turbo (AI). L'azione è irreversibile. Procedere?")) return;
+                    
+                    try {
+                        const res = await fetch('/reset-turbo-logs-777', { method: 'POST' });
+                        const data = await res.json();
+                        if (data.ok) {
+                            alert('Archivio Turbo svuotato con successo!');
+                            location.reload();
+                        } else {
+                            alert('Errore durante il reset.');
+                        }
+                    } catch (e) {
+                        alert('Errore di connessione.');
+                    }
+                }
             </script>
         </body>
         </html>
@@ -1238,9 +1276,19 @@ async function avviaAutoTraining() {
         isSimulando = false;
     }
 
-    // Se ancora nessuno è connesso, programma la prossima partita tra 2 secondi
-    if (umaniConnessi === 0) {
-        setTimeout(avviaAutoTraining, 2000);
+    // Se ancora nessuno è connesso, programma la prossima partita
+    const umaniRealiCheck = umaniConnessi - osservatoriAdmin;
+    if (umaniRealiCheck <= 0) {
+        try {
+            const count = await MatchLog.countDocuments();
+            // Se siamo vicini al limite (100k), rallenta drasticamente (1 partita ogni 30 min)
+            // Altrimenti, continua a ritmo serrato (2 secondi)
+            const delay = (count >= 99000) ? 1000 * 60 * 30 : 2000;
+            if (count >= 99000) console.log("💾 [TURBO] Limite raggiunto. Modalità mantenimento attiva (1 match / 30m).");
+            setTimeout(avviaAutoTraining, delay);
+        } catch (e) {
+            setTimeout(avviaAutoTraining, 2000);
+        }
     }
 }
 
