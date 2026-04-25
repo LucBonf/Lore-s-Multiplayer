@@ -63,7 +63,7 @@ const matchLogSchema = new mongoose.Schema({
     roundCards: Number,
     playerIndex: Number,
     isHuman: Boolean,
-    aiVersion: { type: Number, default: 0 }, // 0=Umano, 1-4=Livello AI
+    aiVariant: { type: String, default: "Human" }, // Es: V4_A80_C20_S50
     dichiarazione: Number,
     preseFatte: Number,
     obiettivoRimanente: Number, // Prese mancanti per fare la dichiarazione
@@ -277,7 +277,7 @@ app.get('/scarica-dataset-lucas-777', async (req, res) => {
 
         const logs = await Model.find().sort({ timestamp: 1 });
         
-        let csv = "Timestamp,MatchId,NumPlayers,RoundCards,PlayerIdx,IsHuman,AIVersion,Decl,Made,Target,Hand,Table,History,VoidSuits,Move,Won\n";
+        let csv = "Timestamp,MatchId,NumPlayers,RoundCards,PlayerIdx,IsHuman,AIVariant,Decl,Made,Target,Hand,Table,History,VoidSuits,Move,Won\n";
         
         logs.forEach(l => {
             csv += [
@@ -287,7 +287,7 @@ app.get('/scarica-dataset-lucas-777', async (req, res) => {
                 l.roundCards,
                 l.playerIndex,
                 l.isHuman ? 1 : 0,
-                l.aiVersion || 0,
+                l.aiVariant || "N/A",
                 l.dichiarazione,
                 l.preseFatte,
                 l.obiettivoRimanente,
@@ -447,7 +447,17 @@ class Player {
         this.id = id;
         this.nome = nome;
         this.isHuman = isHuman;
-        this.aiVersion = isHuman ? 0 : Math.floor(Math.random() * 4) + 1; // Assegna un livello casuale se è bot
+        if (!isHuman) {
+            const level = Math.floor(Math.random() * 4) + 1;
+            const agg = Math.floor(Math.random() * 101);
+            const cons = Math.floor(Math.random() * 101);
+            const sca = Math.floor(Math.random() * 101);
+            this.aiLevel = level;
+            this.aiParams = { agg, cons, sca };
+            this.aiVariant = `V${level}_A${agg}_C${cons}_S${sca}`;
+        } else {
+            this.aiVariant = "Human";
+        }
         this.token = token;
         this.uniqueCode = uniqueCode;
         this.mano = [];
@@ -1025,7 +1035,7 @@ io.on('connection', (socket) => {
                     roundCards: game.sequenzaTurni[game.indiceGiro],
                     playerIndex: giocata.playerId,
                     isHuman: player.isHuman,
-                    aiVersion: player.aiVersion || 0,
+                    aiVariant: player.aiVariant || "N/A",
                     dichiarazione: player.dichiarazione,
                     preseFatte: player.preseFatte,
                     obiettivoRimanente: player.dichiarazione - player.preseFatte,
@@ -1356,24 +1366,24 @@ async function simulazionePartitaSingola() {
             const manoV = p.mano.filter(c => !c.giocata);
             let cartaDaGiocare;
             const vuoleVincere = p.preseFatte < p.dichiarazione;
+            const { agg, cons, sca } = p.aiParams || { agg: 50, cons: 50, sca: 50 };
 
-            // --- NUOVA LOGICA MULTI-LIVELLO ---
-            if (p.aiVersion === 1) {
-                // V1: Casuale
+            // --- LOGICA GENETICA ---
+            if (p.aiLevel === 1) {
                 cartaDaGiocare = manoV[Math.floor(Math.random() * manoV.length)];
-            } else if (p.aiVersion === 2 || p.aiVersion === 3 || p.aiVersion === 4) {
-                // Logica Comune (V2-V4)
+            } else {
                 if (game.tavolo.length === 0) {
                     if (vuoleVincere) {
-                        // V3-V4 cercano carte regnanti o alte
+                        // Aggressività influenza la scelta tra carta regnante o carico
                         let cartaRegnante = manoV.find(c => {
                             const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
                             return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
                         });
-                        if (p.aiVersion >= 3 && cartaRegnante) {
+                        if (cartaRegnante && agg > 20) {
                             cartaDaGiocare = cartaRegnante;
                         } else {
-                            cartaDaGiocare = manoV.sort((a, b) => b.forza - a.forza)[0];
+                            // Se molto aggressivo, butta il carico subito
+                            cartaDaGiocare = (agg > 70) ? manoV.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => b.forza - a.forza)[Math.floor(manoV.length / 2)];
                         }
                     } else {
                         cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
@@ -1386,37 +1396,51 @@ async function simulazionePartitaSingola() {
                     if (carteValide.length > 0) {
                         const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
                         if (vuoleVincere) {
-                            // V4: Se siamo ultimi, usiamo la carta minima necessaria per vincere
-                            if (p.aiVersion >= 4 && game.tavolo.length === game.numPlayers - 1 && carteVincenti.length > 0) {
-                                cartaDaGiocare = carteVincenti.sort((a, b) => a.forza - b.forza)[0];
+                            // Prudenza influenza l'uso di carte alte se non siamo gli ultimi
+                            const siamoUltimi = game.tavolo.length === game.numPlayers - 1;
+                            if (carteVincenti.length > 0) {
+                                if (siamoUltimi) {
+                                    cartaDaGiocare = carteVincenti.sort((a, b) => a.forza - b.forza)[0];
+                                } else {
+                                    // Se prudente, non rischia carichi se non è l'ultimo
+                                    cartaDaGiocare = (cons > 60) ? carteVincenti.sort((a, b) => a.forza - b.forza)[0] : carteVincenti.sort((a, b) => b.forza - a.forza)[0];
+                                }
                             } else {
-                                cartaDaGiocare = (carteVincenti.length > 0) ? carteVincenti.sort((a, b) => a.forza - b.forza)[0] : carteValide.sort((a, b) => b.forza - a.forza)[0];
+                                cartaDaGiocare = carteValide.sort((a, b) => b.forza - a.forza)[0];
                             }
                         } else {
                             const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
-                            // V3-V4: Scartano la più alta tra le perdenti per "pulirsi" la mano
-                            if (p.aiVersion >= 3 && cartePerdenti.length > 0) {
-                                cartaDaGiocare = cartePerdenti.sort((a, b) => b.forza - a.forza)[0];
+                            // Scarto influenza se buttare via carte alte inutili
+                            if (cartePerdenti.length > 0) {
+                                cartaDaGiocare = (sca > 50) ? cartePerdenti.sort((a, b) => b.forza - a.forza)[0] : cartePerdenti.sort((a, b) => a.forza - b.forza)[0];
                             } else {
-                                cartaDaGiocare = (cartePerdenti.length > 0) ? cartePerdenti.sort((a, b) => b.forza - a.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
+                                cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
                             }
                         }
                     } else {
                         // Non ha il seme
                         if (vuoleVincere) {
-                            // Se può tagliare con Ori
                             const briscole = manoV.filter(c => c.seme === 'Ori');
-                            if (p.aiVersion >= 3 && briscole.length > 0) {
-                                // V3-V4 tagliano solo se necessario
+                            if (briscole.length > 0) {
                                 const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
                                 const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
-                                cartaDaGiocare = (briscoleUtili.length > 0) ? briscoleUtili.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
+                                if (briscoleUtili.length > 0) {
+                                    // Se prudente, taglia solo se il carico a terra vale la pena
+                                    const valoreTavolo = game.tavolo.reduce((acc, curr) => acc + (PESO_VALORE[curr.card.valore] > 0 ? 1 : 0), 0);
+                                    if (cons > 70 && valoreTavolo < 1) {
+                                        cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
+                                    } else {
+                                        cartaDaGiocare = briscoleUtili.sort((a, b) => a.forza - b.forza)[0];
+                                    }
+                                } else {
+                                    cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
+                                }
                             } else {
                                 cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
                             }
                         } else {
-                            // Vuole perdere: scarta la più alta (V3+) o la più bassa (V2)
-                            cartaDaGiocare = (p.aiVersion >= 3) ? manoV.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
+                            // Scarto alto se vogliamo perdere (Sca influenza questa scelta)
+                            cartaDaGiocare = (sca > 30) ? manoV.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                         }
                     }
                 }
@@ -1452,7 +1476,7 @@ async function simulazionePartitaSingola() {
                         roundCards: game.sequenzaTurni[game.indiceGiro],
                         playerIndex: giocata.playerId,
                         isHuman: false,
-                        aiVersion: pLog.aiVersion || 0,
+                        aiVariant: pLog.aiVariant || "N/A",
                         dichiarazione: pLog.dichiarazione,
                         preseFatte: pLog.preseFatte,
                         obiettivoRimanente: pLog.dichiarazione - pLog.preseFatte,
