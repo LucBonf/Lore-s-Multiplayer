@@ -512,14 +512,13 @@ app.get('/stato-allenamento-777', async (req, res) => {
                     data.users.forEach(u => {
                         const tr = document.createElement('tr');
                         const lastDate = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'N/A';
-                        tr.innerHTML = `
-                            <td style="padding:5px; border:1px solid #333; color:#f1c40f; cursor:pointer;" onclick="setSearch('${u.uniqueCode}')">${u.nickname}</td>
-                            <td style="padding:5px; border:1px solid #333; text-align:center;">${u.punteggioTotale}</td>
-                            <td style="padding:5px; border:1px solid #333; text-align:center; color:#00ff00;">${u.elo || 1000}</td>
-                            <td style="padding:5px; border:1px solid #333; text-align:center;">${u.partiteGiocate}</td>
-                            <td style="padding:5px; border:1px solid #333; text-align:center;">${u.partiteVinte}</td>
-                            <td style="padding:5px; border:1px solid #333; text-align:center; font-size:0.8em;">${lastDate}</td>
-                        `;
+                        const elo = u.elo || 1000;
+                        tr.innerHTML = '<td style="padding:5px; border:1px solid #333; color:#f1c40f; cursor:pointer;" onclick="setSearch(\'' + u.uniqueCode + '\')">' + u.nickname + '</td>' +
+                                       '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.punteggioTotale + '</td>' +
+                                       '<td style="padding:5px; border:1px solid #333; text-align:center; color:#00ff00;">' + elo + '</td>' +
+                                       '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.partiteGiocate + '</td>' +
+                                       '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.partiteVinte + '</td>' +
+                                       '<td style="padding:5px; border:1px solid #333; text-align:center; font-size:0.8em;">' + lastDate + '</td>';
                         tbody.appendChild(tr);
                     });
                 }

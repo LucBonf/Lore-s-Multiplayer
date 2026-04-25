@@ -1,2 +1,7 @@
 node_modules/
 .env
+secret_routes.txt
+.DS_Store
+*.log
+scratch/
+.gemini/
