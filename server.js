@@ -115,33 +115,85 @@ app.use(express.static(__dirname));
 // ROTTA SEGRETA PER LEGGERE I REPORT (Sia da DB che da file se esiste)
 app.get('/stata-segreta-report-777', async (req, res) => {
     try {
-        let html = `<body style="background: #1a1a1a; color: #eee; font-family: sans-serif; padding: 20px;">
-                    <h1 style="color: #e74c3c;">🪲 Segnalazioni Bug Ricevute</h1>
-                    <div style="display: flex; flex-direction: column; gap: 10px;">`;
+        let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Admin - Bug Reports</title>
+            <style>
+                body { background: #1a1a1a; color: #eee; font-family: sans-serif; padding: 20px; }
+                .report-card { background: #2c3e50; padding: 15px; border-radius: 8px; border-left: 5px solid #e74c3c; margin-bottom: 10px; position: relative; }
+                .report-date { color: #f1c40f; font-weight: bold; }
+                .report-user { color: #3498db; }
+                .delete-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.5rem; cursor: pointer; transition: transform 0.2s; }
+                .delete-btn:hover { transform: scale(1.2); }
+            </style>
+        </head>
+        <body>
+            <h1 style="color: #e74c3c;">🪲 Segnalazioni Bug Ricevute</h1>
+            <div id="reports-container" style="display: flex; flex-direction: column; gap: 10px;">`;
 
         if (dbConnected) {
             const reports = await Report.find().sort({ data: -1 });
             if (reports.length === 0) {
-                html += "<p>Nessun report nel database.</p>";
+                html += "<p>Nessuna segnalazione nel database.</p>";
             } else {
                 reports.forEach(r => {
-                    html += `<div style="background: #2c3e50; padding: 15px; border-radius: 8px; border-left: 5px solid #e74c3c;">
-                                <strong style="color: #f1c40f;">${r.data.toLocaleString('it-IT')}</strong> - 
-                                <span style="color: #3498db;">Utente: ${r.nickname}</span><br>
-                                <p style="margin-top: 10px; font-style: italic;">"${r.testo}"</p>
-                             </div>`;
+                    html += `
+                    <div class="report-card" id="card-${r._id}">
+                        <button class="delete-btn" onclick="eliminaReport('${r._id}')">🗑️</button>
+                        <span class="report-date">${r.data.toLocaleString('it-IT')}</span> - 
+                        <span class="report-user">Utente: ${r.nickname}</span><br>
+                        <p style="margin-top: 10px; font-style: italic;">"${r.testo}"</p>
+                    </div>`;
                 });
             }
         } else {
-            html += "<p style='color: orange;'>⚠️ Database non connesso. Impossibile leggere i report persistenti.</p>";
+            html += "<p style='color: orange;'>⚠️ Database non connesso.</p>";
         }
 
-        html += `</div></body>`;
+        html += `
+            </div>
+            <script>
+                async function eliminaReport(id) {
+                    if(!confirm('Vuoi eliminare questa segnalazione?')) return;
+                    try {
+                        const res = await fetch('/elimina-report-777', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: id })
+                        });
+                        const data = await res.json();
+                        if(data.ok) {
+                            document.getElementById('card-' + id).remove();
+                        } else {
+                            alert('Errore durante l\\'eliminazione');
+                        }
+                    } catch(e) {
+                        alert('Errore di connessione');
+                    }
+                }
+            </script>
+        </body>
+        </html>`;
         res.send(html);
     } catch (err) {
         res.status(500).send("Errore nel recupero dei report.");
     }
 });
+
+// ROTTA PER ELIMINARE I REPORT
+app.post('/elimina-report-777', express.json(), async (req, res) => {
+    try {
+        if (!dbConnected) return res.json({ ok: false, msg: "DB non connesso" });
+        const { id } = req.body;
+        await Report.findByIdAndDelete(id);
+        res.json({ ok: true });
+    } catch (err) {
+        res.json({ ok: false });
+    }
+});
+
 
 
 const SEMI = ["Coppe", "Ori", "Bastoni", "Spade"];
@@ -562,7 +614,7 @@ io.on('connection', (socket) => {
             if (dbConnected) {
                 const nuovoReport = new Report({
                     nickname: nick,
-                    testo: testo
+                    testo: testo.substring(0, 500) // Limite di sicurezza
                 });
                 await nuovoReport.save();
                 console.log(`🪲 Report salvato su DB da ${nick}`);
@@ -601,10 +653,20 @@ io.on('connection', (socket) => {
                 }
             }
 
+            // SICUREZZA: Non accettare la scommessa se è già stata fatta (previene doppi click o lag)
+            if (game.players[game.turnoAttuale].dichiarazione !== "-") return;
+
             game.players[game.turnoAttuale].dichiarazione = val;
             game.sommaScommesse += val;
+            
+            // Avanza il turno solo se la dichiarazione è stata salvata con successo
             game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
-            if (game.players.every(p => p.dichiarazione !== "-")) game.fase = "gioco";
+            
+            // Passa alla fase di gioco SOLO se TUTTI hanno dichiarato
+            if (game.players.every(p => p.dichiarazione !== "-")) {
+                game.fase = "gioco";
+            }
+            
             inviaStato(code);
             gestisciIA(code);
         } catch (e) {
@@ -720,8 +782,9 @@ io.on('connection', (socket) => {
 
     function gestisciIA(code) {
         const game = lobbies[code]?.gameInstance;
-        // Impedisce all'IA di agire se: non c'è il gioco, è il turno di un umano, o l'IA sta già elaborando
-        if (!game || game.players[game.turnoAttuale].isHuman || game.botThinking) return;
+        // Impedisce all'IA di agire se: non c'è il gioco, è il turno di un umano, l'IA sta già elaborando,
+        // o se il tavolo è già pieno (fase di risoluzione presa)
+        if (!game || game.players[game.turnoAttuale].isHuman || game.botThinking || game.tavolo.length >= game.numPlayers) return;
 
         game.botThinking = true;
 
