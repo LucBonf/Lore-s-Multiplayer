@@ -137,7 +137,7 @@ if (process.env.MONGODB_URI) {
             
             // Inizializza collezioni Capped (Limite spazio)
             try {
-                // LOG AI (100MB - ~400k mosse)
+                // LOG AI (100MB - Ripristinato limite per evitare superamento piano gratuito)
                 const collectionsMatch = await mongoose.connection.db.listCollections({ name: 'matchlogs' }).toArray();
                 if (collectionsMatch.length === 0) {
                     await mongoose.connection.db.createCollection('matchlogs', {
@@ -146,6 +146,12 @@ if (process.env.MONGODB_URI) {
                         max: 400000
                     });
                     console.log("📦 Collezione 'matchlogs' (Capped 100MB) creata.");
+                } else {
+                    // Ridimensioniamo forzatamente al ribasso nel caso in cui fosse stata allargata a 500MB
+                    try {
+                        await mongoose.connection.db.command({ collMod: 'matchlogs', cappedSize: 100 * 1024 * 1024 });
+                        console.log("📦 Collezione 'matchlogs' ridimensionata a 100MB.");
+                    } catch(e) {}
                 }
 
                 // REPORT BUG (5MB - 1000 report)
@@ -375,7 +381,7 @@ app.get('/stato-segreta-report-777', authAdmin, async (req, res) => {
 });
 
 // ROTTA SEGRETA: RESET LOG TURBO
-app.post('/reset-turbo-logs-777', express.json(), async (req, res) => {
+app.post('/reset-turbo-logs-777', authAdmin, express.json(), async (req, res) => {
     try {
         if (!dbConnected) return res.status(500).json({ ok: false, msg: "DB non connesso" });
         
@@ -545,13 +551,13 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                 <div style="display: flex; justify-content: space-between; margin-top: 20px;">
                     <div>
                         <h3>💾 DATASET TURBO (AI)</h3>
-                        <div class="metric">Mosse: ${totaleTurbo.toLocaleString()} / 400k</div>
+                        <div class="metric">Mosse registrate: ${totaleTurbo.toLocaleString()}</div>
                         <div class="metric">Partite: ${partiteTurbo}</div>
                         <a href="/scarica-dataset-lucas-777?type=turbo" class="btn">SCARICA TURBO CSV</a>
                     </div>
                     <div style="border-left: 1px solid #00ff00; padding-left: 20px;">
                         <h3>💎 DATASET UMANO</h3>
-                        <div class="metric">Mosse: ${totaleHuman.toLocaleString()} / 50k</div>
+                        <div class="metric">Mosse registrate: ${totaleHuman.toLocaleString()}</div>
                         <div class="metric">Partite: ${partiteHuman}</div>
                         <a href="/scarica-dataset-lucas-777?type=human" class="btn">SCARICA HUMAN CSV</a>
                     </div>
