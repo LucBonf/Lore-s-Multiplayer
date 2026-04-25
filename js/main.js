@@ -712,7 +712,15 @@ window.chiudiReport = () => {
     if (modal) {
         modal.style.display = 'none';
         const ta = document.getElementById('valore-report');
-        if (ta) ta.value = '';
+        if (ta) {
+            ta.value = '';
+            const counter = document.getElementById('char-counter');
+            if (counter) {
+                const lang = localStorage.getItem('lucas_lang') || 'it';
+                const d = dictionary[lang];
+                counter.innerHTML = `0 / 500 <span data-i18n="charLimit">${d.charLimit}</span>`;
+            }
+        }
     }
 };
 
@@ -808,4 +816,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (flagEl) flagEl.innerText = flagsMap[savedLang] || '🇬🇧';
         translatePage(savedLang);
     }, 100);
+
+    // Gestione contatore caratteri report
+    const taReport = document.getElementById('valore-report');
+    const charCounter = document.getElementById('char-counter');
+    if (taReport && charCounter) {
+        taReport.addEventListener('input', () => {
+            const lang = localStorage.getItem('lucas_lang') || 'it';
+            const d = dictionary[lang];
+            charCounter.innerHTML = `${taReport.value.length} / 500 <span data-i18n="charLimit">${d.charLimit}</span>`;
+        });
+    }
 });

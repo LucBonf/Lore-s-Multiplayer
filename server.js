@@ -314,6 +314,7 @@ io.on('connection', (socket) => {
         // --- SKIPA IL DB PER GLI OSPITI ---
         if (dati.uniqueCode && dati.uniqueCode.startsWith("GUEST_")) {
             socket.userUniqueCode = dati.uniqueCode;
+            socket.userNickname = dati.nickname;
             return socket.emit('login_ok', { uniqueCode: dati.uniqueCode, nickname: dati.nickname, partiteVinte: 0, punteggioTotale: 0 });
         }
 
@@ -345,6 +346,7 @@ io.on('connection', (socket) => {
                 await user.save();
             }
             socket.userUniqueCode = user.uniqueCode;
+            socket.userNickname = user.nickname;
             socket.emit('login_ok', user);
         } catch (e) {
             socket.emit('login_err', 'Errore DB: ' + e.message);
@@ -605,10 +607,7 @@ io.on('connection', (socket) => {
 
     socket.on('bug_report', async (testo) => {
         try {
-            let nick = "Sconosciuto";
-            if (socket.userToken && utentiDb[socket.userToken]) {
-                nick = utentiDb[socket.userToken].nickname;
-            }
+            let nick = socket.userNickname || "Sconosciuto";
 
             // SALVATAGGIO SU DATABASE (Persistente)
             if (dbConnected) {

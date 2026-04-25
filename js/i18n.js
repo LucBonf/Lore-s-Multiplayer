@@ -78,7 +78,8 @@ const dictionary = {
         'reportPlaceholder': 'Descrivi il problema in dettaglio...',
         'reportSubmit': 'Invia Segnalazione',
         'reportSuccess': 'Segnalazione inviata con successo! Grazie.',
-        'reportEmpty': 'Il testo della segnalazione non può essere vuoto.'
+        'reportEmpty': 'Il testo della segnalazione non può essere vuoto.',
+        'charLimit': 'caratteri'
     },
     'en': {
         'chooseLanguage': 'Choose Language',
@@ -151,7 +152,8 @@ const dictionary = {
         'reportPlaceholder': 'Describe the problem in detail...',
         'reportSubmit': 'Submit Report',
         'reportSuccess': 'Report submitted successfully! Thank you.',
-        'reportEmpty': 'The report text cannot be empty.'
+        'reportEmpty': 'The report text cannot be empty.',
+        'charLimit': 'characters'
     },
     'fr': {
         'chooseLanguage': 'Choisissez la Langue',
@@ -181,9 +183,9 @@ const dictionary = {
         'loginPinHolder': 'Code PIN à 4 chiffres...',
         'loginBtn': 'CONNEXION / INSCRIPTION',
         'guestBtn': 'Jouer en tant qu\'Invité (sans sauvegarde)',
-        'welcome': 'Bienvenue!',
+        'welcome': 'Bienvenue !',
         'createBtn': 'CRÉER',
-        'roomCodeHolder': 'Pass',
+        'roomCodeHolder': 'Code',
         'joinBtn': 'REJOINDRE',
         'lobbyWait': 'File d\'attente',
         'roomCode': 'Code de la Salle :',
@@ -224,7 +226,8 @@ const dictionary = {
         'reportPlaceholder': 'Décrivez le problème en détail...',
         'reportSubmit': 'Envoyer le rapport',
         'reportSuccess': 'Rapport envoyé avec succès ! Merci.',
-        'reportEmpty': 'Le texte du rapport ne peut pas être vide.'
+        'reportEmpty': 'Le texte du rapport ne peut pas être vide.',
+        'charLimit': 'caractères'
     },
     'es': {
         'chooseLanguage': 'Elige el Idioma',
@@ -297,7 +300,8 @@ const dictionary = {
         'reportPlaceholder': 'Describe el problema en detalle...',
         'reportSubmit': 'Enviar informe',
         'reportSuccess': '¡Informe enviado con éxito! Gracias.',
-        'reportEmpty': 'El texto del informe no puede estar vacío.'
+        'reportEmpty': 'El texto del informe no puede estar vacío.',
+        'charLimit': 'caracteres'
     },
     'de': {
         'chooseLanguage': 'Sprache Wählen',
@@ -370,7 +374,8 @@ const dictionary = {
         'reportPlaceholder': 'Beschreibe das Problem im Detail...',
         'reportSubmit': 'Bericht senden',
         'reportSuccess': 'Bericht erfolgreich gesendet! Vielen Dank.',
-        'reportEmpty': 'Der Text des Berichts darf nicht leer sein.'
+        'reportEmpty': 'Der Text des Berichts darf nicht leer sein.',
+        'charLimit': 'Zeichen'
     }
 };
 
