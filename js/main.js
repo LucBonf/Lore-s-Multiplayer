@@ -678,13 +678,13 @@ window.chiudiLingua = () => {
 };
 
 window.setLanguage = (lang) => {
-    const flags = {
-        'it': '🇮🇹', 'en': '🇬🇧', 'fr': '🇫🇷', 'es': '🇪🇸', 'de': '🇩🇪'
+    const labels = {
+        'it': 'IT 🇮🇹', 'en': 'EN 🇬🇧', 'fr': 'FR 🇫🇷', 'es': 'ES 🇪🇸', 'de': 'DE 🇩🇪'
     };
     
-    const flag = flags[lang] || '🇮🇹';
-    const flagEl = document.getElementById('current-flag');
-    if (flagEl) flagEl.innerText = flag;
+    const label = labels[lang] || 'IT 🇮🇹';
+    const flagEl = document.getElementById('current-flag-container');
+    if (flagEl) flagEl.innerText = label;
     
     console.log(`🌐 Lingua impostata su: ${lang}`);
     
@@ -698,9 +698,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedLang = localStorage.getItem('lucas_lang');
     if (savedLang) {
         setTimeout(() => {
-            const flags = { 'it': '🇮🇹', 'en': '🇬🇧', 'fr': '🇫🇷', 'es': '🇪🇸', 'de': '🇩🇪' };
-            const flagEl = document.getElementById('current-flag');
-            if (flagEl) flagEl.innerText = flags[savedLang] || '🇮🇹';
+            const labelsMap = { 'it': 'IT 🇮🇹', 'en': 'EN 🇬🇧', 'fr': 'FR 🇫🇷', 'es': 'ES 🇪🇸', 'de': 'DE 🇩🇪' };
+            const flagEl = document.getElementById('current-flag-container');
+            if (flagEl) flagEl.innerText = labelsMap[savedLang] || 'IT 🇮🇹';
         }, 100);
     }
 });
