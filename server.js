@@ -377,10 +377,12 @@ app.get('/stato-allenamento-777', async (req, res) => {
             <p style="font-size: 0.8rem; margin-top: 20px;">Aggiornamento automatico ogni 5 secondi...</p>
 
             <script>
-                const socket = io();
+                // Passiamo il ruolo 'admin' nella query di connessione per identificarci istantaneamente
+                const socket = io({
+                    query: { role: 'admin' }
+                });
                 socket.on('connect', () => {
-                    socket.emit('admin_obs');
-                    console.log('Modalità Osservatore Attivata');
+                    console.log('Modalità Osservatore Attivata (Handshake)');
                 });
 
                 async function resetTurbo() {
@@ -522,12 +524,12 @@ const lobbies = {};
 io.on('connection', (socket) => {
     umaniConnessi++;
     
-    // Gestione speciale per chi guarda la dashboard
-    socket.on('admin_obs', () => {
+    // Identificazione immediata tramite query handshake
+    if (socket.handshake.query && socket.handshake.query.role === 'admin') {
         socket.isAdminObs = true;
         osservatoriAdmin++;
-        console.log(`📡 Dashboard Admin collegata. Osservatori: ${osservatoriAdmin}`);
-    });
+        console.log(`📡 Admin connesso. (Tot: ${umaniConnessi}, Admin: ${osservatoriAdmin})`);
+    }
 
     socket.on('login', async (dati) => {
         // Controllo profanità universale e aggressivo
@@ -826,14 +828,13 @@ io.on('connection', (socket) => {
         } catch (e) {
             console.error("Errore disconnect:", e);
         } finally {
+            umaniConnessi = Math.max(0, umaniConnessi - 1);
             if (socket.isAdminObs) {
                 osservatoriAdmin = Math.max(0, osservatoriAdmin - 1);
             }
-            umaniConnessi = Math.max(0, umaniConnessi - 1);
             
             const umaniReali = umaniConnessi - osservatoriAdmin;
             if (umaniReali <= 0) {
-                console.log("💤 Nessun giocatore reale. Avvio Auto-Training...");
                 setTimeout(avviaAutoTraining, 5000);
             }
         }
@@ -1261,10 +1262,12 @@ io.on('connection', (socket) => {
 
 async function avviaAutoTraining() {
     const umaniReali = umaniConnessi - osservatoriAdmin;
-    if (umaniReali > 0) return;
+    if (umaniReali > 0) {
+        isSimulando = false;
+        return;
+    }
     if (!dbConnected) return;
 
-    console.log("🚀 [TURBO] Avvio sessione di simulazione...");
     isSimulando = true;
     
     // Eseguiamo una partita intera
@@ -1272,25 +1275,23 @@ async function avviaAutoTraining() {
         await simulazionePartitaSingola();
     } catch (e) {
         console.error("Errore durante simulazione turbo:", e);
-    } finally {
-        isSimulando = false;
     }
 
-    // Se ancora nessuno è connesso, programma la prossima partita
+    // Ricontrolla se siamo ancora soli
     const umaniRealiCheck = umaniConnessi - osservatoriAdmin;
     if (umaniRealiCheck <= 0) {
         try {
             const count = await MatchLog.countDocuments();
-            // Se siamo vicini al limite (100k), rallenta drasticamente (1 partita ogni 30 min)
-            // Altrimenti, continua a ritmo serrato (2 secondi)
             const delay = (count >= 99000) ? 1000 * 60 * 30 : 2000;
-            if (count >= 99000) console.log("💾 [TURBO] Limite raggiunto. Modalità mantenimento attiva (1 match / 30m).");
             setTimeout(avviaAutoTraining, delay);
         } catch (e) {
             setTimeout(avviaAutoTraining, 2000);
         }
+    } else {
+        isSimulando = false;
     }
 }
+
 
 async function simulazionePartitaSingola() {
     // Crea una partita da 4 Bot (media ideale)
