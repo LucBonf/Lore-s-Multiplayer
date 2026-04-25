@@ -163,6 +163,11 @@ if (process.env.MONGODB_URI) {
                         max: 1000
                     });
                     console.log("📦 Collezione 'reports' (Capped) creata.");
+                } else {
+                    try {
+                        await mongoose.connection.db.command({ convertToCapped: 'reports', size: 5 * 1024 * 1024 });
+                        console.log("📦 Collezione 'reports' convertita in Capped.");
+                    } catch(e) {}
                 }
 
                 // HUMAN LOGS (10MB - Dati umani separati)
@@ -174,6 +179,11 @@ if (process.env.MONGODB_URI) {
                         max: 50000
                     });
                     console.log("📦 Collezione 'humanlogs' (Capped) creata.");
+                } else {
+                    try {
+                        await mongoose.connection.db.command({ convertToCapped: 'humanlogs', size: 10 * 1024 * 1024 });
+                        console.log("📦 Collezione 'humanlogs' convertita in Capped.");
+                    } catch(e) {}
                 }
             } catch (e) { console.log("Nota: Inizializzazione collezioni già completata."); }
 
