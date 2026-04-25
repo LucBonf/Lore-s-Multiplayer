@@ -544,7 +544,7 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                 <div class="metric">Ultimo Log (Umano): ${ultimoHuman ? ultimoHuman.timestamp.toLocaleString('it-IT') : '---'}</div>
                 
                 <br>
-                <a href="/stata-segreta-report-777" class="btn">VEDI BUG REPORT</a>
+                <a href="/stato-segreta-report-777" class="btn">VEDI BUG REPORT</a>
             </div>
 
             <script>
@@ -625,12 +625,40 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                             const tr = document.createElement('tr');
                             const lastDate = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'N/A';
                             const elo = u.elo || 1000;
-                            tr.innerHTML = '<td style="padding:5px; border:1px solid #333; color:#f1c40f; cursor:pointer;" onclick="setSearch(\'' + u.uniqueCode + '\')">' + u.nickname + '</td>' +
-                                           '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.punteggioTotale + '</td>' +
-                                           '<td style="padding:5px; border:1px solid #333; text-align:center; color:#00ff00;">' + elo + '</td>' +
-                                           '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.partiteGiocate + '</td>' +
-                                           '<td style="padding:5px; border:1px solid #333; text-align:center;">' + u.partiteVinte + '</td>' +
-                                           '<td style="padding:5px; border:1px solid #333; text-align:center; font-size:0.8em;">' + lastDate + '</td>';
+                            
+                            // Creiamo le celle in modo sicuro per evitare errori di virgolette (escaping hell)
+                            const tdNick = document.createElement('td');
+                            tdNick.style = "padding:5px; border:1px solid #333; color:#f1c40f; cursor:pointer;";
+                            tdNick.innerText = u.nickname;
+                            tdNick.onclick = () => setSearch(u.uniqueCode);
+                            
+                            const tdPunti = document.createElement('td');
+                            tdPunti.style = "padding:5px; border:1px solid #333; text-align:center;";
+                            tdPunti.innerText = u.punteggioTotale;
+                            
+                            const tdElo = document.createElement('td');
+                            tdElo.style = "padding:5px; border:1px solid #333; text-align:center; color:#00ff00;";
+                            tdElo.innerText = elo;
+                            
+                            const tdGiocate = document.createElement('td');
+                            tdGiocate.style = "padding:5px; border:1px solid #333; text-align:center;";
+                            tdGiocate.innerText = u.partiteGiocate;
+                            
+                            const tdVinte = document.createElement('td');
+                            tdVinte.style = "padding:5px; border:1px solid #333; text-align:center;";
+                            tdVinte.innerText = u.partiteVinte;
+                            
+                            const tdData = document.createElement('td');
+                            tdData.style = "padding:5px; border:1px solid #333; text-align:center; font-size:0.8em;";
+                            tdData.innerText = lastDate;
+                            
+                            tr.appendChild(tdNick);
+                            tr.appendChild(tdPunti);
+                            tr.appendChild(tdElo);
+                            tr.appendChild(tdGiocate);
+                            tr.appendChild(tdVinte);
+                            tr.appendChild(tdData);
+                            
                             tbody.appendChild(tr);
                         });
                     } catch (err) {
