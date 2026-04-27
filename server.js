@@ -1467,18 +1467,6 @@ io.on('connection', (socket) => {
         }
     });
 
-            // Backup su file (opzionale, sparirà al commit su Render)
-            const fs = require('fs');
-            const logEntry = `\n--- BUG REPORT ---\nData: ${new Date().toISOString()}\nUtente: ${nick}\nTesto: ${testo}\n`;
-            fs.appendFile('bug_reports.txt', logEntry, (err) => {
-                if (err) console.error("Errore backup file:", err);
-            });
-
-        } catch (e) {
-            console.error("Errore gestione bug_report:", e);
-        }
-    });
-
     socket.on('invia_scommessa', (valRaw) => {
         try {
             const val = parseInt(valRaw);
