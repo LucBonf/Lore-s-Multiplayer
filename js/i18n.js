@@ -87,7 +87,8 @@ const dictionary = {
         'watchBtn': 'Guarda',
         'replayNext': 'Prossimo',
         'replayPrev': 'Precedente',
-        'replayClose': 'Chiudi Replay'
+        'replayClose': 'Chiudi Replay',
+        'interruptedMatch': 'Partita interrotta'
     },
     'en': {
         'chooseLanguage': 'Choose Language',
@@ -169,7 +170,8 @@ const dictionary = {
         'watchBtn': 'Watch',
         'replayNext': 'Next',
         'replayPrev': 'Previous',
-        'replayClose': 'Close Replay'
+        'replayClose': 'Close Replay',
+        'interruptedMatch': 'Interrupted match'
     },
     'fr': {
         'chooseLanguage': 'Choisissez la Langue',
@@ -251,7 +253,8 @@ const dictionary = {
         'watchBtn': 'Regarder',
         'replayNext': 'Suivant',
         'replayPrev': 'Précédent',
-        'replayClose': 'Fermer'
+        'replayClose': 'Fermer',
+        'interruptedMatch': 'Match interrompu'
     },
     'es': {
         'chooseLanguage': 'Elige el Idioma',
@@ -333,7 +336,8 @@ const dictionary = {
         'watchBtn': 'Ver',
         'replayNext': 'Siguiente',
         'replayPrev': 'Anterior',
-        'replayClose': 'Cerrar'
+        'replayClose': 'Cerrar',
+        'interruptedMatch': 'Partida interrumpida'
     },
     'de': {
         'chooseLanguage': 'Sprache Wählen',
@@ -415,7 +419,8 @@ const dictionary = {
         'watchBtn': 'Ansehen',
         'replayNext': 'Weiter',
         'replayPrev': 'Zurück',
-        'replayClose': 'Schließen'
+        'replayClose': 'Schließen',
+        'interruptedMatch': 'Abgebrochenes Spiel'
     }
 };
 

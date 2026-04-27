@@ -219,11 +219,15 @@ window.apriReplays = async () => {
                         <div style="font-size:0.8rem; color:#ccc; margin-top:4px;">
                             👥 ${r.numPlayers} Giocatori (${r.humanPlayers ? r.humanPlayers.length : 0} Umani: ${r.humanPlayers ? r.humanPlayers.filter(n => n).join(', ') : '---'})
                         </div>
-                        ${r.finalScores && r.finalScores.length > 0 ? `
+                        ${!r.isCompleted ? `
+                        <div style="font-size:0.75rem; color:#e74c3c; margin-top:6px; font-weight:bold;">
+                            🚫 ${d.interruptedMatch}
+                        </div>
+                        ` : (r.finalScores && r.finalScores.length > 0 ? `
                         <div style="font-size:0.75rem; color:#f1c40f; margin-top:6px; font-style: italic;">
                             🏆 ${r.finalScores.sort((a,b) => b.punti - a.punti).map(fs => `${fs.nome} (${fs.punti})`).join(' • ')}
                         </div>
-                        ` : ''}
+                        ` : '')}
                     </div>
                     <button onclick="avviaReplay('${r._id}')" style="background:#3498db; color:white; border:none; padding: 10px 18px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9rem; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">${d.watchBtn}</button>
                 </div>

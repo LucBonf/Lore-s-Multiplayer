@@ -91,6 +91,7 @@ const matchLogSchema = new mongoose.Schema({
     preseFatte: Number,
     obiettivoRimanente: Number, // Prese mancanti per fare la dichiarazione
     finalScores: { type: Array, default: [] }, // Classifica finale della partita (nickname e punti)
+    isCompleted: { type: Boolean, default: false }, // La partita è stata terminata correttamente?
     allHands: { type: Array, default: [] },    // Mani di tutti i giocatori (per replay multi-prospettiva)
     table: String,              // Carte già sul tavolo
     history: String,            // Carte già uscite nel giro
@@ -324,7 +325,8 @@ app.get('/api/replays/:uniqueCode', async (req, res) => {
                 numPlayers: { $first: "$numPlayers" },
                 hostNickname: { $first: "$hostNickname" },
                 humanPlayers: { $addToSet: { $cond: [ "$isHuman", "$nickname", "$$REMOVE" ] } },
-                finalScores: { $first: "$finalScores" }
+                finalScores: { $first: "$finalScores" },
+                isCompleted: { $first: "$isCompleted" }
             }},
             { $sort: { timestamp: -1 } },
             { $limit: 20 }
@@ -1635,7 +1637,7 @@ io.on('connection', (socket) => {
                 // Aggiorniamo i log del match con la classifica finale per i replay
                 if (dbConnected) {
                     const simplifiedScores = classificaFinale.map(c => ({ nome: c.nome, punti: c.punti }));
-                    HumanMatchLog.updateMany({ matchId: game.matchId }, { $set: { finalScores: simplifiedScores } }).catch(e => {});
+                    HumanMatchLog.updateMany({ matchId: game.matchId }, { $set: { finalScores: simplifiedScores, isCompleted: true } }).catch(e => {});
                 }
 
                 io.to(code).emit('fine_partita', classificaFinale);
