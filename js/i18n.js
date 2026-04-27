@@ -79,7 +79,15 @@ const dictionary = {
         'reportSubmit': 'Invia Segnalazione',
         'reportSuccess': 'Segnalazione inviata con successo! Grazie.',
         'reportEmpty': 'Il testo della segnalazione non può essere vuoto.',
-        'charLimit': 'caratteri'
+        'charLimit': 'caratteri',
+        'replaysBtn': '🎬 Replay',
+        'replaysTitle': '🎬 Replay Partite Recenti',
+        'loadingReplays': 'Caricamento replay...',
+        'noReplays': 'Nessun replay disponibile.',
+        'watchBtn': 'Guarda',
+        'replayNext': 'Prossimo',
+        'replayPrev': 'Precedente',
+        'replayClose': 'Chiudi Replay'
     },
     'en': {
         'chooseLanguage': 'Choose Language',
@@ -153,7 +161,15 @@ const dictionary = {
         'reportSubmit': 'Submit Report',
         'reportSuccess': 'Report submitted successfully! Thank you.',
         'reportEmpty': 'The report text cannot be empty.',
-        'charLimit': 'characters'
+        'charLimit': 'characters',
+        'replaysBtn': '🎬 Replay',
+        'replaysTitle': '🎬 Recent Match Replays',
+        'loadingReplays': 'Loading replays...',
+        'noReplays': 'No replays available.',
+        'watchBtn': 'Watch',
+        'replayNext': 'Next',
+        'replayPrev': 'Previous',
+        'replayClose': 'Close Replay'
     },
     'fr': {
         'chooseLanguage': 'Choisissez la Langue',

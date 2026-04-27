@@ -307,6 +307,37 @@ app.get('/api/admin/all-users', authAdmin, async (req, res) => {
     }
 });
 
+// --- NUOVE ROTTE PER REPLAY ---
+app.get('/api/replays', async (req, res) => {
+    if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
+    try {
+        // Recuperiamo le ultime 20 partite distinte dai log umani
+        const replays = await HumanMatchLog.aggregate([
+            { $sort: { timestamp: -1 } },
+            { $group: {
+                _id: "$matchId",
+                timestamp: { $first: "$timestamp" },
+                numPlayers: { $first: "$numPlayers" }
+            }},
+            { $sort: { timestamp: -1 } },
+            { $limit: 20 }
+        ]);
+        res.json({ success: true, replays });
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/replay/:matchId', async (req, res) => {
+    if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
+    try {
+        const moves = await HumanMatchLog.find({ matchId: req.params.matchId }).sort({ timestamp: 1 });
+        res.json({ success: true, moves });
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
 // --- NUOVA ROTTA: ELIMINA UTENTE PER ADMIN ---
 app.get('/api/admin/delete-user/:uniqueCode', authAdmin, async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });

@@ -5,6 +5,10 @@ const socket = io();
 let qtaAttuale = 0; // Per validazione locale
 let canPlay = true;
 
+let currentReplayMoves = [];
+let currentReplayStep = 0;
+let isReplayMode = false;
+
 let sessionToken = sessionStorage.getItem('lucas_token');
 if (!sessionToken) {
     sessionToken = Math.random().toString(36).substring(2, 12);
@@ -180,6 +184,149 @@ window.apriClassifica = () => {
 window.chiudiClassifica = () => {
     document.getElementById('modal-classifica').style.display = 'none';
 };
+
+// =========================================
+//   LOGICA REPLAY
+// =========================================
+
+window.apriReplays = async () => {
+    document.getElementById('modal-replays').style.display = 'block';
+    const container = document.getElementById('replays-list');
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const d = dictionary[lang];
+    
+    container.innerHTML = `<p style="text-align:center;">${d.loadingReplays}</p>`;
+    
+    try {
+        const res = await fetch('/api/replays');
+        const data = await res.json();
+        
+        if (data.success && data.replays.length > 0) {
+            container.innerHTML = data.replays.map(r => `
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding: 10px 0;">
+                    <div style="flex-grow:1;">
+                        <div style="font-weight:bold; color:#3498db; font-size: 0.9rem;">${r._id}</div>
+                        <div style="font-size:0.75rem; color:#888;">${new Date(r.timestamp).toLocaleString(lang)} • ${r.numPlayers} ${d['players' + r.numPlayers] || d.players4}</div>
+                    </div>
+                    <button onclick="avviaReplay('${r._id}')" style="background:#3498db; color:white; border:none; padding: 8px 15px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:0.9rem;">${d.watchBtn}</button>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = `<p style="text-align:center;">${d.noReplays}</p>`;
+        }
+    } catch (e) {
+        container.innerHTML = `<p style="text-align:center; color:#e74c3c;">Errore: ${e.message}</p>`;
+    }
+};
+
+window.chiudiReplays = () => {
+    document.getElementById('modal-replays').style.display = 'none';
+};
+
+window.avviaReplay = async (matchId) => {
+    chiudiReplays();
+    try {
+        const res = await fetch(`/api/replay/${matchId}`);
+        const data = await res.json();
+        if (data.success) {
+            currentReplayMoves = data.moves;
+            currentReplayStep = 0;
+            isReplayMode = true;
+            
+            switchSection('game-area');
+            document.getElementById('replay-controls').style.display = 'flex';
+            
+            renderStepReplay(0);
+        }
+    } catch (e) {
+        alert("Errore caricamento replay: " + e.message);
+    }
+};
+
+window.replayAvanti = () => {
+    if (currentReplayStep < currentReplayMoves.length - 1) {
+        currentReplayStep++;
+        renderStepReplay(currentReplayStep);
+    }
+};
+
+window.replayIndietro = () => {
+    if (currentReplayStep > 0) {
+        currentReplayStep--;
+        renderStepReplay(currentReplayStep);
+    }
+};
+
+window.chiudiReplayViewer = () => {
+    isReplayMode = false;
+    document.getElementById('replay-controls').style.display = 'none';
+    switchSection('setup-menu');
+};
+
+function renderStepReplay(stepIdx) {
+    const move = currentReplayMoves[stepIdx];
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const d = dictionary[lang];
+    
+    document.getElementById('replay-step-info').innerText = `${stepIdx + 1} / ${currentReplayMoves.length}`;
+    
+    const fakeState = {
+        tuttiGiocatori: [],
+        qtaCarte: move.roundCards,
+        sommaScommesse: "?",
+        turnoAttuale: move.playerIndex,
+        fase: 'gioco',
+        tavolo: []
+    };
+    
+    for (let i = 0; i < move.numPlayers; i++) {
+        const isMover = (i === move.playerIndex);
+        fakeState.tuttiGiocatori.push({
+            socketId: isMover ? socket.id : `pseudo-${i}`, 
+            nome: isMover ? (move.isHuman ? "Umano" : move.aiVariant) : `Player ${i}`,
+            isMazziere: false,
+            punti: "?",
+            dichiarazione: isMover ? move.dichiarazione : "?",
+            prese: isMover ? move.preseFatte : "?",
+            mano: [],
+            isHuman: isMover ? move.isHuman : false
+        });
+    }
+    
+    if (move.hand) {
+        fakeState.tuttiGiocatori[move.playerIndex].mano = move.hand.split('|').map(s => {
+            const [val, sem] = s.split('-');
+            return { valore: val, seme: sem, giocata: false, forza: 0 }; 
+        });
+    }
+    
+    const tableCards = move.table ? move.table.split('|') : [];
+    tableCards.push(move.move);
+    
+    fakeState.tavolo = tableCards.filter(s => s).map((s, idx) => {
+        const [val, sem] = s.split('-');
+        return {
+            playerId: (idx === tableCards.length - 1) ? move.playerIndex : -1,
+            card: { valore: val, seme: sem, forza: 0 }
+        };
+    });
+    
+    renderGiocatori(fakeState);
+
+    // Se ha vinto la presa, mostriamo il badge
+    if (move.wonTrick) {
+        setTimeout(() => {
+            const playerBlock = document.querySelector(`.player-block[data-player-id="${move.playerIndex}"]`);
+            if (playerBlock && !playerBlock.querySelector('.winner-badge')) {
+                const badge = document.createElement('div');
+                badge.className = 'winner-badge';
+                badge.innerText = '🏆';
+                playerBlock.appendChild(badge);
+                setTimeout(() => badge.remove(), 1500);
+            }
+        }, 300);
+    }
+}
 
 socket.on('classifica_dati', (dati) => {
     const container = document.getElementById('leaderboard-list');
@@ -482,10 +629,9 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
 
         div.onclick = () => {
             // Clicchi per giocare la carta. 
-            // NOTA: Usando mano.indexOf(c) peschiamo l'indice originale corretto anche se le abbiamo riordinate visivamente!
-            if (isMyTurn && fase === 'gioco' && canPlay) {
-                nascondiErrore(); // Rimuove eventuali messaggi di errore precedenti
-                canPlay = false; // Blocca click multipli istantanei
+            if (isMyTurn && fase === 'gioco' && canPlay && !isReplayMode) {
+                nascondiErrore(); 
+                canPlay = false; 
                 socket.emit('gioca_carta', { cartaIdx: mano.indexOf(c) });
             }
         };
@@ -691,11 +837,13 @@ window.onclick = (event) => {
     const modalClassifica = document.getElementById('modal-classifica');
     const modalLingua = document.getElementById('modal-lingua');
     const modalReport = document.getElementById('modal-report');
+    const modalReplays = document.getElementById('modal-replays');
 
     if (event.target === modalRegole) modalRegole.style.display = 'none';
     if (event.target === modalClassifica) modalClassifica.style.display = 'none';
     if (event.target === modalLingua) chiudiLingua();
     if (event.target === modalReport) chiudiReport();
+    if (event.target === modalReplays) chiudiReplays();
 };
 
 // =========================================
