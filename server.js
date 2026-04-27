@@ -82,6 +82,7 @@ const matchLogSchema = new mongoose.Schema({
     numPlayers: Number,
     roundCards: Number,
     playerIndex: Number,
+    uniqueCode: String,         // Codice univoco dell'utente (per replay personali)
     nickname: String,           // Nickname del giocatore al momento della mossa
     isHuman: Boolean,
     elo: { type: Number, default: 1000 },
@@ -89,7 +90,8 @@ const matchLogSchema = new mongoose.Schema({
     dichiarazione: Number,
     preseFatte: Number,
     obiettivoRimanente: Number, // Prese mancanti per fare la dichiarazione
-    hand: String,               // Carte in mano separate da |
+    finalScores: { type: Array, default: [] }, // Classifica finale della partita (nickname e punti)
+    allHands: { type: Array, default: [] },    // Mani di tutti i giocatori (per replay multi-prospettiva)
     table: String,              // Carte già sul tavolo
     history: String,            // Carte già uscite nel giro
     voidSuits: String,          // Info sui semi finiti (es: "P1:Spade,P2:Coppe")
@@ -310,18 +312,19 @@ app.get('/api/admin/all-users', authAdmin, async (req, res) => {
 });
 
 // --- NUOVE ROTTE PER REPLAY ---
-app.get('/api/replays', async (req, res) => {
+app.get('/api/replays/:uniqueCode', async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
     try {
-        // Recuperiamo le ultime 20 partite distinte dai log umani
         const replays = await HumanMatchLog.aggregate([
+            { $match: { uniqueCode: req.params.uniqueCode } },
             { $sort: { timestamp: -1 } },
             { $group: {
                 _id: "$matchId",
                 timestamp: { $first: "$timestamp" },
                 numPlayers: { $first: "$numPlayers" },
                 hostNickname: { $first: "$hostNickname" },
-                humanPlayers: { $addToSet: { $cond: [ "$isHuman", "$nickname", "$$REMOVE" ] } }
+                humanPlayers: { $addToSet: { $cond: [ "$isHuman", "$nickname", "$$REMOVE" ] } },
+                finalScores: { $first: "$finalScores" }
             }},
             { $sort: { timestamp: -1 } },
             { $limit: 20 }
@@ -1508,9 +1511,14 @@ io.on('connection', (socket) => {
                     player.voidSuits.push(semeUscita);
                 }
 
-                // Costruiamo la mano che aveva *prima* di giocare questa carta
-                const handPreMossa = player.mano.filter(c => !c.giocata).map(c => `${c.valore}-${c.seme}`);
-                handPreMossa.push(`${card.valore}-${card.seme}`);
+                // Costruiamo le mani di tutti i giocatori in questo momento
+                const currentAllHands = game.players.map((p, pIdx) => {
+                    const handCards = p.mano.filter(c => !c.giocata).map(c => `${c.valore}-${c.seme}`);
+                    if (pIdx === giocata.playerId) {
+                        handCards.push(`${card.valore}-${card.seme}`);
+                    }
+                    return handCards.join('|');
+                });
 
                 const tablePreMossa = game.tavolo.slice(0, indexTavolo).map(t => `${t.card.valore}-${t.card.seme}`).join('|');
 
@@ -1520,6 +1528,7 @@ io.on('connection', (socket) => {
                     numPlayers: game.numPlayers,
                     roundCards: game.sequenzaTurni[game.indiceGiro],
                     playerIndex: giocata.playerId,
+                    uniqueCode: player.uniqueCode,
                     nickname: player.nome,
                     isHuman: player.isHuman,
                     elo: player.isHuman ? (player.eloMomentaneo || 1000) : 1000,
@@ -1527,7 +1536,7 @@ io.on('connection', (socket) => {
                     dichiarazione: player.dichiarazione,
                     preseFatte: player.preseFatte,
                     obiettivoRimanente: player.dichiarazione - player.preseFatte,
-                    hand: handPreMossa.join('|'),
+                    allHands: currentAllHands,
                     table: tablePreMossa,
                     history: historyStr,
                     voidSuits: voidStr,
@@ -1621,6 +1630,12 @@ io.on('connection', (socket) => {
                             }
                         } catch (e) { console.error("Errore aggiornamento ELO:", e); }
                     }
+                }
+
+                // Aggiorniamo i log del match con la classifica finale per i replay
+                if (dbConnected) {
+                    const simplifiedScores = classificaFinale.map(c => ({ nome: c.nome, punti: c.punti }));
+                    HumanMatchLog.updateMany({ matchId: game.matchId }, { $set: { finalScores: simplifiedScores } }).catch(e => {});
                 }
 
                 io.to(code).emit('fine_partita', classificaFinale);

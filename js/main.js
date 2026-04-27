@@ -8,6 +8,7 @@ let canPlay = true;
 let currentReplayMoves = [];
 let currentReplayStep = 0;
 let isReplayMode = false;
+let currentPerspectiveIndex = 0; // Indice del giocatore di cui vediamo le carte in replay
 
 let sessionToken = sessionStorage.getItem('lucas_token');
 if (!sessionToken) {
@@ -46,6 +47,12 @@ function switchSection(activeId) {
             const isGame = (activeId === 'game-area');
             btnLeaderboard.style.display = isGame ? 'none' : 'inline-block';
             btnEsci.style.display = isGame ? 'inline-block' : 'none';
+        }
+
+        // Gestione tasto Replay: visibile solo nel menu setup (dopo login)
+        const btnReplays = document.getElementById('btn-replays');
+        if (btnReplays) {
+            btnReplays.style.display = (activeId === 'setup-menu') ? 'inline-block' : 'none';
         }
     } catch (e) {
         console.error("Errore in switchSection:", e);
@@ -198,7 +205,8 @@ window.apriReplays = async () => {
     container.innerHTML = `<p style="text-align:center;">${d.loadingReplays}</p>`;
     
     try {
-        const res = await fetch('/api/replays');
+        const uCode = userProfile ? userProfile.uniqueCode : 'anon';
+        const res = await fetch(`/api/replays/${uCode}`);
         const data = await res.json();
         
         if (data.success && data.replays.length > 0) {
@@ -211,6 +219,11 @@ window.apriReplays = async () => {
                         <div style="font-size:0.8rem; color:#ccc; margin-top:4px;">
                             👥 ${r.numPlayers} Giocatori (${r.humanPlayers ? r.humanPlayers.length : 0} Umani: ${r.humanPlayers ? r.humanPlayers.filter(n => n).join(', ') : '---'})
                         </div>
+                        ${r.finalScores && r.finalScores.length > 0 ? `
+                        <div style="font-size:0.75rem; color:#f1c40f; margin-top:6px; font-style: italic;">
+                            🏆 ${r.finalScores.sort((a,b) => b.punti - a.punti).map(fs => `${fs.nome} (${fs.punti})`).join(' • ')}
+                        </div>
+                        ` : ''}
                     </div>
                     <button onclick="avviaReplay('${r._id}')" style="background:#3498db; color:white; border:none; padding: 10px 18px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9rem; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">${d.watchBtn}</button>
                 </div>
@@ -243,6 +256,7 @@ window.avviaReplay = async (matchId) => {
                 if (m.nickname) nicknameMap[m.playerIndex] = m.nickname;
             });
             window.replayNicknames = nicknameMap;
+            currentPerspectiveIndex = 0; // Default: primo giocatore
 
             switchSection('game-area');
             document.getElementById('replay-controls').style.display = 'flex';
@@ -292,10 +306,11 @@ function renderStepReplay(stepIdx) {
     
     for (let i = 0; i < move.numPlayers; i++) {
         const isMover = (i === move.playerIndex);
+        const isPerspective = (i === currentPerspectiveIndex);
         const savedNick = window.replayNicknames ? window.replayNicknames[i] : null;
 
         fakeState.tuttiGiocatori.push({
-            socketId: isMover ? socket.id : `pseudo-${i}`, 
+            socketId: isPerspective ? socket.id : `pseudo-${i}`, 
             nome: savedNick || (isMover ? (move.isHuman ? "Umano" : move.aiVariant) : `Player ${i}`),
             isMazziere: false,
             punti: "?",
@@ -306,11 +321,23 @@ function renderStepReplay(stepIdx) {
         });
     }
     
-    if (move.hand) {
-        fakeState.tuttiGiocatori[move.playerIndex].mano = move.hand.split('|').map(s => {
-            const [val, sem] = s.split('-');
-            return { valore: val, seme: sem, giocata: false, forza: 0 }; 
+    if (move.allHands && move.allHands.length > 0) {
+        move.allHands.forEach((hStr, i) => {
+            if (hStr && fakeState.tuttiGiocatori[i]) {
+                fakeState.tuttiGiocatori[i].mano = hStr.split('|').map(s => {
+                    const [val, sem] = s.split('-');
+                    return { valore: val, seme: sem, giocata: false, forza: 0 };
+                });
+            }
         });
+    } else if (move.hand) {
+        // Fallback vecchio formato (solo chi muove ha la mano visibile)
+        if (fakeState.tuttiGiocatori[move.playerIndex]) {
+            fakeState.tuttiGiocatori[move.playerIndex].mano = move.hand.split('|').map(s => {
+                const [val, sem] = s.split('-');
+                return { valore: val, seme: sem, giocata: false, forza: 0 }; 
+            });
+        }
     }
     
     const tableCards = move.table ? move.table.split('|') : [];
@@ -325,6 +352,16 @@ function renderStepReplay(stepIdx) {
     });
     
     renderGiocatori(fakeState);
+
+    // Se siamo in replay, aggiungiamo click sui box per cambiare prospettiva
+    document.querySelectorAll('.player-block').forEach(block => {
+        block.style.cursor = 'pointer';
+        block.onclick = () => {
+            const newIdx = parseInt(block.getAttribute('data-player-id'));
+            currentPerspectiveIndex = newIdx;
+            renderStepReplay(currentReplayStep);
+        };
+    });
 
     // Se ha vinto la presa, mostriamo il badge
     if (move.wonTrick) {
