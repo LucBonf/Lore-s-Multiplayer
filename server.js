@@ -316,8 +316,16 @@ app.get('/api/admin/all-users', authAdmin, async (req, res) => {
 app.get('/api/replays/:uniqueCode', async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
     try {
+        const { search } = req.query;
+        const filter = { uniqueCode: req.params.uniqueCode };
+        
+        // Se c'è una ricerca, cerchiamo tra i nickname presenti nel match
+        if (search) {
+            filter.nickname = new RegExp(search, 'i');
+        }
+
         const replays = await HumanMatchLog.aggregate([
-            { $match: { uniqueCode: req.params.uniqueCode } },
+            { $match: filter },
             { $sort: { timestamp: -1 } },
             { $group: {
                 _id: "$matchId",
@@ -330,6 +338,37 @@ app.get('/api/replays/:uniqueCode', async (req, res) => {
             }},
             { $sort: { timestamp: -1 } },
             { $limit: 20 }
+        ]);
+        res.json({ success: true, replays });
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+// --- NUOVA ROTTA: REPLAY PER ADMIN (Tutte le partite + Ricerca) ---
+app.get('/api/admin/replays', authAdmin, async (req, res) => {
+    if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
+    try {
+        const { search } = req.query;
+        const filter = {};
+        if (search) {
+            filter.nickname = new RegExp(search, 'i');
+        }
+
+        const replays = await HumanMatchLog.aggregate([
+            { $match: filter },
+            { $sort: { timestamp: -1 } },
+            { $group: {
+                _id: "$matchId",
+                timestamp: { $first: "$timestamp" },
+                numPlayers: { $first: "$numPlayers" },
+                hostNickname: { $first: "$hostNickname" },
+                humanPlayers: { $addToSet: { $cond: [ "$isHuman", "$nickname", "$$REMOVE" ] } },
+                finalScores: { $first: "$finalScores" },
+                isCompleted: { $first: "$isCompleted" }
+            }},
+            { $sort: { timestamp: -1 } },
+            { $limit: 100 } // Limite più alto per admin
         ]);
         res.json({ success: true, replays });
     } catch (e) {
@@ -1363,28 +1402,27 @@ io.on('connection', (socket) => {
 
         inviaStato(code);
         gestisciIA(code);
-    }
+    } 
 
     socket.on('bug_report', async (testo) => {
         try {
-            let nick = socket.userNickname || "Sconosciuto";
-
-            // RECUPERO CONTESTO PARTITA (Se presente)
-            const roomCode = socket.roomCode;
-            const lobby = roomCode ? lobbies[roomCode] : null;
+            if (!dbConnected) return;
+            const lobby = Object.values(lobbies).find(l => l.giocatori.some(p => p.id === socket.id));
             const matchId = lobby?.gameInstance?.matchId || null;
-
-            // SALVATAGGIO SU DATABASE (Persistente)
-            if (dbConnected) {
-                const nuovoReport = new Report({
-                    nickname: nick,
-                    testo: testo.substring(0, 500), // Limite di sicurezza
-                    roomCode: roomCode,
-                    matchId: matchId
-                });
-                await nuovoReport.save();
-                console.log(`🪲 Report salvato su DB da ${nick} (Match: ${matchId || 'N/A'})`);
-            }
+            const roomCode = lobby ? Object.keys(lobbies).find(key => lobbies[key] === lobby) : null;
+            
+            const newReport = new Report({
+                nickname: socket.userNickname || 'Anonimo',
+                testo: testo.substring(0, 500),
+                roomCode: roomCode,
+                matchId: matchId
+            });
+            await newReport.save();
+            console.log(`🪲 Report salvato su DB da ${newReport.nickname} (Match: ${matchId || 'N/A'})`);
+        } catch (e) {
+            console.error("Errore bug_report:", e);
+        }
+    });
 
             // Backup su file (opzionale, sparirà al commit su Render)
             const fs = require('fs');

@@ -87,6 +87,12 @@
         <div class="modal-content" style="max-width: 600px;">
             <span class="close-btn" onclick="chiudiReplays()">&times;</span>
             <h2 data-i18n="replaysTitle" style="color: #3498db; margin-top: 0; text-align: center;">🎬 Replay Partite Recenti</h2>
+            
+            <div id="replays-search-container" style="margin-bottom: 15px; display: flex; gap: 10px; margin-top: 15px;">
+                <input type="text" id="replays-search-input" placeholder="🔍 Cerca giocatore..." style="flex-grow: 1; background: #1a1a1a; border: 1px solid #3498db; color: white; padding: 10px; border-radius: 8px; outline: none;">
+                <button onclick="apriReplays(true)" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">Cerca</button>
+            </div>
+
             <div id="replays-list" style="margin-top: 20px; font-size: 1.1rem; color: #ddd; text-align: left; line-height: 1.6;">
                 <p data-i18n="loadingReplays" style="text-align: center;">Caricamento replay...</p>
             </div>

@@ -81,6 +81,15 @@ document.addEventListener('DOMContentLoaded', () => {
             switchSection('login-menu');
         }
 
+        // --- GESTIONE AVVIO DIRETTO REPLAY DA URL (Per Admin/Report) ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const replayId = urlParams.get('replay');
+        if (replayId) {
+            setTimeout(() => {
+                if (typeof avviaReplay === 'function') avviaReplay(replayId);
+            }, 1000);
+        }
+
         // --- SICUREZZA TOTALE (SELF-HEALING): SE DOPO 3 SECONDI IL TAVOLO È ANCORA VUOTO, FORZA ---
         setTimeout(() => {
             const sections = ['game-area', 'lobby-wait', 'setup-menu', 'login-menu'];
@@ -196,7 +205,7 @@ window.chiudiClassifica = () => {
 //   LOGICA REPLAY
 // =========================================
 
-window.apriReplays = async () => {
+window.apriReplays = async (isSearch = false) => {
     document.getElementById('modal-replays').style.display = 'block';
     const container = document.getElementById('replays-list');
     const lang = localStorage.getItem('lucas_lang') || 'it';
@@ -204,9 +213,11 @@ window.apriReplays = async () => {
     
     container.innerHTML = `<p style="text-align:center;">${d.loadingReplays}</p>`;
     
+    const searchVal = isSearch ? document.getElementById('replays-search-input').value.trim() : "";
+
     try {
         const uCode = userProfile ? userProfile.uniqueCode : 'anon';
-        const res = await fetch(`/api/replays/${uCode}`);
+        const res = await fetch(`/api/replays/${uCode}?search=${encodeURIComponent(searchVal)}`);
         const data = await res.json();
         
         if (data.success && data.replays.length > 0) {
