@@ -65,6 +65,14 @@ const reportSchema = new mongoose.Schema({
     matchId: { type: String, default: null }
 });
 const Report = mongoose.model('Report', reportSchema);
+
+// Schema Utenti Bannati
+const bannedUserSchema = new mongoose.Schema({
+    nickname: { type: String, required: true, unique: true },
+    date: { type: Date, default: Date.now }
+});
+const BannedUser = mongoose.model('BannedUser', bannedUserSchema);
+
  
 // --- NUOVO: Schema per Training AI (Capped Collection 25MB) ---
 const matchLogSchema = new mongoose.Schema({
@@ -191,7 +199,7 @@ if (process.env.MONGODB_URI) {
             try {
                 // Rimuove account che contengono parole inaccettabili (cazzo, hezbollah, o radici di bestemmie)
                 const deletedOffensive = await User.deleteMany({ 
-                    nickname: { $regex: new RegExp("(cazzo|hezbollah|diocane|porcodio|madonn|dioporco|diop|mailona26|polcodio)", "i") }
+                    nickname: { $regex: new RegExp("(cazzo|hezbollah|diocane|porcodio|madonn|dioporco|diop|mailona26|polcodio|LaMammaDiLuca)", "i") }
                 });
                 if (deletedOffensive.deletedCount > 0) {
                     console.log(`🗑️ Rimossi ${deletedOffensive.deletedCount} account con nickname offensivo.`);
@@ -270,10 +278,16 @@ app.get('/api/admin/find-user/:query', authAdmin, async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
     try {
         const query = req.params.query;
-        // Cerca per nickname (esatto) o per uniqueCode
-        const user = await User.findOne({ $or: [{ nickname: query }, { uniqueCode: query }] });
-        if (!user) return res.json({ success: false, error: "Utente non trovato" });
-        res.json({ success: true, user });
+        // Cerca per nickname (anche parziale/regex) o per uniqueCode
+        const users = await User.find({ 
+            $or: [
+                { nickname: { $regex: new RegExp(query, "i") } }, 
+                { uniqueCode: query }
+            ] 
+        }).limit(20);
+        
+        if (users.length === 0) return res.json({ success: false, error: "Nessun utente trovato" });
+        res.json({ success: true, users });
     } catch (e) {
         res.json({ success: false, error: e.message });
     }
@@ -300,6 +314,30 @@ app.get('/api/admin/delete-user/:uniqueCode', authAdmin, async (req, res) => {
         const code = req.params.uniqueCode;
         const result = await User.deleteOne({ uniqueCode: code });
         if (result.deletedCount === 0) return res.json({ success: false, error: "Nessun utente eliminato" });
+        res.json({ success: true });
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+// --- NUOVA ROTTA: BANNA E ELIMINA UTENTE PER ADMIN ---
+app.get('/api/admin/ban-user/:uniqueCode', authAdmin, async (req, res) => {
+    if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
+    try {
+        const code = req.params.uniqueCode;
+        const user = await User.findOne({ uniqueCode: code });
+        if (!user) return res.json({ success: false, error: "Utente non trovato" });
+
+        // Aggiungi al ban list (se non già presente)
+        try {
+            await new BannedUser({ nickname: user.nickname }).save();
+        } catch (err) {
+            // Se è già bannato, procediamo comunque alla cancellazione dell'account
+        }
+
+        // Elimina l'utente
+        await User.deleteOne({ uniqueCode: code });
+        
         res.json({ success: true });
     } catch (e) {
         res.json({ success: false, error: e.message });
@@ -538,7 +576,10 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                         <p><strong>Nome:</strong> <span id="info-nick">-</span></p>
                         <p><strong>ID:</strong> <span id="info-code">-</span></p>
                         <p><strong>Partite:</strong> <span id="info-matches">-</span></p>
-                        <button class="btn btn-danger" id="btn-delete-user" style="width:100%; margin-top:10px;">❌ ELIMINA ACCOUNT</button>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-danger" id="btn-delete-user" style="flex:1; margin-top:10px;">❌ ELIMINA</button>
+                            <button class="btn" id="btn-ban-user" style="flex:1; margin-top:10px; border-color:#e67e22; color:#e67e22;">🚫 BAN & ELIMINA</button>
+                        </div>
                     </div>
 
                     <div id="all-users-container" style="display:none; max-height:400px; overflow-y:auto; border:1px solid #333; margin-top:10px;">
@@ -619,33 +660,25 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                         
                         const data = await res.json();
                         const box = document.getElementById('user-info-box');
+                        const resultsContainer = document.getElementById('users-tbody');
+                        const resultsWrapper = document.getElementById('all-users-container');
                         
                         if (data.success) {
-                            box.style.display = 'block';
-                            document.getElementById('info-nick').innerText = data.user.nickname;
-                            document.getElementById('info-code').innerText = data.user.uniqueCode;
-                            document.getElementById('info-matches').innerText = data.user.partiteGiocate;
-                            
-                            document.getElementById('btn-delete-user').onclick = async () => {
-                                if (confirm("Sei sicuro di voler eliminare l'utente " + data.user.nickname + "? I log delle partite NON saranno cancellati.")) {
-                                    try {
-                                        const delRes = await fetch('/api/admin/delete-user/' + data.user.uniqueCode);
-                                        if (delRes.status === 401) return location.reload();
-                                        
-                                        const delData = await delRes.json();
-                                        if (delData.success) {
-                                            alert("Utente eliminato correttamente.");
-                                            box.style.display = 'none';
-                                            document.getElementById('user-query').value = '';
-                                            if (document.getElementById('all-users-container').style.display !== 'none') {
-                                                caricaTuttiUtenti(); // Ricarica la lista se è aperta
-                                            }
-                                        } else {
-                                            alert("Errore: " + delData.error);
-                                        }
-                                    } catch(e) { alert("Errore connessione durante eliminazione"); }
-                                }
-                            };
+                            // Se ne trova uno solo, mostriamo il box dettagliato
+                            if (data.users.length === 1) {
+                                const user = data.users[0];
+                                box.style.display = 'block';
+                                document.getElementById('info-nick').innerText = user.nickname;
+                                document.getElementById('info-code').innerText = user.uniqueCode;
+                                document.getElementById('info-matches').innerText = user.partiteGiocate;
+                                
+                                document.getElementById('btn-delete-user').onclick = () => eseguiAzioneUtente('delete', user);
+                                document.getElementById('btn-ban-user').onclick = () => eseguiAzioneUtente('ban', user);
+                            } else {
+                                // Se ne trova molti, mostriamo la tabella
+                                box.style.display = 'none';
+                                renderListaUtenti(data.users);
+                            }
                         } else {
                             alert("Utente non trovato!");
                             box.style.display = 'none';
@@ -653,61 +686,90 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                     } catch(e) { alert("Errore durante la ricerca"); }
                 }
 
+                async function eseguiAzioneUtente(tipo, user) {
+                    const msg = tipo === 'ban' 
+                        ? "ATTENZIONE: Vuoi BANNARTE e ELIMINARE l'utente " + user.nickname + "? Non potrà più registrarsi con questo nome."
+                        : "Sei sicuro di voler eliminare l'utente " + user.nickname + "?";
+                    
+                    if (!confirm(msg)) return;
+
+                    try {
+                        const url = tipo === 'ban' ? '/api/admin/ban-user/' : '/api/admin/delete-user/';
+                        const res = await fetch(url + user.uniqueCode);
+                        if (res.status === 401) return location.reload();
+                        
+                        const resData = await res.json();
+                        if (resData.success) {
+                            alert(tipo === 'ban' ? "Utente BANNATO ed eliminato." : "Utente eliminato.");
+                            document.getElementById('user-info-box').style.display = 'none';
+                            document.getElementById('user-query').value = '';
+                            if (document.getElementById('all-users-container').style.display !== 'none') {
+                                caricaTuttiUtenti();
+                            }
+                        } else {
+                            alert("Errore: " + resData.error);
+                        }
+                    } catch(e) { alert("Errore durante l'operazione"); }
+                }
+
+                function renderListaUtenti(users) {
+                    const container = document.getElementById('all-users-container');
+                    const tbody = document.getElementById('users-tbody');
+                    container.style.display = 'block';
+                    tbody.innerHTML = '';
+
+                    users.forEach(u => {
+                        const tr = document.createElement('tr');
+                        const lastDate = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'N/A';
+                        const elo = u.elo || 1000;
+                        
+                        const tdNick = document.createElement('td');
+                        tdNick.style = "padding:5px; border:1px solid #333; color:#f1c40f; cursor:pointer;";
+                        tdNick.innerText = u.nickname;
+                        tdNick.onclick = () => setSearch(u.uniqueCode);
+                        
+                        const tdPunti = document.createElement('td');
+                        tdPunti.style = "padding:5px; border:1px solid #333; text-align:center;";
+                        tdPunti.innerText = u.punteggioTotale;
+                        
+                        const tdElo = document.createElement('td');
+                        tdElo.style = "padding:5px; border:1px solid #333; text-align:center; color:#00ff00;";
+                        tdElo.innerText = elo;
+                        
+                        const tdGiocate = document.createElement('td');
+                        tdGiocate.style = "padding:5px; border:1px solid #333; text-align:center;";
+                        tdGiocate.innerText = u.partiteGiocate;
+                        
+                        const tdVinte = document.createElement('td');
+                        tdVinte.style = "padding:5px; border:1px solid #333; text-align:center;";
+                        tdVinte.innerText = u.partiteVinte;
+                        
+                        const tdData = document.createElement('td');
+                        tdData.style = "padding:5px; border:1px solid #333; text-align:center; font-size:0.8em;";
+                        tdData.innerText = lastDate;
+                        
+                        tr.appendChild(tdNick);
+                        tr.appendChild(tdPunti);
+                        tr.appendChild(tdElo);
+                        tr.appendChild(tdGiocate);
+                        tr.appendChild(tdVinte);
+                        tr.appendChild(tdData);
+                        
+                        tbody.appendChild(tr);
+                    });
+                }
+
                 async function caricaTuttiUtenti() {
                     try {
                         const res = await fetch('/api/admin/all-users');
                         if (res.status === 401) {
-                            alert("Sessione scaduta! Ricarica la pagina per effettuare nuovamente il login.");
+                            alert("Sessione scaduta! Ricarica la pagina.");
                             return location.reload();
                         }
                         const data = await res.json();
                         if (!data.success) return alert("Errore: " + data.error);
 
-                        const container = document.getElementById('all-users-container');
-                        const tbody = document.getElementById('users-tbody');
-                        container.style.display = 'block';
-                        tbody.innerHTML = '';
-
-                        data.users.forEach(u => {
-                            const tr = document.createElement('tr');
-                            const lastDate = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'N/A';
-                            const elo = u.elo || 1000;
-                            
-                            // Creiamo le celle in modo sicuro per evitare errori di virgolette (escaping hell)
-                            const tdNick = document.createElement('td');
-                            tdNick.style = "padding:5px; border:1px solid #333; color:#f1c40f; cursor:pointer;";
-                            tdNick.innerText = u.nickname;
-                            tdNick.onclick = () => setSearch(u.uniqueCode);
-                            
-                            const tdPunti = document.createElement('td');
-                            tdPunti.style = "padding:5px; border:1px solid #333; text-align:center;";
-                            tdPunti.innerText = u.punteggioTotale;
-                            
-                            const tdElo = document.createElement('td');
-                            tdElo.style = "padding:5px; border:1px solid #333; text-align:center; color:#00ff00;";
-                            tdElo.innerText = elo;
-                            
-                            const tdGiocate = document.createElement('td');
-                            tdGiocate.style = "padding:5px; border:1px solid #333; text-align:center;";
-                            tdGiocate.innerText = u.partiteGiocate;
-                            
-                            const tdVinte = document.createElement('td');
-                            tdVinte.style = "padding:5px; border:1px solid #333; text-align:center;";
-                            tdVinte.innerText = u.partiteVinte;
-                            
-                            const tdData = document.createElement('td');
-                            tdData.style = "padding:5px; border:1px solid #333; text-align:center; font-size:0.8em;";
-                            tdData.innerText = lastDate;
-                            
-                            tr.appendChild(tdNick);
-                            tr.appendChild(tdPunti);
-                            tr.appendChild(tdElo);
-                            tr.appendChild(tdGiocate);
-                            tr.appendChild(tdVinte);
-                            tr.appendChild(tdData);
-                            
-                            tbody.appendChild(tr);
-                        });
+                        renderListaUtenti(data.users);
                     } catch (err) {
                         alert("Errore di connessione al server: " + err.message);
                     }
@@ -874,6 +936,15 @@ io.on('connection', (socket) => {
             const isToxic = await checkWithAI(dati.nickname);
             if (isToxic) {
                 return socket.emit('login_err', 'L\'IA ha rilevato un nickname non appropriato.');
+            }
+
+            // --- NUOVO CONTROLLO BAN ---
+            if (dbConnected) {
+                const escapedNickname = dati.nickname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const isBanned = await BannedUser.findOne({ nickname: { $regex: new RegExp("^" + escapedNickname + "$", "i") } });
+                if (isBanned) {
+                    return socket.emit('login_err', 'Spiacenti, questo nickname è stato bannato dal sistema.');
+                }
             }
         }
 
