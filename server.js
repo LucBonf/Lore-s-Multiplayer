@@ -678,6 +678,17 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                     </div>
                 </div>
 
+                <div class="card">
+                    <h2>🎬 Replay Explorer (Global)</h2>
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <input type="text" id="admin-replay-search" placeholder="Cerca per nickname in tutto il DB..." style="flex-grow:1; padding:10px; border-radius:5px; border:1px solid #444; background:#222; color:white; outline:none;">
+                        <button class="btn" onclick="cercaReplaysAdmin()">🔍 Cerca Replays</button>
+                    </div>
+                    <div id="admin-replays-list" style="max-height:500px; overflow-y:auto; border:1px solid #333; padding:15px; background:rgba(0,0,0,0.2); border-radius:8px;">
+                        <p style="color:#888; text-align:center;">Inserisci un nome o premi cerca per vedere gli ultimi match globali.</p>
+                    </div>
+                </div>
+
                 <div style="display: flex; justify-content: space-between; margin-top: 20px;">
                     <div>
                         <h3>💾 DATASET TURBO (AI)</h3>
@@ -836,6 +847,38 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                         
                         tbody.appendChild(tr);
                     });
+                }
+
+                async function cercaReplaysAdmin() {
+                    const search = document.getElementById('admin-replay-search').value.trim();
+                    const container = document.getElementById('admin-replays-list');
+                    container.innerHTML = '<p style="text-align:center; color:#00ff00;">🔍 Ricerca in corso...</p>';
+
+                    try {
+                        const res = await fetch(`/api/admin/replays?search=${encodeURIComponent(search)}`);
+                        if (res.status === 401) return location.reload();
+                        const data = await res.json();
+
+                        if (data.success && data.replays.length > 0) {
+                            container.innerHTML = data.replays.map(r => {
+                                const statusHtml = !r.isCompleted ? ' | <span style="color:#ff4d4d;">INTERROTTA</span>' : '';
+                                return `
+                                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; padding:10px 0;">
+                                    <div>
+                                        <div style="color:#f1c40f; font-weight:bold;">\${r.hostNickname} • \${new Date(r.timestamp).toLocaleString()}</div>
+                                        <div style="font-size:0.8em; color:#888;">
+                                            👥 \${r.numPlayers} Players (\${r.humanPlayers.join(', ')})
+                                            \${statusHtml}
+                                        </div>
+                                    </div>
+                                    <button class="btn" onclick="window.open('/?replay=\${r._id}', '_blank')" style="padding:5px 10px; font-size:0.8em;">🎬 GUARDA</button>
+                                </div>
+                                `;
+                            }).join('');
+                        } else {
+                            container.innerHTML = '<p style="text-align:center; color:#888;">Nessun replay trovato.</p>';
+                        }
+                    } catch(e) { container.innerHTML = '<p style="text-align:center; color:#ff0000;">Errore nella ricerca.</p>'; }
                 }
 
                 async function caricaTuttiUtenti() {
