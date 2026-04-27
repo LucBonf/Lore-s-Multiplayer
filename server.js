@@ -81,6 +81,7 @@ const matchLogSchema = new mongoose.Schema({
     numPlayers: Number,
     roundCards: Number,
     playerIndex: Number,
+    nickname: String,           // Nickname del giocatore al momento della mossa
     isHuman: Boolean,
     elo: { type: Number, default: 1000 },
     aiVariant: { type: String, default: "Human" }, // Es: V4_A80_C20_S50
@@ -317,7 +318,8 @@ app.get('/api/replays', async (req, res) => {
             { $group: {
                 _id: "$matchId",
                 timestamp: { $first: "$timestamp" },
-                numPlayers: { $first: "$numPlayers" }
+                numPlayers: { $first: "$numPlayers" },
+                players: { $addToSet: "$nickname" }
             }},
             { $sort: { timestamp: -1 } },
             { $limit: 20 }
@@ -1511,6 +1513,7 @@ io.on('connection', (socket) => {
                     numPlayers: game.numPlayers,
                     roundCards: game.sequenzaTurni[game.indiceGiro],
                     playerIndex: giocata.playerId,
+                    nickname: player.nome,
                     isHuman: player.isHuman,
                     elo: player.isHuman ? (player.eloMomentaneo || 1000) : 1000,
                     aiVariant: player.aiVariant || "N/A",

@@ -243,7 +243,15 @@ const dictionary = {
         'reportSubmit': 'Envoyer le rapport',
         'reportSuccess': 'Rapport envoyé avec succès ! Merci.',
         'reportEmpty': 'Le texte du rapport ne peut pas être vide.',
-        'charLimit': 'caractères'
+        'charLimit': 'caractères',
+        'replaysBtn': '🎬 Replays',
+        'replaysTitle': '🎬 Replays des Matchs Récents',
+        'loadingReplays': 'Chargement des replays...',
+        'noReplays': 'Aucun replay disponible.',
+        'watchBtn': 'Regarder',
+        'replayNext': 'Suivant',
+        'replayPrev': 'Précédent',
+        'replayClose': 'Fermer'
     },
     'es': {
         'chooseLanguage': 'Elige el Idioma',
@@ -317,7 +325,15 @@ const dictionary = {
         'reportSubmit': 'Enviar informe',
         'reportSuccess': '¡Informe enviado con éxito! Gracias.',
         'reportEmpty': 'El texto del informe no puede estar vacío.',
-        'charLimit': 'caracteres'
+        'charLimit': 'caracteres',
+        'replaysBtn': '🎬 Replays',
+        'replaysTitle': '🎬 Replays de Partidas Recientes',
+        'loadingReplays': 'Cargando replays...',
+        'noReplays': 'No hay replays disponibles.',
+        'watchBtn': 'Ver',
+        'replayNext': 'Siguiente',
+        'replayPrev': 'Anterior',
+        'replayClose': 'Cerrar'
     },
     'de': {
         'chooseLanguage': 'Sprache Wählen',
@@ -391,7 +407,15 @@ const dictionary = {
         'reportSubmit': 'Bericht senden',
         'reportSuccess': 'Bericht erfolgreich gesendet! Vielen Dank.',
         'reportEmpty': 'Der Text des Berichts darf nicht leer sein.',
-        'charLimit': 'Zeichen'
+        'charLimit': 'Zeichen',
+        'replaysBtn': '🎬 Replays',
+        'replaysTitle': '🎬 Replays der letzten Spiele',
+        'loadingReplays': 'Replays werden geladen...',
+        'noReplays': 'Keine Replays verfügbar.',
+        'watchBtn': 'Ansehen',
+        'replayNext': 'Weiter',
+        'replayPrev': 'Zurück',
+        'replayClose': 'Schließen'
     }
 };
 

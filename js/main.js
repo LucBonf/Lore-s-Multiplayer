@@ -207,6 +207,7 @@ window.apriReplays = async () => {
                     <div style="flex-grow:1;">
                         <div style="font-weight:bold; color:#3498db; font-size: 0.9rem;">${r._id}</div>
                         <div style="font-size:0.75rem; color:#888;">${new Date(r.timestamp).toLocaleString(lang)} • ${r.numPlayers} ${d['players' + r.numPlayers] || d.players4}</div>
+                        <div style="font-size:0.7rem; color:#aaa; margin-top:3px;">👥 ${r.players ? r.players.filter(n => n).join(', ') : '---'}</div>
                     </div>
                     <button onclick="avviaReplay('${r._id}')" style="background:#3498db; color:white; border:none; padding: 8px 15px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:0.9rem;">${d.watchBtn}</button>
                 </div>
@@ -233,6 +234,13 @@ window.avviaReplay = async (matchId) => {
             currentReplayStep = 0;
             isReplayMode = true;
             
+            // Creiamo una mappa degli indici dei giocatori ai loro nickname
+            const nicknameMap = {};
+            currentReplayMoves.forEach(m => {
+                if (m.nickname) nicknameMap[m.playerIndex] = m.nickname;
+            });
+            window.replayNicknames = nicknameMap;
+
             switchSection('game-area');
             document.getElementById('replay-controls').style.display = 'flex';
             
@@ -281,9 +289,11 @@ function renderStepReplay(stepIdx) {
     
     for (let i = 0; i < move.numPlayers; i++) {
         const isMover = (i === move.playerIndex);
+        const savedNick = window.replayNicknames ? window.replayNicknames[i] : null;
+
         fakeState.tuttiGiocatori.push({
             socketId: isMover ? socket.id : `pseudo-${i}`, 
-            nome: isMover ? (move.isHuman ? "Umano" : move.aiVariant) : `Player ${i}`,
+            nome: savedNick || (isMover ? (move.isHuman ? "Umano" : move.aiVariant) : `Player ${i}`),
             isMazziere: false,
             punti: "?",
             dichiarazione: isMover ? move.dichiarazione : "?",
