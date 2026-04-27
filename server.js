@@ -78,6 +78,7 @@ const BannedUser = mongoose.model('BannedUser', bannedUserSchema);
 const matchLogSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
     matchId: String,            // ID unico della partita per correlazione
+    hostNickname: String,       // Nickname di chi ha creato la lobby
     numPlayers: Number,
     roundCards: Number,
     playerIndex: Number,
@@ -319,7 +320,8 @@ app.get('/api/replays', async (req, res) => {
                 _id: "$matchId",
                 timestamp: { $first: "$timestamp" },
                 numPlayers: { $first: "$numPlayers" },
-                players: { $addToSet: "$nickname" }
+                hostNickname: { $first: "$hostNickname" },
+                humanPlayers: { $addToSet: { $cond: [ "$isHuman", "$nickname", "$$REMOVE" ] } }
             }},
             { $sort: { timestamp: -1 } },
             { $limit: 20 }
@@ -1350,6 +1352,10 @@ io.on('connection', (socket) => {
         // Genera un ID unico per la partita (usato per i log)
         lobby.gameInstance.matchId = "M-" + Math.random().toString(36).substring(2, 9).toUpperCase();
         
+        // Identifichiamo il nickname dell'Host (chi ha creato la stanza)
+        const hostPlayer = lobby.giocatori.find(p => p.id === lobby.host);
+        lobby.gameInstance.hostNickname = hostPlayer ? hostPlayer.nome : "Sconosciuto";
+
         inviaStato(code);
         gestisciIA(code);
     }
@@ -1510,6 +1516,7 @@ io.on('connection', (socket) => {
 
                 const logEntry = new LogModel({
                     matchId: game.matchId,
+                    hostNickname: game.hostNickname || "Sconosciuto",
                     numPlayers: game.numPlayers,
                     roundCards: game.sequenzaTurni[game.indiceGiro],
                     playerIndex: giocata.playerId,

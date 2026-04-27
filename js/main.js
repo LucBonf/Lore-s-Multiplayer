@@ -203,13 +203,16 @@ window.apriReplays = async () => {
         
         if (data.success && data.replays.length > 0) {
             container.innerHTML = data.replays.map(r => `
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding: 10px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding: 12px 0;">
                     <div style="flex-grow:1;">
-                        <div style="font-weight:bold; color:#3498db; font-size: 0.9rem;">${r._id}</div>
-                        <div style="font-size:0.75rem; color:#888;">${new Date(r.timestamp).toLocaleString(lang)} • ${r.numPlayers} ${d['players' + r.numPlayers] || d.players4}</div>
-                        <div style="font-size:0.7rem; color:#aaa; margin-top:3px;">👥 ${r.players ? r.players.filter(n => n).join(', ') : '---'}</div>
+                        <div style="font-weight:bold; color:#f1c40f; font-size: 1.0rem;">
+                            ${r.hostNickname || 'Match'} • ${new Date(r.timestamp).toLocaleString(lang, { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                        </div>
+                        <div style="font-size:0.8rem; color:#ccc; margin-top:4px;">
+                            👥 ${r.numPlayers} Giocatori (${r.humanPlayers ? r.humanPlayers.length : 0} Umani: ${r.humanPlayers ? r.humanPlayers.filter(n => n).join(', ') : '---'})
+                        </div>
                     </div>
-                    <button onclick="avviaReplay('${r._id}')" style="background:#3498db; color:white; border:none; padding: 8px 15px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:0.9rem;">${d.watchBtn}</button>
+                    <button onclick="avviaReplay('${r._id}')" style="background:#3498db; color:white; border:none; padding: 10px 18px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9rem; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">${d.watchBtn}</button>
                 </div>
             `).join('');
         } else {
