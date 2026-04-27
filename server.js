@@ -855,14 +855,14 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                     container.innerHTML = '<p style="text-align:center; color:#00ff00;">🔍 Ricerca in corso...</p>';
 
                     try {
-                        const res = await fetch(`/api/admin/replays?search=${encodeURIComponent(search)}`);
+                        const res = await fetch(\`/api/admin/replays?search=\${encodeURIComponent(search)}\`);
                         if (res.status === 401) return location.reload();
                         const data = await res.json();
 
                         if (data.success && data.replays.length > 0) {
                             container.innerHTML = data.replays.map(r => {
                                 const statusHtml = !r.isCompleted ? ' | <span style="color:#ff4d4d;">INTERROTTA</span>' : '';
-                                return `
+                                return \`
                                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; padding:10px 0;">
                                     <div>
                                         <div style="color:#f1c40f; font-weight:bold;">\${r.hostNickname} • \${new Date(r.timestamp).toLocaleString()}</div>
@@ -873,7 +873,7 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                                     </div>
                                     <button class="btn" onclick="window.open('/?replay=\${r._id}', '_blank')" style="padding:5px 10px; font-size:0.8em;">🎬 GUARDA</button>
                                 </div>
-                                `;
+                                \`;
                             }).join('');
                         } else {
                             container.innerHTML = '<p style="text-align:center; color:#888;">Nessun replay trovato.</p>';
