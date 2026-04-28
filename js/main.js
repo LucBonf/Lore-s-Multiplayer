@@ -133,6 +133,28 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         window.addEventListener('resize', handleResize);
         handleResize();
+
+        // --- GESTIONE TASTO INVIO PER INPUT ---
+        const setupEnterKey = (id, action) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        action();
+                    }
+                });
+            }
+        };
+
+        setupEnterKey('login-nickname', () => {
+            const pin = document.getElementById('login-pin');
+            if (pin) pin.focus();
+        });
+        setupEnterKey('login-pin', () => window.eseguiLogin());
+        setupEnterKey('input-room-code', () => window.uniscitiAStanza());
+        setupEnterKey('bet-input', () => window.inviaDichiarazione());
+        setupEnterKey('replays-search-input', () => window.apriReplays(true));
     } catch (err) {
         console.error("Errore fatale in inizializzazione:", err);
         // Fallback estremo: prova a mostrare il login
@@ -145,6 +167,18 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================
 
 let userProfile = null;
+
+function aggiornaWelcomeMessage() {
+    const welcome = document.getElementById('welcome-message');
+    if (welcome && userProfile) {
+        const lang = localStorage.getItem('lucas_lang') || 'it';
+        const d = dictionary[lang];
+        welcome.innerHTML = `
+            ${d.welcome} ${userProfile.nickname}! 
+            <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">${d.wins}: ${userProfile.partiteVinte} | ${d.pts}: ${userProfile.punteggioTotale}</div>
+        `;
+    }
+}
 
 window.eseguiLogin = () => {
     const lang = localStorage.getItem('lucas_lang') || 'it';
@@ -180,15 +214,7 @@ socket.on('login_ok', (profile) => {
     }
 
     // Mostriamo i dati dell'utente nel menu setup
-    const welcome = document.getElementById('welcome-message');
-    if (welcome) {
-        const lang = localStorage.getItem('lucas_lang') || 'it';
-        const d = dictionary[lang];
-        welcome.innerHTML = `
-            ${d.welcome} ${profile.nickname}! 
-            <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">${d.wins}: ${profile.partiteVinte} | ${d.pts}: ${profile.punteggioTotale}</div>
-        `;
-    }
+    aggiornaWelcomeMessage();
 });
 
 
@@ -1072,6 +1098,9 @@ function translatePage(lang) {
            if(d[key]) s.options[i].text = d[key];
        }
     }
+
+    // Aggiornamento dinamico del messaggio di benvenuto se l'utente è loggato
+    aggiornaWelcomeMessage();
 }
 
 // Recupero o Rilevamento lingua all'avvio
