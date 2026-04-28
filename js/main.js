@@ -358,10 +358,12 @@ function renderStepReplay(stepIdx) {
     const tableCards = move.table ? move.table.split('|') : [];
     tableCards.push(move.move);
     
-    fakeState.tavolo = tableCards.filter(s => s).map((s, idx) => {
+    const validCards = tableCards.filter(s => s);
+    fakeState.tavolo = validCards.map((s, idx) => {
         const [val, sem] = s.split('-');
+        const pId = (move.playerIndex - (validCards.length - 1 - idx) + move.numPlayers * 10) % move.numPlayers;
         return {
-            playerId: (idx === tableCards.length - 1) ? move.playerIndex : -1,
+            playerId: pId,
             card: { valore: val, seme: sem, forza: 0 }
         };
     });
