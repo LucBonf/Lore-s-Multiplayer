@@ -97,7 +97,8 @@ const matchLogSchema = new mongoose.Schema({
     history: String,            // Carte già uscite nel giro
     voidSuits: String,          // Info sui semi finiti (es: "P1:Spade,P2:Coppe")
     move: String,               // Carta giocata
-    wonTrick: Boolean           // Ha vinto la presa?
+    wonTrick: Boolean,          // Ha vinto la presa? (Retrocompatibilità)
+    trickWinnerId: Number       // ID del vincitore (impostato solo sull'ultima mossa del giro)
 });
 
 // INDICI PER PERFORMANCE (Log e Statistiche)
@@ -1573,7 +1574,8 @@ io.on('connection', (socket) => {
             const isHumanGame = game.players.some(p => p.isHuman);
             const LogModel = isHumanGame ? HumanMatchLog : MatchLog;
 
-            game.tavolo.forEach((giocata, indexTavolo) => {
+            for (let indexTavolo = 0; indexTavolo < game.tavolo.length; indexTavolo++) {
+                const giocata = game.tavolo[indexTavolo];
                 const player = game.players[giocata.playerId];
                 const card = giocata.card;
                 
@@ -1585,15 +1587,20 @@ io.on('connection', (socket) => {
                 // Costruiamo le mani di tutti i giocatori in questo momento
                 const currentAllHands = game.players.map((p, pIdx) => {
                     const handCards = p.mano.filter(c => !c.giocata).map(c => `${c.valore}-${c.seme}`);
-                    if (pIdx === giocata.playerId) {
-                        handCards.push(`${card.valore}-${card.seme}`);
+                    // Aggiungiamo le carte dei giocatori che devono ancora giocare in questo giro
+                    for (let j = indexTavolo + 1; j < game.tavolo.length; j++) {
+                        if (game.tavolo[j].playerId === pIdx) {
+                            handCards.push(`${game.tavolo[j].card.valore}-${game.tavolo[j].card.seme}`);
+                        }
                     }
                     return handCards.join('|');
                 });
 
                 const tablePreMossa = game.tavolo.slice(0, indexTavolo).map(t => `${t.card.valore}-${t.card.seme}`).join('|');
+                const isLastCard = (indexTavolo === game.tavolo.length - 1);
 
                 const logEntry = new LogModel({
+                    timestamp: new Date(Date.now() + indexTavolo), // Ordine cronologico garantito
                     matchId: game.matchId,
                     hostNickname: game.hostNickname || "Sconosciuto",
                     numPlayers: game.numPlayers,
@@ -1612,10 +1619,11 @@ io.on('connection', (socket) => {
                     history: historyStr,
                     voidSuits: voidStr,
                     move: `${card.valore}-${card.seme}`,
-                    wonTrick: (giocata.playerId === vincitore.playerId)
+                    wonTrick: (giocata.playerId === vincitore.playerId),
+                    trickWinnerId: isLastCard ? vincitore.playerId : undefined
                 });
-                logEntry.save().catch(e => console.error("Errore log AI:", e));
-            });
+                await logEntry.save().catch(e => console.error("Errore log AI:", e));
+            }
         }
 
         game.players[vincitore.playerId].preseFatte++;

@@ -381,7 +381,23 @@ function renderStepReplay(stepIdx) {
     });
 
     // Se ha vinto la presa, mostriamo il badge
-    if (move.wonTrick) {
+    const isNewReplay = currentReplayMoves.some(m => m.trickWinnerId !== undefined);
+    
+    if (isNewReplay) {
+        if (move.trickWinnerId !== undefined) {
+            setTimeout(() => {
+                const playerBlock = document.querySelector(`.player-block[data-player-id="${move.trickWinnerId}"]`);
+                if (playerBlock && !playerBlock.querySelector('.winner-badge')) {
+                    const badge = document.createElement('div');
+                    badge.className = 'winner-badge';
+                    badge.innerText = '🏆';
+                    playerBlock.appendChild(badge);
+                    setTimeout(() => badge.remove(), 1500);
+                }
+            }, 300);
+        }
+    } else if (move.wonTrick) {
+        // Fallback per vecchi replay
         setTimeout(() => {
             const playerBlock = document.querySelector(`.player-block[data-player-id="${move.playerIndex}"]`);
             if (playerBlock && !playerBlock.querySelector('.winner-badge')) {
