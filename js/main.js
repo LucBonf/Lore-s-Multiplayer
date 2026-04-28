@@ -301,6 +301,8 @@ window.chiudiReplayViewer = () => {
     isReplayMode = false;
     document.getElementById('replay-controls').style.display = 'none';
     switchSection('setup-menu');
+    // Riapri direttamente la lista dei replay
+    apriReplays();
 };
 
 function renderStepReplay(stepIdx) {
@@ -762,6 +764,11 @@ window.inviaDichiarazione = () => {
 };
 
 window.esciDallaPartita = () => {
+    // Se siamo in un replay, il tasto ESCI chiude il replay e riapre la lista
+    if (isReplayMode) {
+        chiudiReplayViewer();
+        return;
+    }
     console.log("Uscita dalla partita (Fast Exit)...");
     sessionStorage.removeItem('lucas_room');
     socket.emit('esci_partita');
