@@ -102,7 +102,11 @@
     <!-- Overlay Controlli Replay -->
     <div id="replay-controls" style="display:none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 5000; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 15px; border: 2px solid #3498db; gap: 15px; align-items: center; box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);">
         <button onclick="replayIndietro()" style="background: #2c3e50; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;">⬅️ <span data-i18n="replayPrev">Indietro</span></button>
-        <div id="replay-step-info" style="color: white; font-weight: bold; min-width: 80px; text-align: center;">0 / 0</div>
+        <div id="replay-step-info" style="color: white; font-weight: bold; min-width: 120px; text-align: center; display: flex; align-items: center; gap: 8px; justify-content: center;">
+            <input type="number" id="replay-input-step" min="1" onchange="vaiAStepReplay(this.value)" style="width: 55px; background: #1a1a1a; border: 1px solid #3498db; color: white; border-radius: 5px; text-align: center; font-weight: bold; outline: none; padding: 5px 0;">
+            <span>/</span>
+            <span id="replay-total-steps">0</span>
+        </div>
         <button onclick="replayAvanti()" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><span data-i18n="replayNext">Avanti</span> ➡️</button>
     </div>
 
@@ -213,12 +217,11 @@
             </div>
 
             <div id="classifica-finale-container"
-                style="display:none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 40px; border-radius: 15px; text-align: center; border: 2px solid #f1c40f; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 3000;">
-                <h1 data-i18n="gameEnded" style="color: #f1c40f; margin-top: 0; font-size: 2.5rem;">PARTITA FINITA!</h1>
-                <div id="classifica-finale-lista" style="font-size: 1.5rem; line-height: 2; margin-bottom: 30px;"></div>
+                style="display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.92); padding: 30px; border-radius: 15px; text-align: center; border: 2px solid #f1c40f; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 3000; max-height: 90vh; width: 90%; max-width: 480px; display: none; flex-direction: column;">
+                <h1 data-i18n="gameEnded" style="color: #f1c40f; margin-top: 0; font-size: 2rem; flex-shrink: 0;">PARTITA FINITA!</h1>
+                <div id="classifica-finale-lista" style="font-size: 1.3rem; line-height: 1.9; overflow-y: auto; flex: 1; margin-bottom: 20px; padding-right: 5px;"></div>
                 <button data-i18n="backToLobby" onclick="location.reload()"
-                    style="background: #3498db; color: white; padding: 15px 30px; font-size: 1.2rem; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">TORNA
-                    ALLA LOBBY</button>
+                    style="background: #3498db; color: white; padding: 15px 30px; font-size: 1.1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; flex-shrink: 0; width: 100%;">🏠 TORNA ALLA HOME</button>
             </div>
 
         </div>

@@ -35,7 +35,11 @@ function switchSection(activeId) {
         sections.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                el.style.display = (id === activeId) ? 'block' : 'none';
+                if (id === activeId) {
+                    el.style.display = (id === 'classifica-finale-container') ? 'flex' : 'block';
+                } else {
+                    el.style.display = 'none';
+                }
             }
         });
 
@@ -283,6 +287,15 @@ window.avviaReplay = async (matchId) => {
     }
 };
 
+window.vaiAStepReplay = (val) => {
+    let step = parseInt(val);
+    if (isNaN(step)) return;
+    if (step < 1) step = 1;
+    if (step > currentReplayMoves.length) step = currentReplayMoves.length;
+    currentReplayStep = step - 1;
+    renderStepReplay(currentReplayStep);
+};
+
 window.replayAvanti = () => {
     if (currentReplayStep < currentReplayMoves.length - 1) {
         currentReplayStep++;
@@ -310,7 +323,13 @@ function renderStepReplay(stepIdx) {
     const lang = localStorage.getItem('lucas_lang') || 'it';
     const d = dictionary[lang];
     
-    document.getElementById('replay-step-info').innerText = `${stepIdx + 1} / ${currentReplayMoves.length}`;
+    const inputStep = document.getElementById('replay-input-step');
+    if (inputStep) {
+        inputStep.value = stepIdx + 1;
+        inputStep.max = currentReplayMoves.length;
+    }
+    const totalSteps = document.getElementById('replay-total-steps');
+    if (totalSteps) totalSteps.innerText = currentReplayMoves.length;
     
     const fakeState = {
         tuttiGiocatori: [],
@@ -337,25 +356,33 @@ function renderStepReplay(stepIdx) {
             isHuman: isMover ? move.isHuman : false
         });
     }
-    
+    const REPLAY_PESO_SEME = { "Ori": 400, "Spade": 300, "Coppe": 200, "Bastoni": 100 };
+    const REPLAY_PESO_VALORE = { "Asso": 12, "3": 11, "Re": 10, "Cavallo": 9, "Fante": 8, "7": 7, "6": 6, "5": 5, "4": 4, "2": 3 };
+
     if (move.allHands && move.allHands.length > 0) {
         move.allHands.forEach((hStr, i) => {
             if (hStr && fakeState.tuttiGiocatori[i]) {
-                fakeState.tuttiGiocatori[i].mano = hStr.split('|').map(s => {
+                const hand = hStr.split('|').map(s => {
                     const [val, sem] = s.split('-');
-                    return { valore: val, seme: sem, giocata: false, forza: 0 };
+                    const forza = (REPLAY_PESO_SEME[sem] || 0) + (REPLAY_PESO_VALORE[val] || 0);
+                    return { valore: val, seme: sem, giocata: false, forza: forza };
                 });
+                fakeState.tuttiGiocatori[i].mano = hand;
+                if (move.roundCards === 1 && hand.length > 0) {
+                    fakeState.tuttiGiocatori[i].cartaFronte = hand[0];
+                }
             }
         });
     } else if (move.hand) {
-        // Fallback vecchio formato (solo chi muove ha la mano visibile)
         if (fakeState.tuttiGiocatori[move.playerIndex]) {
             fakeState.tuttiGiocatori[move.playerIndex].mano = move.hand.split('|').map(s => {
                 const [val, sem] = s.split('-');
-                return { valore: val, seme: sem, giocata: false, forza: 0 }; 
+                const forza = (REPLAY_PESO_SEME[sem] || 0) + (REPLAY_PESO_VALORE[val] || 0);
+                return { valore: val, seme: sem, giocata: false, forza: forza }; 
             });
         }
     }
+
     
     const tableCards = move.table ? move.table.split('|') : [];
     tableCards.push(move.move);
@@ -364,9 +391,10 @@ function renderStepReplay(stepIdx) {
     fakeState.tavolo = validCards.map((s, idx) => {
         const [val, sem] = s.split('-');
         const pId = (move.playerIndex - (validCards.length - 1 - idx) + move.numPlayers * 10) % move.numPlayers;
+        const forza = (REPLAY_PESO_SEME[sem] || 0) + (REPLAY_PESO_VALORE[val] || 0);
         return {
             playerId: pId,
-            card: { valore: val, seme: sem, forza: 0 }
+            card: { valore: val, seme: sem, forza: forza }
         };
     });
     
@@ -459,7 +487,10 @@ function renderGiocatori(data) {
     cardsOnTable.innerHTML = '';
 
     const numPlayers = data.tuttiGiocatori.length;
-    const mioIndice = data.tuttiGiocatori.findIndex(p => p.socketId === socket.id);
+    let mioIndice = data.tuttiGiocatori.findIndex(p => p.socketId === socket.id);
+    
+    // Sicurezza: se non siamo tra i giocatori (osservatore o sync error), evitiamo lo slittamento
+    if (mioIndice === -1) mioIndice = 0;
     const lang = localStorage.getItem('lucas_lang') || 'it';
     const d = dictionary[lang];
 

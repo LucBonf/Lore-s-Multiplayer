@@ -73,7 +73,7 @@ const bannedUserSchema = new mongoose.Schema({
 });
 const BannedUser = mongoose.model('BannedUser', bannedUserSchema);
 
- 
+
 // --- NUOVO: Schema per Training AI (Capped Collection 25MB) ---
 const matchLogSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
@@ -133,7 +133,7 @@ async function checkWithAI(nickname) {
 
         const data = await response.json();
         const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase();
-        
+
         console.log(`🤖 IA Mod: [${nickname}] -> ${aiResponse}`);
         return aiResponse === "REJECT";
     } catch (e) {
@@ -145,10 +145,10 @@ async function checkWithAI(nickname) {
 let dbConnected = false;
 if (process.env.MONGODB_URI) {
     mongoose.connect(process.env.MONGODB_URI)
-        .then(async () => { 
-            console.log('🔗 Connesso a MongoDB Atlas!'); 
-            dbConnected = true; 
-            
+        .then(async () => {
+            console.log('🔗 Connesso a MongoDB Atlas!');
+            dbConnected = true;
+
             // Inizializza collezioni Capped (Limite spazio)
             try {
                 // LOG AI (100MB - Ripristinato limite per evitare superamento piano gratuito)
@@ -165,7 +165,7 @@ if (process.env.MONGODB_URI) {
                     try {
                         await mongoose.connection.db.command({ collMod: 'matchlogs', cappedSize: 100 * 1024 * 1024 });
                         console.log("📦 Collezione 'matchlogs' ridimensionata a 100MB.");
-                    } catch(e) {}
+                    } catch (e) { }
                 }
 
                 // REPORT BUG (5MB - 1000 report)
@@ -181,7 +181,7 @@ if (process.env.MONGODB_URI) {
                     try {
                         await mongoose.connection.db.command({ convertToCapped: 'reports', size: 5 * 1024 * 1024 });
                         console.log("📦 Collezione 'reports' convertita in Capped.");
-                    } catch(e) {}
+                    } catch (e) { }
                 }
 
                 // HUMAN LOGS (10MB - Dati umani separati)
@@ -197,14 +197,14 @@ if (process.env.MONGODB_URI) {
                     try {
                         await mongoose.connection.db.command({ convertToCapped: 'humanlogs', size: 10 * 1024 * 1024 });
                         console.log("📦 Collezione 'humanlogs' convertita in Capped.");
-                    } catch(e) {}
+                    } catch (e) { }
                 }
             } catch (e) { console.log("Nota: Inizializzazione collezioni già completata."); }
 
             // --- PULIZIA SPECIFICA RICHIESTA: Elimina utenti offensivi e bestemmie ---
             try {
                 // Rimuove account che contengono parole inaccettabili (cazzo, hezbollah, o radici di bestemmie)
-                const deletedOffensive = await User.deleteMany({ 
+                const deletedOffensive = await User.deleteMany({
                     nickname: { $regex: new RegExp("(cazzo|hezbollah|diocane|porcodio|madonn|dioporco|diop|mailona26|polcodio|LaMammaDiLuca)", "i") }
                 });
                 if (deletedOffensive.deletedCount > 0) {
@@ -228,7 +228,7 @@ const authAdmin = (req, res, next) => {
     if (authCookie === ADMIN_KEY) {
         return next();
     }
-    
+
     // Se è una chiamata API, restituisci un errore JSON invece dell'HTML di login
     if (req.path.startsWith('/api/')) {
         return res.status(401).json({ success: false, error: "Sessione scaduta o non autorizzata. Ricarica la pagina." });
@@ -270,7 +270,7 @@ app.post('/admin-login-verify', express.urlencoded({ extended: true }), (req, re
     const code = req.body.code ? req.body.code.trim() : "";
     const adminKey = ADMIN_KEY ? ADMIN_KEY.trim() : "";
     const returnUrl = req.body.returnUrl || '/stato-allenamento-777';
-    
+
     if (code === adminKey) {
         res.cookie('admin_session', adminKey, { maxAge: 86400000, httpOnly: true, path: '/' }); // Scade in 24h
         res.redirect(returnUrl);
@@ -285,13 +285,13 @@ app.get('/api/admin/find-user/:query', authAdmin, async (req, res) => {
     try {
         const query = req.params.query;
         // Cerca per nickname (anche parziale/regex) o per uniqueCode
-        const users = await User.find({ 
+        const users = await User.find({
             $or: [
-                { nickname: { $regex: new RegExp(query, "i") } }, 
+                { nickname: { $regex: new RegExp(query, "i") } },
                 { uniqueCode: query }
-            ] 
+            ]
         }).limit(20);
-        
+
         if (users.length === 0) return res.json({ success: false, error: "Nessun utente trovato" });
         res.json({ success: true, users });
     } catch (e) {
@@ -302,10 +302,10 @@ app.get('/api/admin/find-user/:query', authAdmin, async (req, res) => {
 // --- NUOVA ROTTA: LISTA COMPLETA UTENTI (OTTIMIZZATA CON INDICI) ---
 app.get('/api/admin/all-users', authAdmin, async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
-    
+
     try {
         // Grazie agli indici aggiunti prima, questa query è velocissima anche con molti utenti
-        const users = await User.find().sort({ lastLogin: -1 }).limit(1000); 
+        const users = await User.find().sort({ lastLogin: -1 }).limit(1000);
         res.json({ success: true, users });
     } catch (e) {
         console.error("Errore rotta all-users:", e);
@@ -319,24 +319,34 @@ app.get('/api/replays/:uniqueCode', async (req, res) => {
     try {
         const { search } = req.query;
         const filter = { uniqueCode: req.params.uniqueCode };
-        
+
         // Se c'è una ricerca, cerchiamo tra i nickname presenti nel match
         if (search) {
             filter.nickname = new RegExp(search, 'i');
         }
 
+        // --- NUOVO: Filtro Qualità Replay ---
+        // Se non è un admin, mostriamo solo i replay salvati col nuovo sistema sequenziale
+        // Il nuovo sistema garantisce la presenza di 'trickWinnerId' in almeno una mossa del match.
+        const isAdmin = req.cookies['admin_session'] === ADMIN_KEY;
+        if (!isAdmin) {
+            filter.trickWinnerId = { $exists: true };
+        }
+
         const replays = await HumanMatchLog.aggregate([
             { $match: filter },
             { $sort: { timestamp: -1 } },
-            { $group: {
-                _id: "$matchId",
-                timestamp: { $first: "$timestamp" },
-                numPlayers: { $first: "$numPlayers" },
-                hostNickname: { $first: "$hostNickname" },
-                humanPlayers: { $addToSet: { $cond: [ "$isHuman", "$nickname", "$$REMOVE" ] } },
-                finalScores: { $first: "$finalScores" },
-                isCompleted: { $first: "$isCompleted" }
-            }},
+            {
+                $group: {
+                    _id: "$matchId",
+                    timestamp: { $first: "$timestamp" },
+                    numPlayers: { $first: "$numPlayers" },
+                    hostNickname: { $first: "$hostNickname" },
+                    humanPlayers: { $addToSet: { $cond: ["$isHuman", "$nickname", "$$REMOVE"] } },
+                    finalScores: { $first: "$finalScores" },
+                    isCompleted: { $first: "$isCompleted" }
+                }
+            },
             { $sort: { timestamp: -1 } },
             { $limit: 20 }
         ]);
@@ -359,15 +369,17 @@ app.get('/api/admin/replays', authAdmin, async (req, res) => {
         const replays = await HumanMatchLog.aggregate([
             { $match: filter },
             { $sort: { timestamp: -1 } },
-            { $group: {
-                _id: "$matchId",
-                timestamp: { $first: "$timestamp" },
-                numPlayers: { $first: "$numPlayers" },
-                hostNickname: { $first: "$hostNickname" },
-                humanPlayers: { $addToSet: { $cond: [ "$isHuman", "$nickname", "$$REMOVE" ] } },
-                finalScores: { $first: "$finalScores" },
-                isCompleted: { $first: "$isCompleted" }
-            }},
+            {
+                $group: {
+                    _id: "$matchId",
+                    timestamp: { $first: "$timestamp" },
+                    numPlayers: { $first: "$numPlayers" },
+                    hostNickname: { $first: "$hostNickname" },
+                    humanPlayers: { $addToSet: { $cond: ["$isHuman", "$nickname", "$$REMOVE"] } },
+                    finalScores: { $first: "$finalScores" },
+                    isCompleted: { $first: "$isCompleted" }
+                }
+            },
             { $sort: { timestamp: -1 } },
             { $limit: 100 } // Limite più alto per admin
         ]);
@@ -417,7 +429,7 @@ app.get('/api/admin/ban-user/:uniqueCode', authAdmin, async (req, res) => {
 
         // Elimina l'utente
         await User.deleteOne({ uniqueCode: code });
-        
+
         res.json({ success: true });
     } catch (e) {
         res.json({ success: false, error: e.message });
@@ -512,7 +524,7 @@ app.get('/stato-segreta-report-777', authAdmin, async (req, res) => {
 app.post('/reset-turbo-logs-777', authAdmin, express.json(), async (req, res) => {
     try {
         if (!dbConnected) return res.status(500).json({ ok: false, msg: "DB non connesso" });
-        
+
         console.log("⚠️ RESET RICHIESTO: Svuotamento log Turbo...");
         await mongoose.connection.db.collection('matchlogs').drop();
         await mongoose.connection.db.createCollection('matchlogs', {
@@ -520,7 +532,7 @@ app.post('/reset-turbo-logs-777', authAdmin, express.json(), async (req, res) =>
             size: 100 * 1024 * 1024,
             max: 400000
         });
-        
+
         res.json({ ok: true });
     } catch (err) {
         console.error("Errore reset turbo:", err);
@@ -532,7 +544,7 @@ app.post('/reset-turbo-logs-777', authAdmin, express.json(), async (req, res) =>
 app.get('/scarica-dataset-lucas-777', authAdmin, async (req, res) => {
     try {
         if (!dbConnected) return res.status(500).send("DB non connesso");
-        
+
         const type = req.query.type || 'turbo';
         const Model = (type === 'human') ? HumanMatchLog : MatchLog;
         const filename = (type === 'human') ? 'lucas_HUMAN_data.csv' : 'lucas_TURBO_data.csv';
@@ -566,7 +578,7 @@ app.get('/scarica-dataset-lucas-777', authAdmin, async (req, res) => {
                 l.move,
                 l.wonTrick ? 1 : 0
             ].join(',') + "\n";
-            
+
             res.write(row);
         });
 
@@ -583,6 +595,30 @@ app.get('/scarica-dataset-lucas-777', authAdmin, async (req, res) => {
     } catch (err) {
         console.error("Errore generale download CSV:", err);
         if (!res.headersSent) res.status(500).send("Errore generazione CSV");
+    }
+});
+
+// --- NUOVA ROTTA SEGRETA: ELIMINA REPLAY SINGOLO ---
+app.get('/delete-replay-777/:matchId', authAdmin, async (req, res) => {
+    if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
+    try {
+        const matchId = req.params.matchId;
+        const result = await HumanMatchLog.deleteMany({ matchId: matchId });
+        res.json({ success: true, deletedCount: result.deletedCount });
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
+// --- NUOVA ROTTA SEGRETA: PULIZIA MASSIVA REPLAY OBSOLETI ---
+app.get('/clean-old-replays-777', authAdmin, async (req, res) => {
+    if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
+    try {
+        // Elimina tutti i log che non hanno il campo trickWinnerId (vecchio sistema)
+        const result = await HumanMatchLog.deleteMany({ trickWinnerId: { $exists: false } });
+        res.json({ success: true, deletedCount: result.deletedCount });
+    } catch (e) {
+        res.json({ success: false, error: e.message });
     }
 });
 
@@ -1037,7 +1073,7 @@ const lobbies = {};
 
 io.on('connection', (socket) => {
     umaniConnessi++;
-    
+
     // Identificazione immediata tramite query handshake
     if (socket.handshake.query && socket.handshake.query.role === 'admin') {
         socket.isAdminObs = true;
@@ -1050,7 +1086,7 @@ io.on('connection', (socket) => {
         if (dati.nickname) {
             // Rimuove spazi, punti e simboli per vedere se l'utente sta barando (es: "d.i.o c.a.n.e" diventa "diocane")
             const normalizedNickname = dati.nickname.toLowerCase().replace(/[^a-z0-9]/gi, '');
-            
+
             if (filter.check(dati.nickname) || filter.check(normalizedNickname)) {
                 return socket.emit('login_err', 'Per favore, usa un nickname rispettoso!');
             }
@@ -1154,7 +1190,7 @@ io.on('connection', (socket) => {
         if (!dbConnected) return socket.emit('classifica_dati', { top10: [], userRank: null });
         try {
             let top10 = await User.find().sort({ punteggioTotale: -1 }).limit(10);
-            
+
             let userRank = null;
             if (socket.userUniqueCode) {
                 const user = await User.findOne({ uniqueCode: socket.userUniqueCode });
@@ -1183,16 +1219,16 @@ io.on('connection', (socket) => {
         try {
             if (!dati || !dati.nome) return socket.emit('errore', "Dati lobby non validi.");
             const code = Math.random().toString(36).substring(2, 6).toUpperCase();
-            lobbies[code] = { 
-                host: socket.id, 
-                parametri: dati, 
-                giocatori: [{ 
-                    id: socket.id, 
-                    nome: dati.nome, 
-                    token: dati.token, 
+            lobbies[code] = {
+                host: socket.id,
+                parametri: dati,
+                giocatori: [{
+                    id: socket.id,
+                    nome: dati.nome,
+                    token: dati.token,
                     uniqueCode: dati.uniqueCode,
-                    elo: socket.userElo || 1000 
-                }] 
+                    elo: socket.userElo || 1000
+                }]
             };
             socket.join(code);
             socket.roomCode = code;
@@ -1246,12 +1282,12 @@ io.on('connection', (socket) => {
                     return socket.emit('errore', "La lobby è piena!");
                 }
                 if (lobby.giocatori.find(p => p.id === socket.id)) return;
-                lobby.giocatori.push({ 
-                    id: socket.id, 
-                    nome: dati.nome, 
-                    token: dati.token, 
+                lobby.giocatori.push({
+                    id: socket.id,
+                    nome: dati.nome,
+                    token: dati.token,
                     uniqueCode: dati.uniqueCode,
-                    elo: socket.userElo || 1000 
+                    elo: socket.userElo || 1000
                 });
                 socket.join(dati.code);
                 socket.roomCode = dati.code;
@@ -1324,24 +1360,24 @@ io.on('connection', (socket) => {
                         // PARTITA IN CORSO: Aspettiamo un po' prima di trasformare in CPU (grace period per refresh)
                         const game = lobby.gameInstance;
                         const playerIndex = game.players.findIndex(p => p.id === socket.id);
-                        
+
                         if (playerIndex !== -1) {
                             const player = game.players[playerIndex];
                             const playerToken = player.token;
                             player.id = null; // Segnala disconnessione temporanea nel gioco
-                            
+
                             // Segnala disconnessione anche nella lista giocatori della lobby
                             if (lobby.giocatori[index]) {
                                 lobby.giocatori[index].id = null;
                             }
-                            
+
                             // Opzionale: notifichiamo gli altri che il giocatore è in attesa di riconnessione
                             inviaStato(code);
 
                             setTimeout(() => {
                                 const currentLobby = lobbies[code];
                                 if (!currentLobby || !currentLobby.gameInstance) return;
-                                
+
                                 const p = currentLobby.gameInstance.players.find(pl => pl.token === playerToken);
                                 // Se dopo il timeout non si è riconnesso (id è ancora null) ed è ancora umano
                                 if (p && p.id === null && p.isHuman) {
@@ -1350,7 +1386,7 @@ io.on('connection', (socket) => {
                                     inviaStato(code);
 
                                     // Il Bot muove solo se è il suo turno
-                                    if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p) && 
+                                    if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p) &&
                                         currentLobby.gameInstance.tavolo.length < currentLobby.gameInstance.numPlayers) {
                                         gestisciIA(code);
                                     }
@@ -1372,7 +1408,7 @@ io.on('connection', (socket) => {
             if (socket.isAdminObs) {
                 osservatoriAdmin = Math.max(0, osservatoriAdmin - 1);
             }
-            
+
             const umaniReali = umaniConnessi - osservatoriAdmin;
             if (umaniReali <= 0) {
                 setTimeout(avviaAutoTraining, 5000);
@@ -1384,7 +1420,7 @@ io.on('connection', (socket) => {
         const lobby = lobbies[code];
         if (!lobby || lobby.gameInstance) return;
         lobby.gameInstance = new LucasGame(parseInt(lobby.parametri.numGiocatori));
-        
+
         // 1. Identifichiamo gli umani e calcoliamo il loro ELO medio
         const humanElos = [];
         lobby.gameInstance.players.forEach((p, i) => {
@@ -1426,12 +1462,12 @@ io.on('connection', (socket) => {
                     p.aiParams = { agg: 25, cons: 85, sca: 10 };
                     p.aiVariant = "AI_Esperto";
                 }
-                
+
                 // Aggiungiamo un 10% di variazione casuale per rendere le partite imprevedibili (Umano-like)
                 p.aiParams.agg = Math.max(0, Math.min(100, p.aiParams.agg + (Math.floor(Math.random() * 21) - 10)));
                 p.aiParams.cons = Math.max(0, Math.min(100, p.aiParams.cons + (Math.floor(Math.random() * 21) - 10)));
                 p.aiParams.sca = Math.max(0, Math.min(100, p.aiParams.sca + (Math.floor(Math.random() * 21) - 10)));
-                
+
                 p.nome = p.aiVariant.replace("AI_", "Bot "); // Es: "Bot Intermedio"
             }
         });
@@ -1439,14 +1475,14 @@ io.on('connection', (socket) => {
         lobby.gameInstance.distribuisci();
         // Genera un ID unico per la partita (usato per i log)
         lobby.gameInstance.matchId = "M-" + Math.random().toString(36).substring(2, 9).toUpperCase();
-        
+
         // Identifichiamo il nickname dell'Host (chi ha creato la stanza)
         const hostPlayer = lobby.giocatori.find(p => p.id === lobby.host);
         lobby.gameInstance.hostNickname = hostPlayer ? hostPlayer.nome : "Sconosciuto";
 
         inviaStato(code);
         gestisciIA(code);
-    } 
+    }
 
     socket.on('bug_report', async (testo) => {
         try {
@@ -1454,7 +1490,7 @@ io.on('connection', (socket) => {
             const lobby = Object.values(lobbies).find(l => l.giocatori.some(p => p.id === socket.id));
             const matchId = lobby?.gameInstance?.matchId || null;
             const roomCode = lobby ? Object.keys(lobbies).find(key => lobbies[key] === lobby) : null;
-            
+
             const newReport = new Report({
                 nickname: socket.userNickname || 'Anonimo',
                 testo: testo.substring(0, 500),
@@ -1494,15 +1530,15 @@ io.on('connection', (socket) => {
 
             game.players[game.turnoAttuale].dichiarazione = val;
             game.sommaScommesse += val;
-            
+
             // Avanza il turno solo se la dichiarazione è stata salvata con successo
             game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
-            
+
             // Passa alla fase di gioco SOLO se TUTTI hanno dichiarato
             if (game.players.every(p => p.dichiarazione !== "-")) {
                 game.fase = "gioco";
             }
-            
+
             inviaStato(code);
             gestisciIA(code);
         } catch (e) {
@@ -1578,7 +1614,7 @@ io.on('connection', (socket) => {
                 const giocata = game.tavolo[indexTavolo];
                 const player = game.players[giocata.playerId];
                 const card = giocata.card;
-                
+
                 // Se non ha risposto al seme, registriamo il "Void"
                 if (card.seme !== semeUscita && !player.voidSuits.includes(semeUscita)) {
                     player.voidSuits.push(semeUscita);
@@ -1657,7 +1693,7 @@ io.on('connection', (socket) => {
                         try {
                             // Recuperiamo i profili attuali per avere l'ELO precedente
                             const userProfiles = await User.find({ uniqueCode: { $in: humanPlayers.map(p => p.uniqueCode) } });
-                            
+
                             // Mappa dei profili per accesso rapido
                             const profileMap = {};
                             userProfiles.forEach(u => profileMap[u.uniqueCode] = u);
@@ -1688,7 +1724,7 @@ io.on('connection', (socket) => {
                                 // BONUS PRECISIONE: +2 punti se hai azzeccato molte scommesse
                                 // (Diciamo se hai fatto almeno l'80% dei punti tramite bonus scommessa)
                                 // Questo premia la "bravura" oltre alla fortuna delle carte
-                                const accuracyRatio = p.punti > 0 ? (p.preseFatte === p.dichiarazione ? 1 : 0) : 0; 
+                                const accuracyRatio = p.punti > 0 ? (p.preseFatte === p.dichiarazione ? 1 : 0) : 0;
                                 // Nota: qui potremmo affinare tenendo traccia dei giri vinti, ma per ora usiamo il finale
                                 if (p.preseFatte === p.dichiarazione) eloChange += 2;
 
@@ -1697,9 +1733,9 @@ io.on('connection', (socket) => {
                                 await User.updateOne(
                                     { uniqueCode: p.uniqueCode },
                                     {
-                                        $inc: { 
-                                            partiteGiocate: 1, 
-                                            partiteVinte: isWinner, 
+                                        $inc: {
+                                            partiteGiocate: 1,
+                                            partiteVinte: isWinner,
                                             punteggioTotale: p.punti,
                                             elo: eloChange
                                         },
@@ -1714,7 +1750,7 @@ io.on('connection', (socket) => {
                 // Aggiorniamo i log del match con la classifica finale per i replay
                 if (dbConnected) {
                     const simplifiedScores = classificaFinale.map(c => ({ nome: c.nome, punti: c.punti }));
-                    HumanMatchLog.updateMany({ matchId: game.matchId }, { $set: { finalScores: simplifiedScores, isCompleted: true } }).catch(e => {});
+                    HumanMatchLog.updateMany({ matchId: game.matchId }, { $set: { finalScores: simplifiedScores, isCompleted: true } }).catch(e => { });
                 }
 
                 io.to(code).emit('fine_partita', classificaFinale);
@@ -1914,7 +1950,7 @@ async function avviaAutoTraining() {
     if (!dbConnected) return;
 
     isSimulando = true;
-    
+
     // Eseguiamo solo 2 partite contemporaneamente per non appesantire troppo il server
     try {
         await Promise.all([
@@ -1953,7 +1989,7 @@ async function simulazionePartitaSingola() {
     const numPlayers = 4;
     const game = new LucasGame(numPlayers);
     game.matchId = "TURBO-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-    
+
     // Inizializza i bot
     game.players.forEach((p, i) => {
         p.nome = `Bot-${i}`;
@@ -1970,7 +2006,7 @@ async function simulazionePartitaSingola() {
         while (game.fase === "scommesse") {
             const p = game.players[game.turnoAttuale];
             const qta = game.sequenzaTurni[game.indiceGiro];
-            
+
             // Logica Bot Scommessa (semplificata per velocità)
             let powerScore = 0;
             p.mano.forEach(c => {
@@ -2004,7 +2040,7 @@ async function simulazionePartitaSingola() {
             let cartaDaGiocare;
             const wantsToWin = p.preseFatte < p.dichiarazione;
             const { agg, cons, sca } = p.aiParams || { agg: 50, cons: 50, sca: 50 };
-            
+
             // --- NUOVO: CROWD FACTOR (Pressione del numero giocatori) ---
             // Più giocatori ci sono, più è probabile che un carico venga "tagliato" da una briscola.
             const crowdFactor = game.numPlayers / 4; // 3 players = 0.75, 8 players = 2.0
@@ -2016,8 +2052,8 @@ async function simulazionePartitaSingola() {
                 if (game.tavolo.length === 0) {
                     if (wantsToWin) {
                         // In tavoli affollati, aprire con un carico è rischioso (rischio taglio alto)
-                        const riskThreshold = 30 * crowdFactor; 
-                        
+                        const riskThreshold = 30 * crowdFactor;
+
                         let cartaRegnante = manoV.find(c => {
                             const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
                             return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
@@ -2078,11 +2114,11 @@ async function simulazionePartitaSingola() {
                             if (briscole.length > 0) {
                                 const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
                                 const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
-                                
+
                                 if (briscoleUtili.length > 0) {
                                     const siamoUltimi = numMancanti === 0;
                                     const valoreTavolo = game.tavolo.reduce((acc, curr) => acc + (PESO_VALORE[curr.card.valore] >= 10 ? 2 : 1), 0);
-                                    
+
                                     // Valutiamo se il gioco vale la candela (il taglio)
                                     // Se mancano molte persone, il rischio che qualcuno controtagli con un Oro più alto è alto
                                     const rischioControtaglio = numMancanti * 0.2 * crowdFactor;
