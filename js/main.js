@@ -357,10 +357,40 @@ function renderStepReplay(stepIdx) {
     const totalSteps = document.getElementById('replay-total-steps');
     if (totalSteps) totalSteps.innerText = currentReplayMoves.length;
     
+    // --- NOVITÀ: Ricostruzione stato Round per tutti i giocatori ---
+    const roundStates = Array.from({ length: move.numPlayers }, () => ({ decl: "?", prs: 0 }));
+    let startR = stepIdx;
+    while(startR > 0 && currentReplayMoves[startR-1].roundCards === move.roundCards) startR--;
+    let endR = stepIdx;
+    while(endR < currentReplayMoves.length - 1 && currentReplayMoves[endR+1].roundCards === move.roundCards) endR++;
+
+    let sommaScommesseRound = 0;
+    let tutteDichiarazioniTrovate = true;
+
+    for (let i = 0; i < move.numPlayers; i++) {
+        // Cerca dichiarazione
+        for(let j = startR; j <= endR; j++) {
+            if (currentReplayMoves[j].playerIndex === i) {
+                roundStates[i].decl = currentReplayMoves[j].dichiarazione;
+                break;
+            }
+        }
+        if (roundStates[i].decl === "?") tutteDichiarazioniTrovate = false;
+        else sommaScommesseRound += roundStates[i].decl;
+
+        // Conta prese vinte nel round fino a stepIdx-1
+        let pCount = 0;
+        for(let j = startR; j < stepIdx; j++) {
+            if (currentReplayMoves[j].trickWinnerId === i) pCount++;
+            else if (currentReplayMoves[j].wonTrick && currentReplayMoves[j].playerIndex === i && currentReplayMoves[j].trickWinnerId === undefined) pCount++;
+        }
+        roundStates[i].prs = pCount;
+    }
+
     const fakeState = {
         tuttiGiocatori: [],
         qtaCarte: move.roundCards,
-        sommaScommesse: "?",
+        sommaScommesse: tutteDichiarazioniTrovate ? sommaScommesseRound : "?",
         turnoAttuale: move.playerIndex,
         fase: 'gioco',
         tavolo: []
@@ -376,8 +406,8 @@ function renderStepReplay(stepIdx) {
             nome: savedNick || (isMover ? (move.isHuman ? "Umano" : move.aiVariant) : `Player ${i}`),
             isMazziere: false,
             punti: "?",
-            dichiarazione: isMover ? move.dichiarazione : "?",
-            prese: isMover ? move.preseFatte : "?",
+            dichiarazione: roundStates[i].decl,
+            prese: roundStates[i].prs,
             mano: [],
             isHuman: isMover ? move.isHuman : false
         });
@@ -408,6 +438,7 @@ function renderStepReplay(stepIdx) {
             });
         }
     }
+
 
     
     const tableCards = move.table ? move.table.split('|') : [];
