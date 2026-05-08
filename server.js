@@ -111,6 +111,18 @@ const MatchLog = mongoose.model('MatchLog', matchLogSchema);
 const HumanMatchLog = mongoose.model('HumanMatchLog', matchLogSchema, 'humanlogs');
 
 
+// --- NUOVO: Schema per il Salvataggio dello Stato (Persistenza Match) ---
+const matchStateSchema = new mongoose.Schema({
+    roomCode: { type: String, required: true, unique: true },
+    host: String,
+    parametri: Object,
+    giocatori: Array,
+    gameInstance: Object,
+    timestamp: { type: Date, default: Date.now }
+});
+const MatchState = mongoose.model('MatchState', matchStateSchema);
+
+
 // --- INTEGRAZIONE IA (GEMINI API) ---
 async function checkWithAI(nickname) {
     const API_KEY = process.env.GEMINI_API_KEY;
@@ -213,6 +225,9 @@ if (process.env.MONGODB_URI) {
             } catch (err) {
                 console.error('Errore durante la rimozione automatica:', err);
             }
+
+            // --- NUOVO: Ripristino stati match ---
+            await caricaStatiMatch();
         })
         .catch(err => console.error('Errore connessione MongoDB:', err));
 } else {
@@ -1064,6 +1079,69 @@ class LucasGame {
     }
 }
 
+// --- NUOVO: Funzioni per Persistenza ---
+async function salvaStatoMatch(code) {
+    if (!dbConnected) return;
+    try {
+        const lobby = lobbies[code];
+        if (!lobby) {
+            await MatchState.deleteOne({ roomCode: code });
+            return;
+        }
+
+        const data = {
+            roomCode: code,
+            host: lobby.host,
+            parametri: lobby.parametri,
+            giocatori: lobby.giocatori,
+            gameInstance: lobby.gameInstance,
+            timestamp: new Date()
+        };
+
+        await MatchState.findOneAndUpdate({ roomCode: code }, data, { upsert: true });
+    } catch (e) {
+        console.error("Errore salvataggio stato match:", e);
+    }
+}
+
+async function caricaStatiMatch() {
+    if (!dbConnected) return;
+    try {
+        const states = await MatchState.find();
+        if (states.length === 0) return;
+        
+        console.log(`📂 Ripristino ${states.length} match dal database...`);
+        for (const state of states) {
+            const lobby = {
+                host: state.host,
+                parametri: state.parametri,
+                giocatori: state.giocatori
+            };
+            
+            if (state.gameInstance) {
+                const g = state.gameInstance;
+                const game = new LucasGame(g.numPlayers);
+                
+                // Copia tutte le proprietà
+                Object.assign(game, g);
+                
+                // Re-instanzia i Player
+                game.players = g.players.map(pData => {
+                    const p = new Player(pData.id, pData.nome, pData.isHuman, pData.token, pData.uniqueCode);
+                    Object.assign(p, pData);
+                    return p;
+                });
+                
+                lobby.gameInstance = game;
+            }
+            
+            lobbies[state.roomCode] = lobby;
+        }
+    } catch (e) {
+        console.error("Errore durante il ripristino dei match:", e);
+    }
+}
+
 let umaniConnessi = 0;
 let osservatoriAdmin = 0;
 let isSimulando = false;
@@ -1233,6 +1311,7 @@ io.on('connection', (socket) => {
             socket.join(code);
             socket.roomCode = code;
             socket.emit('lobby_creata', { code: code, giocatori: lobbies[code].giocatori });
+            salvaStatoMatch(code);
         } catch (e) {
             console.error("Errore crea_lobby:", e);
         }
@@ -1292,6 +1371,7 @@ io.on('connection', (socket) => {
                 socket.join(dati.code);
                 socket.roomCode = dati.code;
                 io.to(dati.code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: dati.code });
+                salvaStatoMatch(dati.code);
             } else {
                 socket.emit('errore', "Codice stanza non valido!");
             }
@@ -1339,6 +1419,7 @@ io.on('connection', (socket) => {
                     // Se era ancora in lobby, aggiorna gli altri
                     io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
                 }
+                salvaStatoMatch(code);
             }
         } catch (e) {
             console.error("Errore esci_partita:", e);
@@ -1373,6 +1454,7 @@ io.on('connection', (socket) => {
 
                             // Opzionale: notifichiamo gli altri che il giocatore è in attesa di riconnessione
                             inviaStato(code);
+                            salvaStatoMatch(code);
 
                             setTimeout(() => {
                                 const currentLobby = lobbies[code];
@@ -1384,6 +1466,7 @@ io.on('connection', (socket) => {
                                     p.isHuman = false;
                                     p.nome += " (Bot)";
                                     inviaStato(code);
+                                    salvaStatoMatch(code);
 
                                     // Il Bot muove solo se è il suo turno
                                     if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p) &&
@@ -1397,6 +1480,7 @@ io.on('connection', (socket) => {
                         // LOBBY D'ATTESA: Lo rimuoviamo semplicemente prima che inizi
                         lobby.giocatori.splice(index, 1);
                         io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
+                        salvaStatoMatch(code);
                     }
                     break; // Trovato e gestito, fermiamo il ciclo
                 }
@@ -1474,12 +1558,13 @@ io.on('connection', (socket) => {
 
         lobby.gameInstance.distribuisci();
         // Genera un ID unico per la partita (usato per i log)
-        lobby.gameInstance.matchId = "M-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+                lobby.gameInstance.matchId = "M-" + Math.random().toString(36).substring(2, 9).toUpperCase();
 
         // Identifichiamo il nickname dell'Host (chi ha creato la stanza)
         const hostPlayer = lobby.giocatori.find(p => p.id === lobby.host);
         lobby.gameInstance.hostNickname = hostPlayer ? hostPlayer.nome : "Sconosciuto";
 
+        salvaStatoMatch(code);
         inviaStato(code);
         gestisciIA(code);
     }
@@ -1567,6 +1652,7 @@ io.on('connection', (socket) => {
                 game.fase = "gioco";
             }
 
+            salvaStatoMatch(code);
             inviaStato(code);
             gestisciIA(code);
         } catch (e) {
@@ -1616,6 +1702,7 @@ io.on('connection', (socket) => {
                 inviaStato(code);
                 gestisciIA(code);
             }
+            salvaStatoMatch(code);
         } catch (e) {
             console.error("Errore gioca_carta:", e);
         }
@@ -1781,12 +1868,14 @@ io.on('connection', (socket) => {
                     HumanMatchLog.updateMany({ matchId: game.matchId }, { $set: { finalScores: simplifiedScores, isCompleted: true } }).catch(e => { });
                 }
 
+                await MatchState.deleteOne({ roomCode: code });
                 io.to(code).emit('fine_partita', classificaFinale);
                 return;
             } else {
                 game.indiceMazziere = (game.indiceMazziere + 1) % game.numPlayers;
                 game.distribuisci();
             }
+            salvaStatoMatch(code);
         }
         inviaStato(code);
         gestisciIA(code);
