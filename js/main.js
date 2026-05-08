@@ -1190,12 +1190,32 @@ document.addEventListener('DOMContentLoaded', () => {
 //   LOGICA CHAT DI GRUPPO
 // =========================================
 
+let unreadChatCount = 0;
+
 window.toggleChat = () => {
     const chatContainer = document.getElementById('chat-container');
     if (chatContainer) {
         chatContainer.classList.toggle('chat-closed');
+        
+        // Se abbiamo aperto la chat, azzeriamo i non letti
+        if (!chatContainer.classList.contains('chat-closed')) {
+            unreadChatCount = 0;
+            updateUnreadBadge();
+        }
     }
 };
+
+function updateUnreadBadge() {
+    const badge = document.getElementById('chat-unread-badge');
+    if (!badge) return;
+
+    if (unreadChatCount > 0) {
+        badge.innerText = unreadChatCount > 99 ? '99+' : unreadChatCount;
+        badge.classList.remove('unread-hidden');
+    } else {
+        badge.classList.add('unread-hidden');
+    }
+}
 
 window.inviaMessaggioChat = () => {
     const input = document.getElementById('chat-input');
@@ -1224,12 +1244,20 @@ socket.on('receive_chat_message', (data) => {
     messagesCont.appendChild(msgDiv);
     messagesCont.scrollTop = messagesCont.scrollHeight;
 
-    // Feedback visivo se la chat è chiusa
+    // Gestione messaggi non letti
     const container = document.getElementById('chat-container');
-    if (container && container.classList.contains('chat-closed') && !isMe) {
+    const isClosed = container && container.classList.contains('chat-closed');
+
+    if (isClosed && !isMe) {
+        unreadChatCount++;
+        updateUnreadBadge();
+        
+        // Feedback visivo sul titolo
         const title = document.getElementById('chat-title');
-        title.style.color = '#fff';
-        setTimeout(() => { if(title) title.style.color = '#f1c40f'; }, 500);
+        if (title) {
+            title.style.color = '#fff';
+            setTimeout(() => { if(title) title.style.color = '#f1c40f'; }, 500);
+        }
     }
 });
 
@@ -1258,5 +1286,7 @@ function updateChatVisibility(giocatori) {
         chatWrapper.style.display = 'none';
         const msgs = document.getElementById('chat-messages');
         if (msgs) msgs.innerHTML = '';
+        unreadChatCount = 0;
+        updateUnreadBadge();
     }
 }
