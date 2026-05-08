@@ -1504,6 +1504,34 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('send_chat_message', (msg) => {
+        try {
+            const code = socket.roomCode;
+            if (!code || !lobbies[code]) return;
+
+            // Verifichiamo quanti umani sono presenti (id non null e isHuman true)
+            // Possiamo usare lobbies[code].giocatori che tiene traccia dei connessi
+            const lobby = lobbies[code];
+            const humanPlayers = lobby.giocatori.filter(p => p.id !== null);
+            
+            if (humanPlayers.length < 2) {
+                return; // Requisito: almeno 2 umani
+            }
+
+            if (!msg || typeof msg !== 'string' || msg.trim() === '') return;
+
+            const messageData = {
+                sender: socket.userNickname || "Anonimo",
+                text: filter.clean(msg).substring(0, 200),
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+
+            io.to(code).emit('receive_chat_message', messageData);
+        } catch (e) {
+            console.error("Errore chat:", e);
+        }
+    });
+
     socket.on('invia_scommessa', (valRaw) => {
         try {
             const val = parseInt(valRaw);

@@ -290,6 +290,26 @@
             <p>&copy; 2026 Lucas Game - Tutti i diritti riservati.</p>
         </footer>
     </div>
+    <!-- Chat di Gruppo (Multiplayer) -->
+    <div id="chat-wrapper" style="display: none;">
+        <div id="chat-container" class="chat-closed">
+            <div id="chat-header">
+                <div id="chat-header-info">
+                    <span id="chat-title">💬 Chat di Gruppo</span>
+                    <span id="chat-player-count"></span>
+                </div>
+                <button id="chat-toggle-btn">▲</button>
+            </div>
+            <div id="chat-body">
+                <div id="chat-messages"></div>
+                <form id="chat-form" onsubmit="event.preventDefault(); window.inviaMessaggioChat();">
+                    <input type="text" id="chat-input" placeholder="Scrivi..." maxlength="200" autocomplete="off">
+                    <button type="submit" id="chat-send-btn">➤</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
 </body>
 
 </html>

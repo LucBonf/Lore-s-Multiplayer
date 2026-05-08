@@ -155,6 +155,14 @@ document.addEventListener('DOMContentLoaded', () => {
         setupEnterKey('input-room-code', () => window.uniscitiAStanza());
         setupEnterKey('bet-input', () => window.inviaDichiarazione());
         setupEnterKey('replays-search-input', () => window.apriReplays(true));
+        setupEnterKey('chat-input', () => window.inviaMessaggioChat());
+
+        // Listener per toggle chat
+        const toggleBtn = document.getElementById('chat-toggle-btn');
+        const chatHeader = document.getElementById('chat-header');
+        if (toggleBtn) toggleBtn.onclick = (e) => { e.stopPropagation(); window.toggleChat(); };
+        if (chatHeader) chatHeader.onclick = () => window.toggleChat();
+
     } catch (err) {
         console.error("Errore fatale in inizializzazione:", err);
         // Fallback estremo: prova a mostrare il login
@@ -862,6 +870,9 @@ window.esciDallaPartita = () => {
     socket.emit('esci_partita');
     // Torniamo alla schermata di setup
     window.switchSection('setup-menu');
+    // Pulizia chat
+    const chatMsgs = document.getElementById('chat-messages');
+    if (chatMsgs) chatMsgs.innerHTML = '';
 };
 
 window.apriRegole = () => {
@@ -879,6 +890,7 @@ socket.on('lobby_creata', (d) => {
     document.getElementById('lobby-info').style.display = 'block';
     document.getElementById('start-game-btn').style.display = 'block';
     document.getElementById('joined-players-list').innerHTML = d.giocatori.map(p => `<div>👤 ${p.nome}</div>`).join('');
+    updateChatVisibility(d.giocatori);
 });
 
 socket.on('aggiorna_lobby', (dati) => {
@@ -892,6 +904,7 @@ socket.on('aggiorna_lobby', (dati) => {
     }
 
     document.getElementById('joined-players-list').innerHTML = dati.giocatori.map(p => `<div>👤 ${p.nome}</div>`).join('');
+    updateChatVisibility(dati.giocatori);
 });
 
 socket.on('conferma_inizio_partita', (dati) => {
@@ -946,6 +959,7 @@ socket.on('conferma_inizio_partita', (dati) => {
 
     // CHIAMIAMO LA MAGIA CIRCOLARE QUI!
     renderGiocatori(dati);
+    updateChatVisibility(dati.tuttiGiocatori);
 
     // --- MICRO-RITARDO SUI CLICK ---
     // Ritarda la possibilità di giocare una carta non appena lo stato viene ricevuto e renderizzato, evitando carte "istantanee"
@@ -998,6 +1012,10 @@ socket.on('fine_partita', (cl) => {
     
     document.getElementById('endgame-list').innerHTML = listHtml;
     document.getElementById('modal-endgame').style.display = 'block';
+    
+    // Pulizia chat a fine partita
+    const chatMsgs = document.getElementById('chat-messages');
+    if (chatMsgs) chatMsgs.innerHTML = '';
 });
 
 // Funzioni per l'apertura e chiusura del Regolamento
@@ -1167,3 +1185,78 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// =========================================
+//   LOGICA CHAT DI GRUPPO
+// =========================================
+
+window.toggleChat = () => {
+    const chatContainer = document.getElementById('chat-container');
+    if (chatContainer) {
+        chatContainer.classList.toggle('chat-closed');
+    }
+};
+
+window.inviaMessaggioChat = () => {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    socket.emit('send_chat_message', text);
+    input.value = '';
+};
+
+socket.on('receive_chat_message', (data) => {
+    const messagesCont = document.getElementById('chat-messages');
+    if (!messagesCont) return;
+
+    const isMe = (data.sender === userProfile?.nickname);
+    
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-msg ${isMe ? 'me' : ''}`;
+    
+    msgDiv.innerHTML = `
+        <div class="chat-msg-sender">${data.sender}</div>
+        <div class="chat-msg-text">${escapeHtml(data.text)}</div>
+        <div class="chat-msg-time">${data.time}</div>
+    `;
+    
+    messagesCont.appendChild(msgDiv);
+    messagesCont.scrollTop = messagesCont.scrollHeight;
+
+    // Feedback visivo se la chat è chiusa
+    const container = document.getElementById('chat-container');
+    if (container && container.classList.contains('chat-closed') && !isMe) {
+        const title = document.getElementById('chat-title');
+        title.style.color = '#fff';
+        setTimeout(() => { if(title) title.style.color = '#f1c40f'; }, 500);
+    }
+});
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function updateChatVisibility(giocatori) {
+    const chatWrapper = document.getElementById('chat-wrapper');
+    const playerCountEl = document.getElementById('chat-player-count');
+    
+    if (!chatWrapper) return;
+
+    // Conta gli umani connessi
+    const humanCount = giocatori.filter(p => p.id !== null && p.isHuman !== false).length;
+    
+    if (humanCount >= 2) {
+        chatWrapper.style.display = 'block';
+        if (playerCountEl) {
+            const lang = localStorage.getItem('lucas_lang') || 'it';
+            playerCountEl.innerText = lang === 'it' ? `(${humanCount} umani online)` : `(${humanCount} humans online)`;
+        }
+    } else {
+        chatWrapper.style.display = 'none';
+        const msgs = document.getElementById('chat-messages');
+        if (msgs) msgs.innerHTML = '';
+    }
+}
