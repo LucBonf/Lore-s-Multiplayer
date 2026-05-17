@@ -16,6 +16,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css?v=2.1">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2c3e50">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/main.js?v=2.0" type="module" defer></script>
     <!-- Precaricamento Sprite Carte e Retro -->
@@ -26,6 +29,29 @@
 </head>
 
 <body>
+    <!-- SCHERMATA DI CARICAMENTO GLOBALE -->
+    <div id="global-loading-screen">
+        <div class="loading-content">
+            <h1 class="loading-title">LUCAS</h1>
+            <p class="loading-subtitle" data-i18n="connecting">Connessione al server in corso...</p>
+            <div class="progress-container">
+                <div id="loading-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Animazione finta per dare feedback durante l'attesa del socket
+        let progress = 0;
+        const progressBar = document.getElementById('loading-progress-bar');
+        window.loadingInterval = setInterval(() => {
+            if (progress < 90) {
+                progress += Math.random() * 5 + 2;
+                if (progress > 90) progress = 90;
+                if (progressBar) progressBar.style.width = progress + '%';
+            }
+        }, 300);
+    </script>
+
     <!-- Toast Banner per gli Errori -->
     <div id="error-banner"></div>
     
@@ -313,6 +339,17 @@
         </div>
     </div>
 
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('ServiceWorker registrato con successo: ', registration.scope);
+                }).catch(err => {
+                    console.log('Registrazione ServiceWorker fallita: ', err);
+                });
+            });
+        }
+    </script>
 </body>
 
 </html>

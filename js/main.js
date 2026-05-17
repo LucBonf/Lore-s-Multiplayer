@@ -17,6 +17,19 @@ if (!sessionToken) {
 }
 
 socket.on('connect', () => {
+    // Nascondi caricamento globale se presente
+    if (window.loadingInterval) clearInterval(window.loadingInterval);
+    const bar = document.getElementById('loading-progress-bar');
+    const screen = document.getElementById('global-loading-screen');
+    if (bar) bar.style.width = '100%';
+    setTimeout(() => {
+        if (screen) {
+            screen.style.opacity = '0';
+            screen.style.visibility = 'hidden';
+            setTimeout(() => screen.remove(), 500);
+        }
+    }, 500);
+
     const savedCode = sessionStorage.getItem('lucas_room');
     if (savedCode) {
         socket.emit('riconnetti', { code: savedCode, token: sessionToken });

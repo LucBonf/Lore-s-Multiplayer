@@ -1,0 +1,22 @@
+{
+  "name": "Lucas - Gioco di Carte",
+  "short_name": "Lucas",
+  "description": "Il gioco di carte online strategico basato su prese e dichiarazioni.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#0d0d0d",
+  "theme_color": "#2c3e50",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
