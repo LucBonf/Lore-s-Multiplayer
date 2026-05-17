@@ -1,0 +1,33 @@
+{
+  "packageId": "com.lucasgame.app",
+  "host": "lucas-game.onrender.com",
+  "name": "Lucas",
+  "launcherName": "Lucas",
+  "display": "fullscreen",
+  "themeColor": "#2c3e50",
+  "navigationColor": "#0d0d0d",
+  "navigationColorDark": "#0d0d0d",
+  "navigationDividerColor": "#0d0d0d",
+  "navigationDividerColorDark": "#0d0d0d",
+  "backgroundColor": "#0d0d0d",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://lucas-game.onrender.com/icons/icon-512.png",
+  "maskableIconUrl": "https://lucas-game.onrender.com/icons/icon-512.png",
+  "features": {
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "signingKey": {
+    "path": "/app/android.keystore",
+    "alias": "android"
+  },
+  "webManifestUrl": "https://lucas-game.onrender.com/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "additionalTrustedOrigins": []
+}
