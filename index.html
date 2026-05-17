@@ -48,6 +48,8 @@
                 progress += Math.random() * 5 + 2;
                 if (progress > 90) progress = 90;
                 if (progressBar) progressBar.style.width = progress + '%';
+            } else {
+                clearInterval(window.loadingInterval);
             }
         }, 300);
     </script>
