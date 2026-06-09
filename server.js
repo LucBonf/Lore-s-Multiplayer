@@ -1354,7 +1354,10 @@ io.on('connection', (socket) => {
     socket.on('crea_lobby', (dati) => {
         try {
             if (!dati || !dati.nome) return socket.emit('errore', "Dati lobby non validi.");
-            const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+            let code;
+            do {
+                code = Math.random().toString(36).substring(2, 6).toUpperCase();
+            } while (code === "FAST" || lobbies[code]);
             lobbies[code] = {
                 host: socket.id,
                 parametri: dati,
@@ -1449,6 +1452,28 @@ io.on('connection', (socket) => {
     socket.on('unisciti_lobby', (dati) => {
         try {
             if (!dati || !dati.code) return socket.emit('errore', "Codice stanza mancante.");
+            const roomCode = dati.code.trim().toUpperCase();
+            if (roomCode === "FAST") {
+                if (lobbies["FAST"]) {
+                    delete lobbies["FAST"];
+                }
+                lobbies["FAST"] = {
+                    host: socket.id,
+                    parametri: { numGiocatori: "8" },
+                    giocatori: [{
+                        id: socket.id,
+                        nome: dati.nome,
+                        token: dati.token,
+                        uniqueCode: dati.uniqueCode,
+                        elo: socket.userElo || 1000
+                    }],
+                    isFast: true
+                };
+                socket.join("FAST");
+                socket.roomCode = "FAST";
+                avviaPartita("FAST");
+                return;
+            }
             const lobby = lobbies[dati.code];
             if (lobby) {
                 let existingPlayer = lobby.giocatori.find(p => p.token && p.token === dati.token);
@@ -1811,15 +1836,16 @@ io.on('connection', (socket) => {
 
             carta.giocata = true;
             game.tavolo.push({ playerId: pIdx, card: carta });
+            const isFast = lobbies[code]?.isFast || code === "FAST";
             if (game.tavolo.length === game.numPlayers) {
                 inviaStato(code);
-                setTimeout(() => risolviPresa(code), 1500);
+                setTimeout(() => risolviPresa(code), isFast ? 150 : 1500);
             } else {
                 game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
 
                 // --- MICRO-RITARDO SUL SERVER (Previene carte istantanee) ---
                 game.acceptInput = false;
-                setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 400);
+                setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, isFast ? 50 : 400);
 
                 inviaStato(code);
                 gestisciIA(code);
@@ -1838,7 +1864,8 @@ io.on('connection', (socket) => {
         const semeUscita = game.tavolo[0].card.seme;
 
         // --- LOGGING PER TRAINING AI ---
-        if (dbConnected) {
+        const isFast = lobbies[code]?.isFast || code === "FAST";
+        if (dbConnected && !isFast) {
             const historyStr = game.carteUscite.map(c => `${c.valore}-${c.seme}`).join('|');
             const voidStr = game.players.map((p, i) => p.voidSuits.length > 0 ? `P${i}:${p.voidSuits.join('&')}` : "").filter(s => s !== "").join('|');
             const tableStr = game.tavolo.map(t => `${t.card.valore}-${t.card.seme}`).join('|');
@@ -1912,7 +1939,7 @@ io.on('connection', (socket) => {
 
         // --- MICRO-RITARDO SUL SERVER AL CAMBIO PRESA ---
         game.acceptInput = false;
-        setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 500);
+        setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, isFast ? 50 : 500);
 
         // --- FIX 3: Ora la mano finisce SOLO se TUTTI i giocatori hanno davvero giocato tutte le carte ---
         if (game.players.every(p => p.mano.every(c => c.giocata))) {
@@ -1926,7 +1953,7 @@ io.on('connection', (socket) => {
                 const classificaFinale = [...game.players].sort((a, b) => b.punti - a.punti);
 
                 // --- CALCOLO E AGGIORNAMENTO ELO ---
-                if (dbConnected) {
+                if (dbConnected && !isFast) {
                     const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
                     if (humanPlayers.length > 0) {
                         try {
@@ -1992,7 +2019,7 @@ io.on('connection', (socket) => {
                 }
 
                 // Aggiorniamo i log del match con la classifica finale per i replay
-                if (dbConnected) {
+                if (dbConnected && !isFast) {
                     const simplifiedScores = classificaFinale.map(c => ({ nome: c.nome, punti: c.punti }));
                     HumanMatchLog.updateMany({ matchId: game.matchId }, { $set: { finalScores: simplifiedScores, isCompleted: true } }).catch(e => { });
                 }
@@ -2026,6 +2053,7 @@ io.on('connection', (socket) => {
 
         game.botThinking = true;
 
+        const isFast = lobbies[code]?.isFast || code === "FAST";
         setTimeout(() => {
             const currentGame = lobbies[code]?.gameInstance;
             if (!currentGame) return;
@@ -2243,14 +2271,14 @@ io.on('connection', (socket) => {
 
                 if (currentGame.tavolo.length === currentGame.numPlayers) {
                     inviaStato(code);
-                    setTimeout(() => risolviPresa(code), 1500);
+                    setTimeout(() => risolviPresa(code), isFast ? 150 : 1500);
                 } else {
                     currentGame.turnoAttuale = (currentGame.turnoAttuale + 1) % currentGame.numPlayers;
                     inviaStato(code);
                     gestisciIA(code);
                 }
             }
-        }, 1200);
+        }, isFast ? 50 : 1200);
     }
 
     function inviaStato(code) {
