@@ -538,13 +538,15 @@ socket.on('classifica_dati', (dati) => {
     }
 
     let html = top10.map((u, i) => {
-        let stemma = null;
-        if (u.nickname && u.nickname.trim().toUpperCase() === "LUCA") stemma = "admin";
-        else if (i === 0) stemma = "oro";
-        else if (i === 1) stemma = "argento";
-        else if (i === 2) stemma = "bronzo";
+        let stemmi = [];
+        if (u.nickname && u.nickname.trim().toUpperCase() === "LUCA") {
+            stemmi.push("admin");
+        }
+        if (i === 0) stemmi.push("oro");
+        else if (i === 1) stemmi.push("argento");
+        else if (i === 2) stemmi.push("bronzo");
 
-        const nicknameConStemma = renderNomeConStemma(u.nickname, stemma);
+        const nicknameConStemma = renderNomeConStemma(u.nickname, stemmi.join(","));
         return `
             <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #555; padding: 10px 0;">
                 <span><strong>${i+1}°.</strong> ${nicknameConStemma}</span>
@@ -555,13 +557,15 @@ socket.on('classifica_dati', (dati) => {
 
     if (userRank) {
         const formattedPos = userRank.posizione.toLocaleString('it-IT');
-        let stemma = null;
-        if (userRank.nickname && userRank.nickname.trim().toUpperCase() === "LUCA") stemma = "admin";
-        else if (userRank.posizione === 1) stemma = "oro";
-        else if (userRank.posizione === 2) stemma = "argento";
-        else if (userRank.posizione === 3) stemma = "bronzo";
+        let stemmi = [];
+        if (userRank.nickname && userRank.nickname.trim().toUpperCase() === "LUCA") {
+            stemmi.push("admin");
+        }
+        if (userRank.posizione === 1) stemmi.push("oro");
+        else if (userRank.posizione === 2) stemmi.push("argento");
+        else if (userRank.posizione === 3) stemmi.push("bronzo");
 
-        const nicknameConStemma = renderNomeConStemma(userRank.nickname, stemma);
+        const nicknameConStemma = renderNomeConStemma(userRank.nickname, stemmi.join(","));
         html += `
             <div style="margin-top: 20px; border-top: 2px solid #e67e22; padding-top: 15px; background: rgba(230, 126, 34, 0.1); border-radius: 0 0 8px 8px; padding: 15px;">
                 <div style="display:flex; justify-content:space-between; color: #f1c40f; font-weight: bold;">
@@ -581,27 +585,34 @@ socket.on('classifica_dati', (dati) => {
 
 function renderNomeConStemma(nome, stemma) {
     if (!stemma) return nome;
-    let icon = "";
-    let color = "";
-    let title = "";
-    if (stemma === "admin") {
-        icon = "👑";
-        color = "#e74c3c";
-        title = "Admin / Creatore";
-    } else if (stemma === "oro") {
-        icon = "🥇";
-        color = "#f1c40f";
-        title = "1° in Classifica";
-    } else if (stemma === "argento") {
-        icon = "🥈";
-        color = "#bdc3c7";
-        title = "2° in Classifica";
-    } else if (stemma === "bronzo") {
-        icon = "🥉";
-        color = "#e67e22";
-        title = "3° in Classifica";
-    }
-    return `<span class="badge-player badge-${stemma}" style="color: ${color}; margin-right: 4px;" title="${title}">${icon}</span>${nome}`;
+    const parts = stemma.split(",");
+    let badgesHtml = "";
+    parts.forEach(s => {
+        let icon = "";
+        let color = "";
+        let title = "";
+        if (s === "admin") {
+            icon = "👑";
+            color = "#e74c3c";
+            title = "Admin / Creatore";
+        } else if (s === "oro") {
+            icon = "🥇";
+            color = "#f1c40f";
+            title = "1° in Classifica";
+        } else if (s === "argento") {
+            icon = "🥈";
+            color = "#bdc3c7";
+            title = "2° in Classifica";
+        } else if (s === "bronzo") {
+            icon = "🥉";
+            color = "#e67e22";
+            title = "3° in Classifica";
+        }
+        if (icon) {
+            badgesHtml += `<span class="badge-player badge-${s}" style="color: ${color}; margin-right: 4px;" title="${title}">${icon}</span>`;
+        }
+    });
+    return badgesHtml + nome;
 }
 
 function renderGiocatori(data) {
@@ -1066,8 +1077,9 @@ socket.on('fine_partita', (cl) => {
     const listHtml = cl.map((p, i) => {
         let pos = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : `${i + 1}°`));
         let pts = p.punti;
+        const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
         return `<div style="display: flex; justify-content: space-between; border-bottom: 1px solid #7f8c8d; padding: 5px 0;">
-                    <span>${pos} ${p.nome}</span>
+                    <span>${pos} ${nomeConStemma}</span>
                     <span style="color: #f1c40f; font-weight: bold;">${pts} ${d.points}</span>
                 </div>`;
     }).join('');

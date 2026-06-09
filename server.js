@@ -1159,16 +1159,17 @@ setInterval(aggiornaTop3Cache, 30000);
 setTimeout(aggiornaTop3Cache, 5000);
 
 function ottieniStemma(uniqueCode, nome) {
+    let stemmi = [];
     if (nome && nome.trim().toUpperCase() === "LUCA") {
-        return "admin";
+        stemmi.push("admin");
     }
     if (dbConnected && top3Cached && top3Cached.length > 0) {
         const idx = top3Cached.findIndex(u => u.uniqueCode === uniqueCode);
-        if (idx === 0) return "oro";
-        if (idx === 1) return "argento";
-        if (idx === 2) return "bronzo";
+        if (idx === 0) stemmi.push("oro");
+        else if (idx === 1) stemmi.push("argento");
+        else if (idx === 2) stemmi.push("bronzo");
     }
-    return null;
+    return stemmi.length > 0 ? stemmi.join(",") : null;
 }
 
 function inviaAggiornamentoLobby(code) {
@@ -1920,7 +1921,15 @@ io.on('connection', (socket) => {
                 }
 
                 await MatchState.deleteOne({ roomCode: code });
-                io.to(code).emit('fine_partita', classificaFinale);
+                const classificaFinaleConStemma = classificaFinale.map(p => ({
+                    id: p.id,
+                    nome: p.nome,
+                    isHuman: p.isHuman,
+                    uniqueCode: p.uniqueCode,
+                    punti: p.punti,
+                    stemma: ottieniStemma(p.uniqueCode, p.nome)
+                }));
+                io.to(code).emit('fine_partita', classificaFinaleConStemma);
                 return;
             } else {
                 game.indiceMazziere = (game.indiceMazziere + 1) % game.numPlayers;
