@@ -218,6 +218,12 @@ window.eseguiLogin = () => {
     socket.emit('login', { uniqueCode: code, nickname: nickname, token: sessionToken });
 };
 
+window.eseguiLogout = () => {
+    localStorage.removeItem('lucas_user');
+    sessionStorage.removeItem('lucas_room');
+    location.reload();
+};
+
 window.continuaComeOspite = () => {
     const randomSuffix = Math.random().toString(36).substring(2, 7);
     const guestId = "GUEST_" + randomSuffix;
