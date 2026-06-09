@@ -1338,6 +1338,7 @@ io.on('connection', (socket) => {
                 p.nome = p.nome.replace(" (Bot)", "");
             }
             inviaStato(code);
+            gestisciIA(code); // FIX: Riprendi l'esecuzione del bot se è il suo turno
         } else {
             io.to(code).emit('aggiorna_lobby', { giocatori: lobby.giocatori, code: code });
         }
