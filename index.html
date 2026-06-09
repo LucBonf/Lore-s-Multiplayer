@@ -214,6 +214,17 @@
                     <button data-i18n="joinBtn" onclick="uniscitiAStanza()"
                         style="padding: 10px 20px; font-weight: bold; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; flex-grow: 1; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">ENTRA</button>
                 </div>
+                
+                <!-- Lista Partite Pubbliche -->
+                <div id="public-lobbies-container" style="margin-top: 25px; text-align: left; display: none; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(241, 196, 15, 0.2); padding: 15px; border-radius: 10px;">
+                    <h3 style="color: #f1c40f; font-size: 1.1rem; margin-top: 0; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;">
+                        <span>🌐 Partite Pubbliche</span>
+                        <span onclick="window.richiediLobbyPubbliche()" style="color: #3498db; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: color 0.2s;" onmouseover="this.style.color='#5dade2'" onmouseout="this.style.color='#3498db'">🔄 Aggiorna</span>
+                    </h3>
+                    <div id="public-lobbies-list" style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+                        <!-- Inserite dinamicamente -->
+                    </div>
+                </div>
 
                 <div style="margin-top: 25px;">
                     <button data-i18n="logoutBtn" onclick="eseguiLogout()" style="background: none; border: 1px solid #e74c3c; color: #e74c3c; padding: 6px 15px; border-radius: 5px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s, color 0.2s;" onmouseover="this.style.background='#e74c3c'; this.style.color='white';" onmouseout="this.style.background='none'; this.style.color='#e74c3c';">Esci dall'Account</button>
@@ -227,6 +238,15 @@
                     style="display:none; margin-bottom: 20px; font-size: 1.2rem; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; border: 1px solid #f1c40f;">
                     <p style="margin: 0; color: #ddd;"><span data-i18n="roomCode">Codice Stanza:</span><br><strong id="display-room-code"
                             style="color: #f1c40f; font-size: 1.8rem; letter-spacing: 2px;">-</strong></p>
+                </div>
+
+                <!-- Impostazione Privacy Stanza -->
+                <div id="privacy-toggle-container" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 10px 15px; border-radius: 8px; border: 1px solid rgba(241, 196, 15, 0.3);">
+                    <span style="font-weight: bold; color: #ddd; font-size: 1rem;">🌐 Stanza Pubblica</span>
+                    <label class="switch" style="position: relative; display: inline-block; width: 50px; height: 26px; margin: 0;">
+                        <input type="checkbox" id="privacy-checkbox" onchange="window.cambiaPrivacyLobby(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                        <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #7f8c8d; transition: .4s; border-radius: 34px;"></span>
+                    </label>
                 </div>
 
                 <div id="joined-players-list"

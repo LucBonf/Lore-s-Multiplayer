@@ -44,6 +44,9 @@ socket.on('riconnessione_fallita', () => {
 // --- NOVITÀ: Gestione Centralizzata delle Sezioni (Resiliente) ---
 function switchSection(activeId) {
     try {
+        if (activeId === 'setup-menu' && typeof window.richiediLobbyPubbliche === 'function') {
+            window.richiediLobbyPubbliche();
+        }
         const sections = ['login-menu', 'setup-menu', 'lobby-wait', 'game-area', 'classifica-finale-container'];
         sections.forEach(id => {
             const el = document.getElementById(id);
@@ -966,6 +969,13 @@ socket.on('lobby_creata', (d) => {
     const isHost = (d.host === socket.id);
     document.getElementById('start-game-btn').style.display = isHost ? 'block' : 'none';
     
+    // Configura checkbox privacy
+    const privacyCheckbox = document.getElementById('privacy-checkbox');
+    if (privacyCheckbox) {
+        privacyCheckbox.checked = d.pubblica || false;
+        privacyCheckbox.disabled = !isHost;
+    }
+    
     document.getElementById('joined-players-list').innerHTML = d.giocatori.map(p => `<div>👤 ${renderNomeConStemma(p.nome, p.stemma)}</div>`).join('');
     updateChatVisibility(d.giocatori);
 });
@@ -984,8 +994,55 @@ socket.on('aggiorna_lobby', (dati) => {
     const isHost = (dati.host === socket.id);
     document.getElementById('start-game-btn').style.display = isHost ? 'block' : 'none';
 
+    // Configura checkbox privacy
+    const privacyCheckbox = document.getElementById('privacy-checkbox');
+    if (privacyCheckbox) {
+        privacyCheckbox.checked = dati.pubblica || false;
+        privacyCheckbox.disabled = !isHost;
+    }
+
     document.getElementById('joined-players-list').innerHTML = dati.giocatori.map(p => `<div>👤 ${renderNomeConStemma(p.nome, p.stemma)}</div>`).join('');
     updateChatVisibility(dati.giocatori);
+});
+
+// Impostazioni Privacy e Lobby Pubbliche
+window.cambiaPrivacyLobby = (checked) => {
+    const code = sessionStorage.getItem('lucas_room');
+    if (code) {
+        socket.emit('imposta_privacy', { code, pubblica: checked });
+    }
+};
+
+window.richiediLobbyPubbliche = () => {
+    socket.emit('richiedi_lobby_pubbliche');
+};
+
+window.uniscitiAPartitaPubblica = (code) => {
+    document.getElementById('input-room-code').value = code;
+    window.uniscitiAStanza();
+};
+
+socket.on('lista_lobby_pubbliche', (list) => {
+    const container = document.getElementById('public-lobbies-container');
+    const listEl = document.getElementById('public-lobbies-list');
+    if (!container || !listEl) return;
+
+    if (!list || list.length === 0) {
+        container.style.display = 'none';
+        listEl.innerHTML = '';
+        return;
+    }
+
+    container.style.display = 'block';
+    listEl.innerHTML = list.map(l => `
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; margin-bottom: 4px;">
+            <div>
+                <span style="font-weight: bold; color: #f1c40f;">${l.hostName}</span>
+                <span style="color: #bbb; font-size: 0.9rem; margin-left: 8px;">(${l.playersCount}/${l.maxPlayers})</span>
+            </div>
+            <button onclick="window.uniscitiAPartitaPubblica('${l.code}')" style="background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 0.85rem; font-weight: bold; width: auto; height: auto;">Entra</button>
+        </div>
+    `).join('');
 });
 
 socket.on('conferma_inizio_partita', (dati) => {

@@ -1179,7 +1179,25 @@ function inviaAggiornamentoLobby(code) {
         ...g,
         stemma: ottieniStemma(g.uniqueCode, g.nome)
     }));
-    io.to(code).emit('aggiorna_lobby', { giocatori: giocatoriConStemma, code: code, host: lobby.host });
+    io.to(code).emit('aggiorna_lobby', { giocatori: giocatoriConStemma, code: code, host: lobby.host, pubblica: lobby.pubblica || false });
+}
+
+function inviaLobbyPubblicheTutti() {
+    const publicLobbies = [];
+    for (const code in lobbies) {
+        const l = lobbies[code];
+        if (l.pubblica && !l.gameInstance && l.giocatori.length > 0) {
+            const hostPlayer = l.giocatori.find(p => p.id === l.host);
+            const hostName = hostPlayer ? hostPlayer.nome : "Sconosciuto";
+            publicLobbies.push({
+                code: code,
+                hostName: hostName,
+                playersCount: l.giocatori.length,
+                maxPlayers: parseInt(l.parametri.numGiocatori)
+            });
+        }
+    }
+    io.emit('lista_lobby_pubbliche', publicLobbies);
 }
 
 let umaniConnessi = 0;
@@ -1354,11 +1372,43 @@ io.on('connection', (socket) => {
                 ...g,
                 stemma: ottieniStemma(g.uniqueCode, g.nome)
             }));
-            socket.emit('lobby_creata', { code: code, giocatori: giocatoriConStemma, host: lobbies[code].host });
+            socket.emit('lobby_creata', { code: code, giocatori: giocatoriConStemma, host: lobbies[code].host, pubblica: false });
             salvaStatoMatch(code);
         } catch (e) {
             console.error("Errore crea_lobby:", e);
         }
+    });
+
+    socket.on('imposta_privacy', (dati) => {
+        try {
+            if (!dati || !dati.code) return;
+            const lobby = lobbies[dati.code];
+            if (lobby && lobby.host === socket.id) {
+                lobby.pubblica = dati.pubblica;
+                inviaAggiornamentoLobby(dati.code);
+                inviaLobbyPubblicheTutti();
+            }
+        } catch (e) {
+            console.error("Errore imposta_privacy:", e);
+        }
+    });
+
+    socket.on('richiedi_lobby_pubbliche', () => {
+        const publicLobbies = [];
+        for (const code in lobbies) {
+            const l = lobbies[code];
+            if (l.pubblica && !l.gameInstance && l.giocatori.length > 0) {
+                const hostPlayer = l.giocatori.find(p => p.id === l.host);
+                const hostName = hostPlayer ? hostPlayer.nome : "Sconosciuto";
+                publicLobbies.push({
+                    code: code,
+                    hostName: hostName,
+                    playersCount: l.giocatori.length,
+                    maxPlayers: parseInt(l.parametri.numGiocatori)
+                });
+            }
+        }
+        socket.emit('lista_lobby_pubbliche', publicLobbies);
     });
 
     function gestisciRiconnessione(socket, code, token) {
@@ -1421,6 +1471,9 @@ io.on('connection', (socket) => {
                 socket.roomCode = dati.code;
                 inviaAggiornamentoLobby(dati.code);
                 salvaStatoMatch(dati.code);
+                if (lobby.pubblica) {
+                    inviaLobbyPubblicheTutti();
+                }
             } else {
                 socket.emit('errore', "Codice stanza non valido!");
             }
@@ -1454,9 +1507,19 @@ io.on('connection', (socket) => {
                 const wasHost = (socket.id === lobby.host);
                 if (idx !== -1) lobby.giocatori.splice(idx, 1);
 
-                if (wasHost && lobby.giocatori.length > 0) {
-                    lobby.host = lobby.giocatori[0].id;
+                if (lobby.giocatori.length === 0) {
+                    delete lobbies[code];
+                    if (dbConnected) {
+                        MatchState.deleteOne({ roomCode: code }).catch(e => {});
+                    }
+                } else {
+                    if (wasHost) {
+                        lobby.host = lobby.giocatori[0].id;
+                    }
+                    inviaAggiornamentoLobby(code);
+                    salvaStatoMatch(code);
                 }
+                inviaLobbyPubblicheTutti();
 
                 // Gestione del subentro IA se il gioco è in corso
                 if (lobby.gameInstance) {
@@ -1562,6 +1625,7 @@ io.on('connection', (socket) => {
         const lobby = lobbies[code];
         if (!lobby || lobby.gameInstance) return;
         lobby.gameInstance = new LucasGame(parseInt(lobby.parametri.numGiocatori));
+        inviaLobbyPubblicheTutti();
 
         // 1. Identifichiamo gli umani e calcoliamo il loro ELO medio
         const humanElos = [];
