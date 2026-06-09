@@ -1179,7 +1179,7 @@ function inviaAggiornamentoLobby(code) {
         ...g,
         stemma: ottieniStemma(g.uniqueCode, g.nome)
     }));
-    io.to(code).emit('aggiorna_lobby', { giocatori: giocatoriConStemma, code: code });
+    io.to(code).emit('aggiorna_lobby', { giocatori: giocatoriConStemma, code: code, host: lobby.host });
 }
 
 let umaniConnessi = 0;
@@ -1354,7 +1354,7 @@ io.on('connection', (socket) => {
                 ...g,
                 stemma: ottieniStemma(g.uniqueCode, g.nome)
             }));
-            socket.emit('lobby_creata', { code: code, giocatori: giocatoriConStemma });
+            socket.emit('lobby_creata', { code: code, giocatori: giocatoriConStemma, host: lobbies[code].host });
             salvaStatoMatch(code);
         } catch (e) {
             console.error("Errore crea_lobby:", e);
@@ -1368,7 +1368,11 @@ io.on('connection', (socket) => {
         let foundLobbyPlayer = lobby.giocatori.find(p => p.token === token);
         if (!foundLobbyPlayer) return socket.emit('riconnessione_fallita');
 
+        const wasHost = (foundLobbyPlayer.id === lobby.host);
         foundLobbyPlayer.id = socket.id;
+        if (wasHost) {
+            lobby.host = socket.id;
+        }
         socket.join(code);
         socket.roomCode = code;
 
@@ -1447,7 +1451,12 @@ io.on('connection', (socket) => {
             if (lobby) {
                 // Rimuovi dalla lobby (lista d'attesa) Test gits
                 const idx = lobby.giocatori.findIndex(p => p.id === socket.id);
+                const wasHost = (socket.id === lobby.host);
                 if (idx !== -1) lobby.giocatori.splice(idx, 1);
+
+                if (wasHost && lobby.giocatori.length > 0) {
+                    lobby.host = lobby.giocatori[0].id;
+                }
 
                 // Gestione del subentro IA se il gioco è in corso
                 if (lobby.gameInstance) {
@@ -1523,7 +1532,11 @@ io.on('connection', (socket) => {
                         }
                     } else {
                         // LOBBY D'ATTESA: Lo rimuoviamo semplicemente prima che inizi
+                        const wasHost = (socket.id === lobby.host);
                         lobby.giocatori.splice(index, 1);
+                        if (wasHost && lobby.giocatori.length > 0) {
+                            lobby.host = lobby.giocatori[0].id;
+                        }
                         inviaAggiornamentoLobby(code);
                         salvaStatoMatch(code);
                     }

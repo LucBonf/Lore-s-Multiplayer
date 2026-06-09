@@ -961,7 +961,11 @@ socket.on('lobby_creata', (d) => {
     switchSection('lobby-wait');
     document.getElementById('display-room-code').innerText = d.code;
     document.getElementById('lobby-info').style.display = 'block';
-    document.getElementById('start-game-btn').style.display = 'block';
+    
+    // Mostriamo il tasto avvia partita solo se siamo il creatore/host
+    const isHost = (d.host === socket.id);
+    document.getElementById('start-game-btn').style.display = isHost ? 'block' : 'none';
+    
     document.getElementById('joined-players-list').innerHTML = d.giocatori.map(p => `<div>👤 ${renderNomeConStemma(p.nome, p.stemma)}</div>`).join('');
     updateChatVisibility(d.giocatori);
 });
@@ -975,6 +979,10 @@ socket.on('aggiorna_lobby', (dati) => {
         document.getElementById('display-room-code').innerText = dati.code;
         document.getElementById('lobby-info').style.display = 'block';
     }
+
+    // Mostriamo il tasto avvia partita solo se siamo il creatore/host
+    const isHost = (dati.host === socket.id);
+    document.getElementById('start-game-btn').style.display = isHost ? 'block' : 'none';
 
     document.getElementById('joined-players-list').innerHTML = dati.giocatori.map(p => `<div>👤 ${renderNomeConStemma(p.nome, p.stemma)}</div>`).join('');
     updateChatVisibility(dati.giocatori);
