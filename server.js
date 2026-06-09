@@ -2084,89 +2084,155 @@ io.on('connection', (socket) => {
             const qta = currentGame.sequenzaTurni[currentGame.indiceGiro];
 
             if (currentGame.fase === "scommesse") {
-                // SCOMMESSA AVANZATA (Power Scoring)
-                let powerScore = 0;
+                let s = 0;
+                if (p.aiLevel <= 2) {
+                    // SCOMMESSA AVANZATA (Power Scoring) - Originale per Beginner/Apprentice
+                    let powerScore = 0;
 
-                if (qta === 1) {
-                    // --- FIX ROUND FRONTE: Il Bot non deve guardare la sua carta! ---
-                    // Deve stimare la probabilità di vittoria basandosi solo sulle carte visibili degli altri.
-                    const visibleCards = [];
-                    currentGame.players.forEach(otherP => {
-                        if (otherP.id !== p.id) {
-                            otherP.mano.forEach(c => { if (!c.giocata) visibleCards.push(c); });
-                        }
-                    });
-
-                    const playedCards = currentGame.carteUscite;
-                    const maxForzaAvversari = visibleCards.length > 0 ? Math.max(...visibleCards.map(vc => vc.forza)) : 0;
-
-                    // Calcoliamo quante carte nel mazzo (non viste e non giocate) superano il massimo avversario
-                    let carteSuperiori = 0;
-                    let carteTotaliMistero = 0;
-
-                    SEMI.forEach(s => {
-                        VALORI.forEach(v => {
-                            const forza = PESO_SEME[s] + PESO_VALORE[v];
-                            const isVisible = visibleCards.some(vc => vc.seme === s && vc.valore === v);
-                            const isPlayed = playedCards.some(pc => pc.seme === s && pc.valore === v);
-
-                            if (!isVisible && !isPlayed) {
-                                carteTotaliMistero++;
-                                if (forza > maxForzaAvversari) carteSuperiori++;
+                    if (qta === 1) {
+                        const visibleCards = [];
+                        currentGame.players.forEach(otherP => {
+                            if (otherP.id !== p.id) {
+                                otherP.mano.forEach(c => { if (!c.giocata) visibleCards.push(c); });
                             }
                         });
-                    });
 
-                    const probVittoria = carteTotaliMistero > 0 ? (carteSuperiori / carteTotaliMistero) : 0;
-                    // Se la probabilità è alta, simula un powerScore che porti a dichiarare 1
-                    powerScore = (Math.random() < probVittoria) ? 140 : 10;
+                        const playedCards = currentGame.carteUscite;
+                        const maxForzaAvversari = visibleCards.length > 0 ? Math.max(...visibleCards.map(vc => vc.forza)) : 0;
+
+                        let carteSuperiori = 0;
+                        let carteTotaliMistero = 0;
+
+                        SEMI.forEach(s_ => {
+                            VALORI.forEach(v_ => {
+                                const forza = PESO_SEME[s_] + PESO_VALORE[v_];
+                                const isVisible = visibleCards.some(vc => vc.seme === s_ && vc.valore === v_);
+                                const isPlayed = playedCards.some(pc => pc.seme === s_ && pc.valore === v_);
+
+                                if (!isVisible && !isPlayed) {
+                                    carteTotaliMistero++;
+                                    if (forza > maxForzaAvversari) carteSuperiori++;
+                                }
+                            });
+                        });
+
+                        const probVittoria = carteTotaliMistero > 0 ? (carteSuperiori / carteTotaliMistero) : 0;
+                        powerScore = (Math.random() < probVittoria) ? 140 : 10;
+                    } else {
+                        p.mano.forEach(c => {
+                            if (c.valore === 'Asso') powerScore += 140;
+                            else if (c.valore === '3') powerScore += 120;
+                            else if (c.valore === 'Re') powerScore += 90;
+                            else if (c.valore === 'Cavallo') powerScore += 70;
+                            else if (c.valore === 'Fante') powerScore += 55;
+                            else powerScore += 15;
+
+                            if (c.seme === 'Ori') powerScore += 50;
+                            if (c.seme === 'Spade') powerScore += 30;
+                            if (c.seme === 'Coppe') powerScore += 10;
+                        });
+                    }
+
+                    const div = (currentGame.numPlayers <= 3) ? 120 : 150;
+                    const ordineTurno = (currentGame.turnoAttuale - (currentGame.indiceMazziere + 1) + currentGame.numPlayers) % currentGame.numPlayers;
+                    const posFactor = 0.85 + (ordineTurno / currentGame.numPlayers) * 0.3;
+
+                    let scommesseFactor = 1.0;
+                    const scommesseFatte = currentGame.players.filter(pl => pl.dichiarazione !== "-").length;
+                    if (scommesseFatte > 0) {
+                        const quotaTarget = (qta / currentGame.numPlayers) * scommesseFatte;
+                        if (currentGame.sommaScommesse > quotaTarget) scommesseFactor = 0.85;
+                        else if (currentGame.sommaScommesse < quotaTarget) scommesseFactor = 1.15;
+                    }
+
+                    s = Math.floor((powerScore / div) * posFactor * scommesseFactor);
+
+                    if (qta === 1 && currentGame.sommaScommesse >= 1 && s >= 1) {
+                        if (Math.random() > 0.4) s = 0;
+                    }
+
+                    if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
+
+                    if (currentGame.turnoAttuale === currentGame.indiceMazziere && (currentGame.sommaScommesse + s === qta)) {
+                        if (s === 0) s = 1;
+                        else if (s === qta) s = qta - 1;
+                        else s = (powerScore / div > 0.5) ? s + 1 : s - 1;
+                    }
                 } else {
-                    p.mano.forEach(c => {
-                        if (c.valore === 'Asso') powerScore += 140;
-                        else if (c.valore === '3') powerScore += 120;
-                        else if (c.valore === 'Re') powerScore += 90;
-                        else if (c.valore === 'Cavallo') powerScore += 70;
-                        else if (c.valore === 'Fante') powerScore += 55;
-                        else powerScore += 15;
+                    // Logica Ottimizzata per Intermediate/Expert
+                    let expectedTricks = 0;
 
-                        if (c.seme === 'Ori') powerScore += 50;
-                        if (c.seme === 'Spade') powerScore += 30;
-                        if (c.seme === 'Coppe') powerScore += 10;
-                    });
+                    if (qta === 1) {
+                        const visibleCards = [];
+                        currentGame.players.forEach(otherP => {
+                            if (otherP.id !== p.id) {
+                                otherP.mano.forEach(c => { if (!c.giocata) visibleCards.push(c); });
+                            }
+                        });
+
+                        const playedCards = currentGame.carteUscite;
+                        const maxForzaAvversari = visibleCards.length > 0 ? Math.max(...visibleCards.map(vc => vc.forza)) : 0;
+
+                        let carteSuperiori = 0;
+                        let carteTotaliMistero = 0;
+
+                        SEMI.forEach(s_ => {
+                            VALORI.forEach(v_ => {
+                                const forza = PESO_SEME[s_] + PESO_VALORE[v_];
+                                const isVisible = visibleCards.some(vc => vc.seme === s_ && vc.valore === v_);
+                                const isPlayed = playedCards.some(pc => pc.seme === s_ && pc.valore === v_);
+
+                                if (!isVisible && !isPlayed) {
+                                    carteTotaliMistero++;
+                                    if (forza > maxForzaAvversari) carteSuperiori++;
+                                }
+                            });
+                        });
+
+                        const probVittoria = carteTotaliMistero > 0 ? (carteSuperiori / carteTotaliMistero) : 0;
+                        expectedTricks = (probVittoria > 0.5) ? 1 : 0;
+                    } else {
+                        p.mano.forEach(c => {
+                            if (c.seme === 'Ori') {
+                                if (c.valore === 'Asso') expectedTricks += 1.0;
+                                else if (c.valore === '3') expectedTricks += 0.95;
+                                else if (c.valore === 'Re') expectedTricks += 0.85;
+                                else if (c.valore === 'Cavallo') expectedTricks += 0.75;
+                                else if (c.valore === 'Fante') expectedTricks += 0.65;
+                                else expectedTricks += 0.35;
+                            } else {
+                                const sizeFactor = qta - 1;
+                                if (c.valore === 'Asso') expectedTricks += Math.max(0.3, 0.7 - 0.04 * sizeFactor);
+                                else if (c.valore === '3') expectedTricks += Math.max(0.15, 0.5 - 0.04 * sizeFactor);
+                                else if (c.valore === 'Re') expectedTricks += Math.max(0.05, 0.3 - 0.03 * sizeFactor);
+                                else if (c.valore === 'Cavallo') expectedTricks += Math.max(0.02, 0.15 - 0.02 * sizeFactor);
+                                else if (c.valore === 'Fante') expectedTricks += Math.max(0.01, 0.10 - 0.01 * sizeFactor);
+                                else expectedTricks += 0.02;
+                            }
+                        });
+                    }
+
+                    s = Math.round(expectedTricks);
+
+                    if (qta === 1 && currentGame.sommaScommesse >= 1 && s >= 1) {
+                        s = 0;
+                    }
+
+                    if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
+
+                    if (currentGame.turnoAttuale === currentGame.indiceMazziere && (currentGame.sommaScommesse + s === qta)) {
+                        const decimalPart = expectedTricks - Math.floor(expectedTricks);
+                        if (decimalPart > 0.5) {
+                            s = Math.min(qta, s + 1);
+                        } else {
+                            s = Math.max(0, s - 1);
+                        }
+                        if (currentGame.sommaScommesse + s === qta) {
+                            s = (s >= qta / 2) ? s - 1 : s + 1;
+                        }
+                    }
                 }
 
-                // --- LOGICA CONTESTUALE (Matrix Training) ---
-                // 1. Adattamento al numero di giocatori
-                const div = (currentGame.numPlayers <= 3) ? 120 : 150;
-
-                // 3. Adattamento alla posizione (chi parla dopo ha più info)
-                const ordineTurno = (currentGame.turnoAttuale - (currentGame.indiceMazziere + 1) + currentGame.numPlayers) % currentGame.numPlayers;
-                const posFactor = 0.85 + (ordineTurno / currentGame.numPlayers) * 0.3; // 0.85x per il primo, 1.15x per l'ultimo
-
-                // 4. Adattamento alle scommesse degli avversari (Pressione del tavolo)
-                let scommesseFactor = 1.0;
-                const scommesseFatte = currentGame.players.filter(pl => pl.dichiarazione !== "-").length;
-                if (scommesseFatte > 0) {
-                    const quotaTarget = (qta / currentGame.numPlayers) * scommesseFatte;
-                    if (currentGame.sommaScommesse > quotaTarget) scommesseFactor = 0.85; // Tavolo affollato, prudenza
-                    else if (currentGame.sommaScommesse < quotaTarget) scommesseFactor = 1.15; // C'è spazio, aggressività
-                }
-
-                let s = Math.floor((powerScore / div) * posFactor * scommesseFactor);
-
-                // Nel giro da 1, se qualcuno ha già detto 1, riduciamo la probabilità di pareggiare (solo uno vince)
-                if (qta === 1 && currentGame.sommaScommesse >= 1 && s >= 1) {
-                    if (Math.random() > 0.4) s = 0;
-                }
-
-                if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
-
-                if (currentGame.turnoAttuale === currentGame.indiceMazziere && (currentGame.sommaScommesse + s === qta)) {
-                    // Vincolo Mazziere: decide se salire o scendere in base alla forza della mano
-                    if (s === 0) s = 1;
-                    else if (s === qta) s = qta - 1;
-                    else s = (powerScore / div > 0.5) ? s + 1 : s - 1;
-                }
                 s = Math.max(0, Math.min(s, qta));
 
                 p.dichiarazione = s;
@@ -2174,12 +2240,10 @@ io.on('connection', (socket) => {
                 currentGame.turnoAttuale = (currentGame.turnoAttuale + 1) % currentGame.numPlayers;
                 if (currentGame.players.every(pl => pl.dichiarazione !== "-")) currentGame.fase = "gioco";
 
-                // Sblocca il flag prima di triggerare il prossimo bot
                 currentGame.botThinking = false;
                 inviaStato(code);
                 gestisciIA(code);
             } else {
-                // FASE DI GIOCO: Intelligenza Genetica / SMART
                 const manoV = p.mano.filter(c => !c.giocata);
                 let cartaDaGiocare;
                 const wantsToWin = p.preseFatte < p.dichiarazione;
@@ -2189,10 +2253,10 @@ io.on('connection', (socket) => {
 
                 if (p.aiLevel === 1) {
                     cartaDaGiocare = manoV[Math.floor(Math.random() * manoV.length)];
-                } else {
+                } else if (p.aiLevel === 2) {
+                    // Logica originale per livello 2 (Principiante)
                     if (currentGame.tavolo.length === 0) {
                         if (wantsToWin) {
-                            const riskThreshold = 30 * crowdFactor;
                             let cartaRegnante = manoV.find(c => {
                                 const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
                                 return superiori.every(sr => currentGame.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
@@ -2241,11 +2305,6 @@ io.on('connection', (socket) => {
                                     cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
                                 }
                             }
-
-                            if (cartaDaGiocare.seme !== semeUscita) {
-                                console.error(`⚠️ IA Error: Il bot ha provato a giocare ${cartaDaGiocare.seme} invece di ${semeUscita}. Correzione forzata.`);
-                                cartaDaGiocare = carteValide[0];
-                            }
                         } else {
                             if (wantsToWin) {
                                 const briscole = manoV.filter(c => c.seme === 'Ori');
@@ -2271,6 +2330,89 @@ io.on('connection', (socket) => {
                                 }
                             } else {
                                 cartaDaGiocare = (sca > 30) ? manoV.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
+                            }
+                        }
+                    }
+                } else {
+                    // Logica Ottimizzata per livelli 3 e 4 (Intermedio ed Esperto)
+                    if (currentGame.tavolo.length === 0) {
+                        if (wantsToWin) {
+                            let cartaRegnante = manoV.find(c => {
+                                const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
+                                return superiori.every(sr => currentGame.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
+                            });
+
+                            if (cartaRegnante) {
+                                cartaDaGiocare = cartaRegnante;
+                            } else {
+                                const nonBriscoleForti = manoV.filter(c => c.seme !== 'Ori' && (c.valore === 'Asso' || c.valore === '3'));
+                                if (nonBriscoleForti.length > 0) {
+                                    cartaDaGiocare = nonBriscoleForti.sort((a, b) => b.forza - a.forza)[0];
+                                } else {
+                                    cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[Math.floor(manoV.length / 2)];
+                                }
+                            }
+                        } else {
+                            const nonBriscole = manoV.filter(c => c.seme !== 'Ori');
+                            cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
+                        }
+                    } else {
+                        const semeUscita = currentGame.tavolo[0].card.seme;
+                        const carteValide = manoV.filter(c => c.seme === semeUscita);
+                        const vincenteAttuale = currentGame.calcolaVincitorePresa();
+
+                        if (carteValide.length > 0) {
+                            const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
+                            if (wantsToWin) {
+                                if (carteVincenti.length > 0) {
+                                    const siamoUltimi = numMancanti === 0;
+                                    if (siamoUltimi) {
+                                        cartaDaGiocare = carteVincenti.sort((a, b) => a.forza - b.forza)[0];
+                                    } else {
+                                        const miglioreVincente = carteVincenti.sort((a, b) => b.forza - a.forza)[0];
+                                        if (miglioreVincente.valore === 'Asso' || miglioreVincente.valore === '3' || cons < 60) {
+                                            cartaDaGiocare = miglioreVincente;
+                                        } else {
+                                            cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                                        }
+                                    }
+                                } else {
+                                    cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                                }
+                            } else {
+                                const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
+                                if (cartePerdenti.length > 0) {
+                                    cartaDaGiocare = cartePerdenti.sort((a, b) => b.forza - a.forza)[0];
+                                } else {
+                                    cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                                }
+                            }
+                        } else {
+                            if (wantsToWin) {
+                                const briscole = manoV.filter(c => c.seme === 'Ori');
+                                if (briscole.length > 0) {
+                                    const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
+                                    const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
+
+                                    if (briscoleUtili.length > 0) {
+                                        const siamoUltimi = numMancanti === 0;
+                                        const valoreTavolo = currentGame.tavolo.reduce((acc, curr) => acc + (PESO_VALORE[curr.card.valore] >= 10 ? 2 : 1), 0);
+
+                                        if (siamoUltimi || valoreTavolo >= 1 || cons < 50) {
+                                            cartaDaGiocare = briscoleUtili.sort((a, b) => a.forza - b.forza)[0];
+                                        } else {
+                                            cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
+                                        }
+                                    } else {
+                                        const nonBriscole = manoV.filter(c => c.seme !== 'Ori');
+                                        cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
+                                    }
+                                } else {
+                                    cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
+                                }
+                            } else {
+                                const nonBriscole = manoV.filter(c => c.seme !== 'Ori');
+                                cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                             }
                         }
                     }
@@ -2417,68 +2559,128 @@ async function simulazionePartitaSingola() {
             const p = game.players[game.turnoAttuale];
             const qta = game.sequenzaTurni[game.indiceGiro];
 
-            // Logica Bot Scommessa (FIX ROUND FRONTE)
-            let powerScore = 0;
-            if (qta === 1) {
-                const visibleCards = [];
-                game.players.forEach(otherP => {
-                    if (otherP.id !== p.id) {
-                        otherP.mano.forEach(c => { if (!c.giocata) visibleCards.push(c); });
-                    }
-                });
-                const playedCards = game.carteUscite;
-                const maxForzaAvversari = visibleCards.length > 0 ? Math.max(...visibleCards.map(vc => vc.forza)) : 0;
-                let carteSuperiori = 0;
-                let carteTotaliMistero = 0;
-                SEMI.forEach(s => {
-                    VALORI.forEach(v => {
-                        const forza = PESO_SEME[s] + PESO_VALORE[v];
-                        const isVisible = visibleCards.some(vc => vc.seme === s && vc.valore === v);
-                        const isPlayed = playedCards.some(pc => pc.seme === s && pc.valore === v);
-                        if (!isVisible && !isPlayed) {
-                            carteTotaliMistero++;
-                            if (forza > maxForzaAvversari) carteSuperiori++;
+            let s = 0;
+            if (p.aiLevel <= 2) {
+                // Logica originale per Beginner/Apprentice (livello 1 e 2)
+                let powerScore = 0;
+                if (qta === 1) {
+                    const visibleCards = [];
+                    game.players.forEach(otherP => {
+                        if (otherP.id !== p.id) {
+                            otherP.mano.forEach(c => { if (!c.giocata) visibleCards.push(c); });
                         }
                     });
-                });
-                const probVittoria = carteTotaliMistero > 0 ? (carteSuperiori / carteTotaliMistero) : 0;
-                powerScore = (Math.random() < probVittoria) ? 140 : 10;
+                    const playedCards = game.carteUscite;
+                    const maxForzaAvversari = visibleCards.length > 0 ? Math.max(...visibleCards.map(vc => vc.forza)) : 0;
+                    let carteSuperiori = 0;
+                    let carteTotaliMistero = 0;
+                    SEMI.forEach(s_ => {
+                        VALORI.forEach(v_ => {
+                            const forza = PESO_SEME[s_] + PESO_VALORE[v_];
+                            const isVisible = visibleCards.some(vc => vc.seme === s_ && vc.valore === v_);
+                            const isPlayed = playedCards.some(pc => pc.seme === s_ && pc.valore === v_);
+                            if (!isVisible && !isPlayed) {
+                                carteTotaliMistero++;
+                                if (forza > maxForzaAvversari) carteSuperiori++;
+                            }
+                        });
+                    });
+                    const probVittoria = carteTotaliMistero > 0 ? (carteSuperiori / carteTotaliMistero) : 0;
+                    powerScore = (Math.random() < probVittoria) ? 140 : 10;
+                } else {
+                    p.mano.forEach(c => {
+                        if (c.valore === 'Asso') powerScore += 140;
+                        else if (c.valore === '3') powerScore += 120;
+                        else if (c.valore === 'Re') powerScore += 90;
+                        else if (c.valore === 'Cavallo') powerScore += 70;
+                        else if (c.valore === 'Fante') powerScore += 55;
+                        else powerScore += 15;
+
+                        if (c.seme === 'Ori') powerScore += 50;
+                        if (c.seme === 'Spade') powerScore += 30;
+                        if (c.seme === 'Coppe') powerScore += 10;
+                    });
+                }
+                const div = (game.numPlayers <= 3) ? 120 : 150;
+                const ordineTurno = (game.turnoAttuale - (game.indiceMazziere + 1) + game.numPlayers) % game.numPlayers;
+                const posFactor = 0.85 + (ordineTurno / game.numPlayers) * 0.3;
+                let scommesseFactor = 1.0;
+                const scommesseFatte = game.players.filter(pl => pl.dichiarazione !== "-").length;
+                if (scommesseFatte > 0) {
+                    const quotaTarget = (qta / game.numPlayers) * scommesseFatte;
+                    if (game.sommaScommesse > quotaTarget) scommesseFactor = 0.85;
+                    else if (game.sommaScommesse < quotaTarget) scommesseFactor = 1.15;
+                }
+                s = Math.floor((powerScore / div) * posFactor * scommesseFactor);
+                if (qta === 1 && game.sommaScommesse >= 1 && s >= 1) {
+                    if (Math.random() > 0.4) s = 0;
+                }
+                if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
+                if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
+                    if (s === 0) s = 1;
+                    else if (s === qta) s = qta - 1;
+                    else s = (powerScore / div > 0.5) ? s + 1 : s - 1;
+                }
             } else {
-                p.mano.forEach(c => {
-                    if (c.valore === 'Asso') powerScore += 140;
-                    else if (c.valore === '3') powerScore += 120;
-                    else if (c.valore === 'Re') powerScore += 90;
-                    else if (c.valore === 'Cavallo') powerScore += 70;
-                    else if (c.valore === 'Fante') powerScore += 55;
-                    else powerScore += 15;
-
-                    if (c.seme === 'Ori') powerScore += 50;
-                    if (c.seme === 'Spade') powerScore += 30;
-                    if (c.seme === 'Coppe') powerScore += 10;
-                });
-            }
-            const div = (game.numPlayers <= 3) ? 120 : 150;
-            const ordineTurno = (game.turnoAttuale - (game.indiceMazziere + 1) + game.numPlayers) % game.numPlayers;
-            const posFactor = 0.85 + (ordineTurno / game.numPlayers) * 0.3;
-
-            let scommesseFactor = 1.0;
-            const scommesseFatte = game.players.filter(pl => pl.dichiarazione !== "-").length;
-            if (scommesseFatte > 0) {
-                const quotaTarget = (qta / game.numPlayers) * scommesseFatte;
-                if (game.sommaScommesse > quotaTarget) scommesseFactor = 0.85;
-                else if (game.sommaScommesse < quotaTarget) scommesseFactor = 1.15;
-            }
-
-            let s = Math.floor((powerScore / div) * posFactor * scommesseFactor);
-            if (qta === 1 && game.sommaScommesse >= 1 && s >= 1) {
-                if (Math.random() > 0.4) s = 0;
-            }
-
-            if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
-            if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
-                if (s === 0) s = 1;
-                else if (s === qta) s = qta - 1;
-                else s = (powerScore / div > 0.5) ? s + 1 : s - 1;
+                // Logica Ottimizzata per Intermediate/Expert (livello 3 e 4)
+                let expectedTricks = 0;
+                if (qta === 1) {
+                    const visibleCards = [];
+                    game.players.forEach(otherP => {
+                        if (otherP.id !== p.id) {
+                            otherP.mano.forEach(c => { if (!c.giocata) visibleCards.push(c); });
+                        }
+                    });
+                    const playedCards = game.carteUscite;
+                    const maxForzaAvversari = visibleCards.length > 0 ? Math.max(...visibleCards.map(vc => vc.forza)) : 0;
+                    let carteSuperiori = 0;
+                    let carteTotaliMistero = 0;
+                    SEMI.forEach(s_ => {
+                        VALORI.forEach(v_ => {
+                            const forza = PESO_SEME[s_] + PESO_VALORE[v_];
+                            const isVisible = visibleCards.some(vc => vc.seme === s_ && vc.valore === v_);
+                            const isPlayed = playedCards.some(pc => pc.seme === s_ && pc.valore === v_);
+                            if (!isVisible && !isPlayed) {
+                                carteTotaliMistero++;
+                                if (forza > maxForzaAvversari) carteSuperiori++;
+                            }
+                        });
+                    });
+                    const probVittoria = carteTotaliMistero > 0 ? (carteSuperiori / carteTotaliMistero) : 0;
+                    expectedTricks = (probVittoria > 0.5) ? 1 : 0;
+                } else {
+                    p.mano.forEach(c => {
+                        if (c.seme === 'Ori') {
+                            if (c.valore === 'Asso') expectedTricks += 1.0;
+                            else if (c.valore === '3') expectedTricks += 0.95;
+                            else if (c.valore === 'Re') expectedTricks += 0.85;
+                            else if (c.valore === 'Cavallo') expectedTricks += 0.75;
+                            else if (c.valore === 'Fante') expectedTricks += 0.65;
+                            else expectedTricks += 0.35;
+                        } else {
+                            const sizeFactor = qta - 1;
+                            if (c.valore === 'Asso') expectedTricks += Math.max(0.3, 0.7 - 0.04 * sizeFactor);
+                            else if (c.valore === '3') expectedTricks += Math.max(0.15, 0.5 - 0.04 * sizeFactor);
+                            else if (c.valore === 'Re') expectedTricks += Math.max(0.05, 0.3 - 0.03 * sizeFactor);
+                            else if (c.valore === 'Cavallo') expectedTricks += Math.max(0.02, 0.15 - 0.02 * sizeFactor);
+                            else if (c.valore === 'Fante') expectedTricks += Math.max(0.01, 0.10 - 0.01 * sizeFactor);
+                            else expectedTricks += 0.02;
+                        }
+                    });
+                }
+                s = Math.round(expectedTricks);
+                if (qta === 1 && game.sommaScommesse >= 1 && s >= 1) {
+                    s = 0;
+                }
+                if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
+                if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
+                    const decimalPart = expectedTricks - Math.floor(expectedTricks);
+                    if (decimalPart > 0.5) s = Math.min(qta, s + 1);
+                    else s = Math.max(0, s - 1);
+                    if (game.sommaScommesse + s === qta) {
+                        s = (s >= qta / 2) ? s - 1 : s + 1;
+                    }
+                }
             }
             s = Math.max(0, Math.min(s, qta));
 
@@ -2495,29 +2697,22 @@ async function simulazionePartitaSingola() {
             let cartaDaGiocare;
             const wantsToWin = p.preseFatte < p.dichiarazione;
             const { agg, cons, sca } = p.aiParams || { agg: 50, cons: 50, sca: 50 };
+            const crowdFactor = game.numPlayers / 4;
+            const numMancanti = game.numPlayers - 1 - game.tavolo.length;
 
-            // --- NUOVO: CROWD FACTOR (Pressione del numero giocatori) ---
-            // Più giocatori ci sono, più è probabile che un carico venga "tagliato" da una briscola.
-            const crowdFactor = game.numPlayers / 4; // 3 players = 0.75, 8 players = 2.0
-
-            // --- LOGICA GENETICA ---
             if (p.aiLevel === 1) {
                 cartaDaGiocare = manoV[Math.floor(Math.random() * manoV.length)];
-            } else {
+            } else if (p.aiLevel === 2) {
+                // Logica originale per livello 2 (Principiante)
                 if (game.tavolo.length === 0) {
                     if (wantsToWin) {
-                        // In tavoli affollati, aprire con un carico è rischioso (rischio taglio alto)
-                        const riskThreshold = 30 * crowdFactor;
-
                         let cartaRegnante = manoV.find(c => {
                             const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
                             return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
                         });
-
                         if (cartaRegnante && agg > 20) {
                             cartaDaGiocare = cartaRegnante;
                         } else {
-                            // Se il tavolo è affollato e non siamo sicuri, giochiamo coperti (carta media/bassa)
                             if (crowdFactor > 1.5 && agg < 80) {
                                 cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[Math.floor(manoV.length / 3)];
                             } else {
@@ -2531,21 +2726,16 @@ async function simulazionePartitaSingola() {
                     const semeUscita = game.tavolo[0].card.seme;
                     const carteValide = manoV.filter(c => c.seme === semeUscita);
                     const vincenteAttuale = game.calcolaVincitorePresa();
-                    const numMancanti = game.numPlayers - 1 - game.tavolo.length;
-
                     if (carteValide.length > 0) {
                         const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
                         if (wantsToWin) {
                             const siamoUltimi = numMancanti === 0;
                             if (carteVincenti.length > 0) {
                                 if (siamoUltimi) {
-                                    // Se siamo ultimi, usiamo la carta più bassa per vincere (efficienza)
                                     cartaDaGiocare = carteVincenti.sort((a, b) => a.forza - b.forza)[0];
                                 } else {
-                                    // Se NON siamo ultimi, il rischio che qualcuno dopo di noi tagli è proporzionale a numMancanti
                                     const rischioTaglio = numMancanti * 0.15 * crowdFactor;
                                     if (cons > (80 - rischioTaglio * 100)) {
-                                        // Troppo rischioso, giochiamo una carta bassa per ora
                                         cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
                                     } else {
                                         cartaDaGiocare = carteVincenti.sort((a, b) => b.forza - a.forza)[0];
@@ -2563,21 +2753,15 @@ async function simulazionePartitaSingola() {
                             }
                         }
                     } else {
-                        // Non ha il seme: valutiamo il taglio con Ori
                         if (wantsToWin) {
                             const briscole = manoV.filter(c => c.seme === 'Ori');
                             if (briscole.length > 0) {
                                 const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
                                 const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
-
                                 if (briscoleUtili.length > 0) {
                                     const siamoUltimi = numMancanti === 0;
                                     const valoreTavolo = game.tavolo.reduce((acc, curr) => acc + (PESO_VALORE[curr.card.valore] >= 10 ? 2 : 1), 0);
-
-                                    // Valutiamo se il gioco vale la candela (il taglio)
-                                    // Se mancano molte persone, il rischio che qualcuno controtagli con un Oro più alto è alto
                                     const rischioControtaglio = numMancanti * 0.2 * crowdFactor;
-
                                     if (!siamoUltimi && (cons > (70 - rischioControtaglio * 100)) && valoreTavolo < 2) {
                                         cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
                                     } else {
@@ -2591,6 +2775,85 @@ async function simulazionePartitaSingola() {
                             }
                         } else {
                             cartaDaGiocare = (sca > 30) ? manoV.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
+                        }
+                    }
+                }
+            } else {
+                // Logica Ottimizzata per livelli 3 e 4 (Intermedio ed Esperto)
+                if (game.tavolo.length === 0) {
+                    if (wantsToWin) {
+                        let cartaRegnante = manoV.find(c => {
+                            const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
+                            return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
+                        });
+                        if (cartaRegnante) {
+                            cartaDaGiocare = cartaRegnante;
+                        } else {
+                            const nonBriscoleForti = manoV.filter(c => c.seme !== 'Ori' && (c.valore === 'Asso' || c.valore === '3'));
+                            if (nonBriscoleForti.length > 0) {
+                                cartaDaGiocare = nonBriscoleForti.sort((a, b) => b.forza - a.forza)[0];
+                            } else {
+                                cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[Math.floor(manoV.length / 2)];
+                            }
+                        }
+                    } else {
+                        const nonBriscole = manoV.filter(c => c.seme !== 'Ori');
+                        cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
+                    }
+                } else {
+                    const semeUscita = game.tavolo[0].card.seme;
+                    const carteValide = manoV.filter(c => c.seme === semeUscita);
+                    const vincenteAttuale = game.calcolaVincitorePresa();
+                    if (carteValide.length > 0) {
+                        const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
+                        if (wantsToWin) {
+                            if (carteVincenti.length > 0) {
+                                const siamoUltimi = numMancanti === 0;
+                                if (siamoUltimi) {
+                                    cartaDaGiocare = carteVincenti.sort((a, b) => a.forza - b.forza)[0];
+                                } else {
+                                    const miglioreVincente = carteVincenti.sort((a, b) => b.forza - a.forza)[0];
+                                    if (miglioreVincente.valore === 'Asso' || miglioreVincente.valore === '3' || cons < 60) {
+                                        cartaDaGiocare = miglioreVincente;
+                                    } else {
+                                        cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                                    }
+                                }
+                            } else {
+                                cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                            }
+                        } else {
+                            const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
+                            if (cartePerdenti.length > 0) {
+                                cartaDaGiocare = cartePerdenti.sort((a, b) => b.forza - a.forza)[0];
+                            } else {
+                                cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                            }
+                        }
+                    } else {
+                        if (wantsToWin) {
+                            const briscole = manoV.filter(c => c.seme === 'Ori');
+                            if (briscole.length > 0) {
+                                const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
+                                const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
+                                if (briscoleUtili.length > 0) {
+                                    const siamoUltimi = numMancanti === 0;
+                                    const valoreTavolo = game.tavolo.reduce((acc, curr) => acc + (PESO_VALORE[curr.card.valore] >= 10 ? 2 : 1), 0);
+                                    if (siamoUltimi || valoreTavolo >= 1 || cons < 50) {
+                                        cartaDaGiocare = briscoleUtili.sort((a, b) => a.forza - b.forza)[0];
+                                    } else {
+                                        cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
+                                    }
+                                } else {
+                                    const nonBriscole = game.players[game.turnoAttuale].mano.filter(c => !c.giocata && c.seme !== 'Ori'); // Fix reference: manoV
+                                    cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
+                                }
+                            } else {
+                                cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
+                            }
+                        } else {
+                            const nonBriscole = manoV.filter(c => c.seme !== 'Ori');
+                            cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                         }
                     }
                 }
