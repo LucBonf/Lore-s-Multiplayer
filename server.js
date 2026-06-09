@@ -1882,7 +1882,7 @@ io.on('connection', (socket) => {
 
         // --- LOGGING PER TRAINING AI ---
         const isFast = lobbies[code]?.isFast || code === "FAST";
-        if (dbConnected && !isFast) {
+        if (dbConnected) {
             const historyStr = game.carteUscite.map(c => `${c.valore}-${c.seme}`).join('|');
             const voidStr = game.players.map((p, i) => p.voidSuits.length > 0 ? `P${i}:${p.voidSuits.join('&')}` : "").filter(s => s !== "").join('|');
             const tableStr = game.tavolo.map(t => `${t.card.valore}-${t.card.seme}`).join('|');
@@ -1970,7 +1970,7 @@ io.on('connection', (socket) => {
                 const classificaFinale = [...game.players].sort((a, b) => b.punti - a.punti);
 
                 // --- CALCOLO E AGGIORNAMENTO ELO ---
-                if (dbConnected && !isFast) {
+                if (dbConnected) {
                     const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
                     if (humanPlayers.length > 0) {
                         try {
@@ -2036,7 +2036,7 @@ io.on('connection', (socket) => {
                 }
 
                 // Aggiorniamo i log del match con la classifica finale per i replay
-                if (dbConnected && !isFast) {
+                if (dbConnected) {
                     const simplifiedScores = classificaFinale.map(c => ({ nome: c.nome, punti: c.punti }));
                     HumanMatchLog.updateMany({ matchId: game.matchId }, { $set: { finalScores: simplifiedScores, isCompleted: true } }).catch(e => { });
                 }
