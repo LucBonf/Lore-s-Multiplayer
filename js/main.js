@@ -430,6 +430,7 @@ function renderStepReplay(stepIdx) {
 
         fakeState.tuttiGiocatori.push({
             socketId: isPerspective ? socket.id : `pseudo-${i}`, 
+            isMe: isPerspective,
             nome: savedNick || (isMover ? (move.isHuman ? "Umano" : move.aiVariant) : `Player ${i}`),
             isMazziere: false,
             punti: "?",
@@ -536,19 +537,35 @@ socket.on('classifica_dati', (dati) => {
         return;
     }
 
-    let html = top10.map((u, i) => `
-        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #555; padding: 10px 0;">
-            <span><strong>${i+1}°.</strong> ${u.nickname}</span>
-            <span>${u.punteggioTotale} ${d.points} (${u.partiteVinte} ${d.wins})</span>
-        </div>
-    `).join('');
+    let html = top10.map((u, i) => {
+        let stemma = null;
+        if (u.nickname && u.nickname.trim().toUpperCase() === "LUCA") stemma = "admin";
+        else if (i === 0) stemma = "oro";
+        else if (i === 1) stemma = "argento";
+        else if (i === 2) stemma = "bronzo";
+
+        const nicknameConStemma = renderNomeConStemma(u.nickname, stemma);
+        return `
+            <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #555; padding: 10px 0;">
+                <span><strong>${i+1}°.</strong> ${nicknameConStemma}</span>
+                <span>${u.punteggioTotale} ${d.points} (${u.partiteVinte} ${d.wins})</span>
+            </div>
+        `;
+    }).join('');
 
     if (userRank) {
         const formattedPos = userRank.posizione.toLocaleString('it-IT');
+        let stemma = null;
+        if (userRank.nickname && userRank.nickname.trim().toUpperCase() === "LUCA") stemma = "admin";
+        else if (userRank.posizione === 1) stemma = "oro";
+        else if (userRank.posizione === 2) stemma = "argento";
+        else if (userRank.posizione === 3) stemma = "bronzo";
+
+        const nicknameConStemma = renderNomeConStemma(userRank.nickname, stemma);
         html += `
             <div style="margin-top: 20px; border-top: 2px solid #e67e22; padding-top: 15px; background: rgba(230, 126, 34, 0.1); border-radius: 0 0 8px 8px; padding: 15px;">
                 <div style="display:flex; justify-content:space-between; color: #f1c40f; font-weight: bold;">
-                    <span><strong>${formattedPos}°.</strong> ${userRank.nickname} (${d.you})</span>
+                    <span><strong>${formattedPos}°.</strong> ${nicknameConStemma} (${d.you})</span>
                     <span>${userRank.punteggioTotale} ${d.points} (${userRank.partiteVinte} ${d.wins})</span>
                 </div>
             </div>
@@ -562,6 +579,31 @@ socket.on('classifica_dati', (dati) => {
 //   NUOVO RENDER GIOCATORI CIRCOLARE (MAIN.JS)
 // =========================================
 
+function renderNomeConStemma(nome, stemma) {
+    if (!stemma) return nome;
+    let icon = "";
+    let color = "";
+    let title = "";
+    if (stemma === "admin") {
+        icon = "👑";
+        color = "#e74c3c";
+        title = "Admin / Creatore";
+    } else if (stemma === "oro") {
+        icon = "🥇";
+        color = "#f1c40f";
+        title = "1° in Classifica";
+    } else if (stemma === "argento") {
+        icon = "🥈";
+        color = "#bdc3c7";
+        title = "2° in Classifica";
+    } else if (stemma === "bronzo") {
+        icon = "🥉";
+        color = "#e67e22";
+        title = "3° in Classifica";
+    }
+    return `<span class="badge-player badge-${stemma}" style="color: ${color}; margin-right: 4px;" title="${title}">${icon}</span>${nome}`;
+}
+
 function renderGiocatori(data) {
     const playersCircle = document.getElementById('players-circle');
     const cardsOnTable = document.getElementById('cards-on-table');
@@ -571,7 +613,7 @@ function renderGiocatori(data) {
     cardsOnTable.innerHTML = '';
 
     const numPlayers = data.tuttiGiocatori.length;
-    let mioIndice = data.tuttiGiocatori.findIndex(p => p.socketId === socket.id);
+    let mioIndice = data.tuttiGiocatori.findIndex(p => p.isMe || p.socketId === socket.id);
     
     // Sicurezza: se non siamo tra i giocatori (osservatore o sync error), evitiamo lo slittamento
     if (mioIndice === -1) mioIndice = 0;
@@ -600,7 +642,7 @@ function renderGiocatori(data) {
     for (let i = 0; i < numPlayers; i++) {
         const serverPlayerIndex = (mioIndice + i) % numPlayers;
         const p = data.tuttiGiocatori[serverPlayerIndex];
-        const isMe = (p.socketId === socket.id);
+        const isMe = p.isMe || (p.socketId === socket.id);
 
         let posX, posY;
         let angoloGradi;
@@ -644,8 +686,9 @@ function renderGiocatori(data) {
         pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
 
         const ruolo = p.isMazziere ? ` ${d.roleDealer}` : "";
+        const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
         pBlock.innerHTML = `
-            <div class="name">${p.nome}${ruolo}</div>
+            <div class="name">${nomeConStemma}${ruolo}</div>
             <div class="stats">${d.pts}: ${p.punti} | ${d.betLabel}: ${p.dichiarazione} | ${d.tricks}: ${p.prese}</div>
         `;
 
@@ -908,7 +951,7 @@ socket.on('lobby_creata', (d) => {
     document.getElementById('display-room-code').innerText = d.code;
     document.getElementById('lobby-info').style.display = 'block';
     document.getElementById('start-game-btn').style.display = 'block';
-    document.getElementById('joined-players-list').innerHTML = d.giocatori.map(p => `<div>👤 ${p.nome}</div>`).join('');
+    document.getElementById('joined-players-list').innerHTML = d.giocatori.map(p => `<div>👤 ${renderNomeConStemma(p.nome, p.stemma)}</div>`).join('');
     updateChatVisibility(d.giocatori);
 });
 
@@ -922,7 +965,7 @@ socket.on('aggiorna_lobby', (dati) => {
         document.getElementById('lobby-info').style.display = 'block';
     }
 
-    document.getElementById('joined-players-list').innerHTML = dati.giocatori.map(p => `<div>👤 ${p.nome}</div>`).join('');
+    document.getElementById('joined-players-list').innerHTML = dati.giocatori.map(p => `<div>👤 ${renderNomeConStemma(p.nome, p.stemma)}</div>`).join('');
     updateChatVisibility(dati.giocatori);
 });
 
@@ -932,7 +975,7 @@ socket.on('conferma_inizio_partita', (dati) => {
     switchSection('game-area');
 
     const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
-    const eMioTurno = (pAttuale.socketId === socket.id);
+    const eMioTurno = pAttuale.isMe || (pAttuale.socketId === socket.id);
 
     // Gestione comparsa riquadro scommesse
     const areaScommessa = document.getElementById('dichiarazione-area');
@@ -946,7 +989,7 @@ socket.on('conferma_inizio_partita', (dati) => {
         betInput.focus();
 
         // Controllo se sono il mazziere per mostrare il vincolo
-        const me = dati.tuttiGiocatori.find(p => p.socketId === socket.id);
+        const me = dati.tuttiGiocatori.find(p => p.isMe || p.socketId === socket.id);
         const lang = localStorage.getItem('lucas_lang') || 'it';
         const d = dictionary[lang];
         if (me && me.isMazziere) {

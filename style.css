@@ -1186,3 +1186,41 @@ button {
     0% { text-shadow: 0 0 10px rgba(241, 196, 15, 0.3); transform: scale(1); }
     100% { text-shadow: 0 0 30px rgba(241, 196, 15, 0.8); transform: scale(1.05); }
 }
+
+/* Badge dei Giocatori (Stemmi) */
+.badge-player {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    line-height: 1;
+    vertical-align: middle;
+    margin-right: 5px;
+    animation: badge-shine 2.5s infinite ease-in-out;
+}
+
+.badge-admin {
+    animation: badge-pulse-admin 2s infinite ease-in-out;
+}
+
+@keyframes badge-shine {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.3));
+    }
+    50% {
+        transform: scale(1.2);
+        filter: drop-shadow(0 0 6px currentColor);
+    }
+}
+
+@keyframes badge-pulse-admin {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+        filter: drop-shadow(0 0 2px #e74c3c);
+    }
+    50% {
+        transform: scale(1.25) rotate(5deg);
+        filter: drop-shadow(0 0 8px #e74c3c);
+    }
+}
