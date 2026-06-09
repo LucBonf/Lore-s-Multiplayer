@@ -1022,6 +1022,16 @@ window.uniscitiAPartitaPubblica = (code) => {
     window.uniscitiAStanza();
 };
 
+window.tornaAllaLobby = () => {
+    const modalEndgame = document.getElementById('modal-endgame');
+    if (modalEndgame) modalEndgame.style.display = 'none';
+
+    const containerFinale = document.getElementById('classifica-finale-container');
+    if (containerFinale) containerFinale.style.display = 'none';
+
+    socket.emit('torna_in_lobby');
+};
+
 socket.on('lista_lobby_pubbliche', (list) => {
     const container = document.getElementById('public-lobbies-container');
     const listEl = document.getElementById('public-lobbies-list');

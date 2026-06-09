@@ -1414,6 +1414,23 @@ io.on('connection', (socket) => {
         socket.emit('lista_lobby_pubbliche', publicLobbies);
     });
 
+    socket.on('torna_in_lobby', () => {
+        try {
+            const code = socket.roomCode;
+            if (!code) return;
+            const lobby = lobbies[code];
+            if (lobby) {
+                if (lobby.gameInstance) {
+                    lobby.gameInstance = null;
+                }
+                inviaAggiornamentoLobby(code);
+                inviaLobbyPubblicheTutti();
+            }
+        } catch (e) {
+            console.error("Errore torna_in_lobby:", e);
+        }
+    });
+
     function gestisciRiconnessione(socket, code, token) {
         const lobby = lobbies[code];
         if (!lobby) return socket.emit('riconnessione_fallita');
