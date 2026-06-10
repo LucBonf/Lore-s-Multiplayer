@@ -701,9 +701,15 @@ function renderGiocatori(data) {
 
         const ruolo = p.isMazziere ? ` ${d.roleDealer}` : "";
         const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
+        let timerHtml = "";
+        if (data.turnoAttuale === serverPlayerIndex && p.isHuman !== false && (data.fase === 'scommesse' || data.fase === 'gioco')) {
+            timerHtml = `<div class="turn-timer" id="turn-timer-display" style="display: none;">30s</div>`;
+        }
+
         pBlock.innerHTML = `
             <div class="name">${nomeConStemma}${ruolo}</div>
             <div class="stats">${d.pts}: ${p.punti} | ${d.betLabel}: ${p.dichiarazione} | ${d.tricks}: ${p.prese}</div>
+            ${timerHtml}
         `;
 
         if (isMe) {
@@ -936,6 +942,10 @@ window.inviaDichiarazione = () => {
 };
 
 window.esciDallaPartita = () => {
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
     // Se siamo in un replay, il tasto ESCI chiude il replay e riapre la lista
     if (isReplayMode) {
         chiudiReplayViewer();
@@ -1109,6 +1119,27 @@ socket.on('conferma_inizio_partita', (dati) => {
     renderGiocatori(dati);
     updateChatVisibility(dati.tuttiGiocatori);
 
+    // Gestione timer client-side
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    const timerDisplay = document.getElementById('turn-timer-display');
+    if (timerDisplay) {
+        let timeLeft = 30;
+        window.clientTurnInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 10) {
+                timerDisplay.style.display = 'block';
+                timerDisplay.innerText = `${timeLeft}s`;
+            }
+            if (timeLeft <= 0) {
+                clearInterval(window.clientTurnInterval);
+                timerDisplay.innerText = "Timeout!";
+            }
+        }, 1000);
+    }
+
     // --- MICRO-RITARDO SUI CLICK ---
     // Ritarda la possibilità di giocare una carta non appena lo stato viene ricevuto e renderizzato, evitando carte "istantanee"
     canPlay = false;
@@ -1143,6 +1174,10 @@ socket.on('errore', (m) => {
     canPlay = true; // Sblocca l'interfaccia se c'è stato un errore (es. vincolo mazziere)
 });
 socket.on('fine_partita', (cl) => {
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
     sessionStorage.removeItem('lucas_room');
     
     const lang = localStorage.getItem('lucas_lang') || 'it';
@@ -1439,3 +1474,24 @@ function updateChatVisibility(giocatori) {
         updateUnreadBadge();
     }
 }
+
+socket.on('mossa_automatica', (d) => {
+    const messagesCont = document.getElementById('chat-messages');
+    if (messagesCont) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'chat-msg';
+        msgDiv.style.background = 'rgba(231, 76, 60, 0.15)';
+        msgDiv.style.border = '1px solid rgba(231, 76, 60, 0.2)';
+        msgDiv.style.alignSelf = 'center';
+        msgDiv.style.width = '95%';
+        msgDiv.style.margin = '5px auto';
+        msgDiv.style.textAlign = 'center';
+        msgDiv.innerHTML = `
+            <div style="color: #e74c3c; font-style: italic; font-weight: bold; font-size: 0.8rem; padding: 4px;">
+                ⏱️ ${d.nickname} ha esaurito il tempo! Mossa automatica: ${d.mossa}
+            </div>
+        `;
+        messagesCont.appendChild(msgDiv);
+        messagesCont.scrollTop = messagesCont.scrollHeight;
+    }
+});

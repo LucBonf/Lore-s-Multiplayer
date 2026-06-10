@@ -1277,3 +1277,34 @@ button {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* --- TIMER DI TURNO (AUTOPLAY COUNTDOWN) --- */
+.turn-timer {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(231, 76, 60, 0.95);
+    color: white;
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 3px 10px;
+    border-radius: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    z-index: 1000;
+    border: 1px solid rgba(255,255,255,0.2);
+    animation: timerPulse 1s infinite alternate;
+}
+
+@keyframes timerPulse {
+    from {
+        opacity: 0.85;
+        transform: translateX(-50%) scale(0.95);
+        box-shadow: 0 0 5px rgba(231, 76, 60, 0.5);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) scale(1.05);
+        box-shadow: 0 0 15px rgba(231, 76, 60, 0.8);
+    }
+}

@@ -1205,6 +1205,7 @@ let osservatoriAdmin = 0;
 let isSimulando = false;
 let turboEnabled = false; // Interruttore Maestro AI
 const lobbies = {};
+const turnTimers = {};
 
 
 io.on('connection', (socket) => {
@@ -1565,6 +1566,10 @@ io.on('connection', (socket) => {
 
                 if (lobby.giocatori.length === 0) {
                     delete lobbies[code];
+                    if (turnTimers[code]) {
+                        clearTimeout(turnTimers[code]);
+                        delete turnTimers[code];
+                    }
                     if (dbConnected) {
                         MatchState.deleteOne({ roomCode: code }).catch(e => {});
                     }
@@ -1587,6 +1592,7 @@ io.on('connection', (socket) => {
                         p.nome += " (Bot)";
                         inviaStato(code);
                         gestisciIA(code);
+                        avviaTimerTurno(code);
                     }
                 } else {
                     // Se era ancora in lobby, aggiorna gli altri
@@ -1646,6 +1652,7 @@ io.on('connection', (socket) => {
                                         currentLobby.gameInstance.tavolo.length < currentLobby.gameInstance.numPlayers) {
                                         gestisciIA(code);
                                     }
+                                    avviaTimerTurno(code);
                                 }
                             }, 8000); // 8 secondi di tolleranza per il refresh
                         }
@@ -1745,6 +1752,7 @@ io.on('connection', (socket) => {
         salvaStatoMatch(code);
         inviaStato(code);
         gestisciIA(code);
+        avviaTimerTurno(code);
     }
 
     socket.on('bug_report', async (testo) => {
@@ -1839,6 +1847,7 @@ io.on('connection', (socket) => {
             salvaStatoMatch(code);
             inviaStato(code);
             gestisciIA(code);
+            avviaTimerTurno(code);
         } catch (e) {
             console.error("Errore invia_scommessa:", e);
         }
@@ -1888,6 +1897,7 @@ io.on('connection', (socket) => {
                 gestisciIA(code);
             }
             salvaStatoMatch(code);
+            avviaTimerTurno(code);
         } catch (e) {
             console.error("Errore gioca_carta:", e);
         }
@@ -2071,6 +2081,10 @@ io.on('connection', (socket) => {
                     stemma: ottieniStemma(p.uniqueCode, p.nome)
                 }));
                 io.to(code).emit('fine_partita', classificaFinaleConStemma);
+                if (turnTimers[code]) {
+                    clearTimeout(turnTimers[code]);
+                    delete turnTimers[code];
+                }
                 return;
             } else {
                 game.indiceMazziere = (game.indiceMazziere + 1) % game.numPlayers;
@@ -2080,6 +2094,7 @@ io.on('connection', (socket) => {
         }
         inviaStato(code);
         gestisciIA(code);
+        avviaTimerTurno(code);
     }
 
     function gestisciIA(code) {
@@ -2274,6 +2289,7 @@ io.on('connection', (socket) => {
                 currentGame.botThinking = false;
                 inviaStato(code);
                 gestisciIA(code);
+                avviaTimerTurno(code);
             } else {
                 const manoV = p.mano.filter(c => !c.giocata);
                 let cartaDaGiocare;
@@ -2466,6 +2482,7 @@ io.on('connection', (socket) => {
                     currentGame.turnoAttuale = (currentGame.turnoAttuale + 1) % currentGame.numPlayers;
                     inviaStato(code);
                     gestisciIA(code);
+                    avviaTimerTurno(code);
                 }
             }
         }, isFast ? 50 : 1200);
@@ -2509,9 +2526,263 @@ io.on('connection', (socket) => {
                     };
                 })
             };
-            // Uso io.to(socketId) per mandare il messaggio SOLO a lui
-            io.to(giocatoreUmano.id).emit('conferma_inizio_partita', payload);
         });
+    }
+
+    function avviaTimerTurno(code) {
+        if (turnTimers[code]) {
+            clearTimeout(turnTimers[code]);
+            delete turnTimers[code];
+        }
+
+        const lobby = lobbies[code];
+        if (!lobby || !lobby.gameInstance) return;
+        const game = lobby.gameInstance;
+
+        // Se la presa si sta risolvendo (tavolo pieno), non facciamo partire il timer
+        if (game.tavolo.length >= game.numPlayers) return;
+
+        const activePlayer = game.players[game.turnoAttuale];
+        if (activePlayer && activePlayer.isHuman) {
+            turnTimers[code] = setTimeout(() => {
+                autogiocaTurno(code, game.turnoAttuale);
+            }, 30000);
+        }
+    }
+
+    function autogiocaTurno(code, playerIndex) {
+        const lobby = lobbies[code];
+        if (!lobby || !lobby.gameInstance) return;
+        const game = lobby.gameInstance;
+        if (game.turnoAttuale !== playerIndex) return;
+
+        const p = game.players[playerIndex];
+        if (!p.isHuman) return;
+
+        console.log(`⏱️ Player ${p.nome} (Human) timed out in room ${code}. Autoplay active.`);
+
+        const qta = game.sequenzaTurni[game.indiceGiro];
+
+        if (game.fase === "scommesse") {
+            // Calcolo scommessa automatica basata sulla logica bot intermedia (livello 3)
+            let expectedTricks = 0;
+            if (qta === 1) {
+                const visibleCards = [];
+                game.players.forEach(otherP => {
+                    if (otherP.id !== p.id) {
+                        otherP.mano.forEach(c => { if (!c.giocata) visibleCards.push(c); });
+                    }
+                });
+                const playedCards = game.carteUscite;
+                const maxForzaAvversari = visibleCards.length > 0 ? Math.max(...visibleCards.map(vc => vc.forza)) : 0;
+                let carteSuperiori = 0;
+                let carteTotaliMistero = 0;
+
+                SEMI.forEach(s_ => {
+                    VALORI.forEach(v_ => {
+                        const forza = PESO_SEME[s_] + PESO_VALORE[v_];
+                        const isVisible = visibleCards.some(vc => vc.seme === s_ && vc.valore === v_);
+                        const isPlayed = playedCards.some(pc => pc.seme === s_ && pc.valore === v_);
+                        if (!isVisible && !isPlayed) {
+                            carteTotaliMistero++;
+                            if (forza > maxForzaAvversari) carteSuperiori++;
+                        }
+                    });
+                });
+                const probVittoria = carteTotaliMistero > 0 ? (carteSuperiori / carteTotaliMistero) : 0;
+                expectedTricks = (probVittoria > 0.5) ? 1 : 0;
+            } else {
+                p.mano.forEach(c => {
+                    if (c.seme === 'Ori') {
+                        if (c.valore === 'Asso') expectedTricks += 1.0;
+                        else if (c.valore === '3') expectedTricks += 0.95;
+                        else if (c.valore === 'Re') expectedTricks += 0.85;
+                        else if (c.valore === 'Cavallo') expectedTricks += 0.75;
+                        else if (c.valore === 'Fante') expectedTricks += 0.65;
+                        else expectedTricks += 0.35;
+                    } else {
+                        const sizeFactor = qta - 1;
+                        if (c.valore === 'Asso') expectedTricks += Math.max(0.3, 0.7 - 0.04 * sizeFactor);
+                        else if (c.valore === '3') expectedTricks += Math.max(0.15, 0.5 - 0.04 * sizeFactor);
+                        else if (c.valore === 'Re') expectedTricks += Math.max(0.05, 0.3 - 0.03 * sizeFactor);
+                        else if (c.valore === 'Cavallo') expectedTricks += Math.max(0.02, 0.15 - 0.02 * sizeFactor);
+                        else if (c.valore === 'Fante') expectedTricks += Math.max(0.01, 0.10 - 0.01 * sizeFactor);
+                        else expectedTricks += 0.02;
+                    }
+                });
+            }
+
+            let s = Math.round(expectedTricks);
+
+            if (qta === 1 && game.sommaScommesse >= 1 && s >= 1) {
+                s = 0;
+            }
+            if (qta >= 6 && s > qta * 0.7) s = Math.ceil(qta * 0.6);
+
+            if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
+                const decimalPart = expectedTricks - Math.floor(expectedTricks);
+                if (decimalPart > 0.5) {
+                    s = Math.min(qta, s + 1);
+                } else {
+                    s = Math.max(0, s - 1);
+                }
+                if (game.sommaScommesse + s === qta) {
+                    s = (s >= qta / 2) ? s - 1 : s + 1;
+                }
+            }
+
+            // Se la mano ha più di 1 carta e contiene l'Asso di Ori, la scommessa minima deve essere 1.
+            // Se la scommessa da 1 viola il vincolo del mazziere, dichiara 2.
+            if (qta > 1 && p.mano.some(c => c.seme === 'Ori' && c.valore === 'Asso')) {
+                if (s < 1) {
+                    s = 1;
+                }
+                if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
+                    s = 2;
+                }
+            }
+
+            s = Math.max(0, Math.min(s, qta));
+
+            p.dichiarazione = s;
+            game.sommaScommesse += s;
+
+            // Invia notifica di timeout ai client
+            io.to(code).emit('mossa_automatica', { nickname: p.nome, mossa: `scommessa ${s}` });
+
+            game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
+            if (game.players.every(pl => pl.dichiarazione !== "-")) {
+                game.fase = "gioco";
+            }
+
+            salvaStatoMatch(code);
+            inviaStato(code);
+            gestisciIA(code);
+            avviaTimerTurno(code);
+
+        } else if (game.fase === "gioco") {
+            const manoV = p.mano.filter(c => !c.giocata);
+            if (manoV.length === 0) return;
+
+            let cartaDaGiocare;
+            const wantsToWin = p.preseFatte < p.dichiarazione;
+            const cons = 65; // Coefficiente conservazione fisso a livello 3 (Intermedio)
+            const numMancanti = game.numPlayers - 1 - game.tavolo.length;
+
+            let carteValide = [];
+            if (game.tavolo.length > 0) {
+                const semeUscita = game.tavolo[0].card.seme;
+                carteValide = manoV.filter(c => c.seme === semeUscita);
+            }
+            if (carteValide.length === 0) {
+                carteValide = manoV;
+            }
+
+            if (game.tavolo.length === 0) {
+                if (wantsToWin) {
+                    let cartaRegnante = carteValide.find(c => {
+                        const superiori = VALORI.filter(v => PESO_VALORE[v] > PESO_VALORE[c.valore]).map(v => new Card(v, c.seme));
+                        return superiori.every(sr => game.carteUscite.some(cu => cu.seme === sr.seme && cu.valore === sr.valore));
+                    });
+
+                    if (cartaRegnante) {
+                        cartaDaGiocare = cartaRegnante;
+                    } else {
+                        const nonBriscoleForti = carteValide.filter(c => c.seme !== 'Ori' && (c.valore === 'Asso' || c.valore === '3'));
+                        if (nonBriscoleForti.length > 0) {
+                            cartaDaGiocare = nonBriscoleForti.sort((a, b) => b.forza - a.forza)[0];
+                        } else {
+                            cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[Math.floor(carteValide.length / 2)];
+                        }
+                    }
+                } else {
+                    const nonBriscole = carteValide.filter(c => c.seme !== 'Ori');
+                    cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
+                }
+            } else {
+                const vincenteAttuale = game.calcolaVincitorePresa();
+                const semeUscita = game.tavolo[0].card.seme;
+                const haSeme = manoV.some(c => c.seme === semeUscita);
+
+                if (haSeme) {
+                    const carteVincenti = carteValide.filter(c => c.forza > vincenteAttuale.card.forza);
+                    if (wantsToWin) {
+                        if (carteVincenti.length > 0) {
+                            const siamoUltimi = numMancanti === 0;
+                            if (siamoUltimi) {
+                                cartaDaGiocare = carteVincenti.sort((a, b) => a.forza - b.forza)[0];
+                            } else {
+                                const miglioreVincente = carteVincenti.sort((a, b) => b.forza - a.forza)[0];
+                                if (miglioreVincente.valore === 'Asso' || miglioreVincente.valore === '3' || cons < 60) {
+                                    cartaDaGiocare = miglioreVincente;
+                                } else {
+                                    cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                                }
+                            }
+                        } else {
+                            cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                        }
+                    } else {
+                        const cartePerdenti = carteValide.filter(c => c.forza < vincenteAttuale.card.forza);
+                        if (cartePerdenti.length > 0) {
+                            cartaDaGiocare = cartePerdenti.sort((a, b) => b.forza - a.forza)[0];
+                        } else {
+                            cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                        }
+                    }
+                } else {
+                    if (wantsToWin) {
+                        const briscole = carteValide.filter(c => c.seme === 'Ori');
+                        if (briscole.length > 0) {
+                            const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
+                            const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
+
+                            if (briscoleUtili.length > 0) {
+                                const siamoUltimi = numMancanti === 0;
+                                const valoreTavolo = game.tavolo.reduce((acc, curr) => acc + (PESO_VALORE[curr.card.valore] >= 10 ? 2 : 1), 0);
+
+                                if (siamoUltimi || valoreTavolo >= 1 || cons < 50) {
+                                    cartaDaGiocare = briscoleUtili.sort((a, b) => a.forza - b.forza)[0];
+                                } else {
+                                    cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                                }
+                            } else {
+                                const nonBriscole = carteValide.filter(c => c.seme !== 'Ori');
+                                cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
+                            }
+                        } else {
+                            cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
+                        }
+                    } else {
+                        const nonBriscole = carteValide.filter(c => c.seme !== 'Ori');
+                        cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => b.forza - a.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
+                    }
+                }
+            }
+
+            if (!cartaDaGiocare) {
+                cartaDaGiocare = carteValide[0];
+            }
+
+            cartaDaGiocare.giocata = true;
+            game.tavolo.push({ playerId: playerIndex, card: cartaDaGiocare });
+
+            const isFast = lobby.isFast || code === "FAST";
+
+            // Invia notifica di timeout ai client
+            io.to(code).emit('mossa_automatica', { nickname: p.nome, mossa: `${cartaDaGiocare.valore} di ${cartaDaGiocare.seme}` });
+
+            if (game.tavolo.length === game.numPlayers) {
+                inviaStato(code);
+                setTimeout(() => risolviPresa(code), isFast ? 150 : 1500);
+            } else {
+                game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
+                inviaStato(code);
+                gestisciIA(code);
+                avviaTimerTurno(code);
+            }
+            salvaStatoMatch(code);
+        }
     }
 });
 
