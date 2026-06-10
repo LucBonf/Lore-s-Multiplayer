@@ -1,8 +1,8 @@
 import fs from 'fs';
 
-const SEMI = ["Coppe", "Ori", "Bastoni", "Spade"];
+const SEMI = ["Coppe", "Denari", "Bastoni", "Spade"];
 const VALORI = ["Asso", "2", "3", "4", "5", "6", "7", "Fante", "Cavallo", "Re"];
-const PESO_SEME = { "Ori": 400, "Spade": 300, "Coppe": 200, "Bastoni": 100 };
+const PESO_SEME = { "Denari": 400, "Ori": 400, "Spade": 300, "Coppe": 200, "Bastoni": 100 };
 const PESO_VALORE = { "Asso": 12, "3": 11, "Re": 10, "Cavallo": 9, "Fante": 8, "7": 7, "6": 6, "5": 5, "4": 4, "2": 3 };
 
 class Card {
@@ -126,7 +126,7 @@ function runDeepSimulations() {
                             else if (c.valore === '3') powerScore += 75;
                             else if (['Re', 'Cavallo', 'Fante'].includes(c.valore)) powerScore += 50;
                             else powerScore += 20;
-                            if (c.seme === 'Ori') powerScore += 40;
+                            if (c.seme === 'Denari') powerScore += 40;
                             if (c.seme === 'Spade') powerScore += 25;
                         });
                         s = Math.floor(powerScore / 115);

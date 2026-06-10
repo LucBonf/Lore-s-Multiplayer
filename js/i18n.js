@@ -4,7 +4,7 @@ const dictionary = {
         'rulesTitle': '📖 Regolamento: Gioco di Lucas',
         'rulesContent': `<p><strong>1. Mazzo e Giocatori:</strong> Si gioca con 40 carte. Il sistema calcola automaticamente quante carte dare e la sequenza delle mani. Le carte avanzate restano coperte nel mazzo.</p>
                 <p><strong>2. Gerarchia dei Semi:</strong><br>
-                    <span style="color:#f1c40f;">1. Ori (🪙)</span> > <span style="color:#3498db;">2. Spade (🗡️)</span>
+                    <span style="color:#f1c40f;">1. Denari (🪙)</span> > <span style="color:#3498db;">2. Spade (🗡️)</span>
                     > <span style="color:#e74c3c;">3. Coppe (🍷)</span> > <span style="color:#2ecc71;">4. Bastoni
                         (🏏)</span>.<br>
                     <em>Un seme di livello superiore batte sempre un seme di livello inferiore, anche se non è il seme
@@ -89,7 +89,19 @@ const dictionary = {
         'replayNext': 'Prossimo',
         'replayPrev': 'Precedente',
         'replayClose': 'Chiudi Replay',
-        'interruptedMatch': 'Partita interrotta'
+        'interruptedMatch': 'Partita interrotta',
+        'timeoutWarning': 'ha esaurito il tempo! Mossa automatica:',
+        'suitDenari': 'Denari',
+        'suitSpade': 'Spade',
+        'suitCoppe': 'Coppe',
+        'suitBastoni': 'Bastoni',
+        'valAsso': 'Asso',
+        'valRe': 'Re',
+        'valCavallo': 'Cavallo',
+        'valFante': 'Fante',
+        'prepDi': 'di',
+        'betAction': 'scommessa',
+        'humansOnline': 'umani online'
     },
     'en': {
         'chooseLanguage': 'Choose Language',
@@ -173,7 +185,19 @@ const dictionary = {
         'replayNext': 'Next',
         'replayPrev': 'Previous',
         'replayClose': 'Close Replay',
-        'interruptedMatch': 'Interrupted match'
+        'interruptedMatch': 'Interrupted match',
+        'timeoutWarning': 'has run out of time! Automatic move:',
+        'suitDenari': 'Coins',
+        'suitSpade': 'Swords',
+        'suitCoppe': 'Cups',
+        'suitBastoni': 'Clubs',
+        'valAsso': 'Ace',
+        'valRe': 'King',
+        'valCavallo': 'Knight',
+        'valFante': 'Jack',
+        'prepDi': 'of',
+        'betAction': 'bid',
+        'humansOnline': 'humans online'
     },
     'fr': {
         'chooseLanguage': 'Choisissez la Langue',
@@ -257,7 +281,19 @@ const dictionary = {
         'replayNext': 'Suivant',
         'replayPrev': 'Précédent',
         'replayClose': 'Fermer',
-        'interruptedMatch': 'Match interrompu'
+        'interruptedMatch': 'Match interrompu',
+        'timeoutWarning': 'a manqué de temps ! Mouvement automatique :',
+        'suitDenari': 'Deniers',
+        'suitSpade': 'Épées',
+        'suitCoppe': 'Coupes',
+        'suitBastoni': 'Bâtons',
+        'valAsso': 'As',
+        'valRe': 'Roi',
+        'valCavallo': 'Cavalier',
+        'valFante': 'Valet',
+        'prepDi': 'de',
+        'betAction': 'annonce',
+        'humansOnline': 'humains en ligne'
     },
     'es': {
         'chooseLanguage': 'Elige el Idioma',
@@ -341,7 +377,19 @@ const dictionary = {
         'replayNext': 'Siguiente',
         'replayPrev': 'Anterior',
         'replayClose': 'Cerrar',
-        'interruptedMatch': 'Partida interrumpida'
+        'interruptedMatch': 'Partida interrumpida',
+        'timeoutWarning': 'se ha quedado sin tiempo. Movimiento automático:',
+        'suitDenari': 'Oros',
+        'suitSpade': 'Espadas',
+        'suitCoppe': 'Copas',
+        'suitBastoni': 'Bastos',
+        'valAsso': 'As',
+        'valRe': 'Rey',
+        'valCavallo': 'Caballo',
+        'valFante': 'Sota',
+        'prepDi': 'de',
+        'betAction': 'declaración',
+        'humansOnline': 'humanos en línea'
     },
     'de': {
         'chooseLanguage': 'Sprache Wählen',
@@ -425,7 +473,19 @@ const dictionary = {
         'replayNext': 'Weiter',
         'replayPrev': 'Zurück',
         'replayClose': 'Schließen',
-        'interruptedMatch': 'Abgebrochenes Spiel'
+        'interruptedMatch': 'Abgebrochenes Spiel',
+        'timeoutWarning': 'hat keine Zeit mehr! Automatischer Spielzug:',
+        'suitDenari': 'Münzen',
+        'suitSpade': 'Schwerter',
+        'suitCoppe': 'Kelche',
+        'suitBastoni': 'Stäbe',
+        'valAsso': 'Ass',
+        'valRe': 'König',
+        'valCavallo': 'Pferd',
+        'valFante': 'Bube',
+        'prepDi': 'von',
+        'betAction': 'Ansage',
+        'humansOnline': 'Menschen online'
     }
 };
 

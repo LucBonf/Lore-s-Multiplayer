@@ -977,9 +977,9 @@ app.post('/elimina-report-777', authAdmin, express.json(), async (req, res) => {
 
 
 
-const SEMI = ["Coppe", "Ori", "Bastoni", "Spade"];
+const SEMI = ["Coppe", "Denari", "Bastoni", "Spade"];
 const VALORI = ["Asso", "2", "3", "4", "5", "6", "7", "Fante", "Cavallo", "Re"];
-const PESO_SEME = { "Ori": 400, "Spade": 300, "Coppe": 200, "Bastoni": 100 };
+const PESO_SEME = { "Denari": 400, "Denari": 400, "Spade": 300, "Coppe": 200, "Bastoni": 100 };
 const PESO_VALORE = { "Asso": 12, "3": 11, "Re": 10, "Cavallo": 9, "Fante": 8, "7": 7, "6": 6, "5": 5, "4": 4, "2": 3 };
 
 class Card {
@@ -1073,7 +1073,7 @@ class LucasGame {
 
     calcolaVincitorePresa() {
         return this.tavolo.reduce((migliore, attuale) => {
-            // Poiché la "forza" include già il peso assoluto del seme (es. Ori > Spade > Coppe > Bastoni)
+            // Poiché la "forza" include già il peso assoluto del seme (es. Denari > Spade > Coppe > Bastoni)
             // e del valore della carta, vince semplicemente la carta con la forza maggiore.
             return (attuale.card.forza > migliore.card.forza) ? attuale : migliore;
         });
@@ -1130,8 +1130,28 @@ async function caricaStatiMatch() {
                 game.players = g.players.map(pData => {
                     const p = new Player(pData.id, pData.nome, pData.isHuman, pData.token, pData.uniqueCode);
                     Object.assign(p, pData);
+                    // Normalizzazione seme da Ori a Denari
+                    if (p.mano) {
+                        p.mano.forEach(c => {
+                            if (c.seme === 'Ori') c.seme = 'Denari';
+                        });
+                    }
                     return p;
                 });
+                
+                // Normalizzazione carte sul tavolo
+                if (game.tavolo) {
+                    game.tavolo.forEach(gt => {
+                        if (gt.card && gt.card.seme === 'Ori') gt.card.seme = 'Denari';
+                    });
+                }
+                
+                // Normalizzazione carte uscite
+                if (game.carteUscite) {
+                    game.carteUscite.forEach(c => {
+                        if (c.seme === 'Ori') c.seme = 'Denari';
+                    });
+                }
                 
                 lobby.gameInstance = game;
             }
@@ -2162,7 +2182,7 @@ io.on('connection', (socket) => {
                             else if (c.valore === 'Fante') powerScore += 55;
                             else powerScore += 15;
 
-                            if (c.seme === 'Ori') powerScore += 50;
+                            if (c.seme === 'Denari') powerScore += 50;
                             if (c.seme === 'Spade') powerScore += 30;
                             if (c.seme === 'Coppe') powerScore += 10;
                         });
@@ -2228,7 +2248,7 @@ io.on('connection', (socket) => {
                         expectedTricks = (probVittoria > 0.5) ? 1 : 0;
                     } else {
                         p.mano.forEach(c => {
-                            if (c.seme === 'Ori') {
+                            if (c.seme === 'Denari') {
                                 if (c.valore === 'Asso') expectedTricks += 1.0;
                                 else if (c.valore === '3') expectedTricks += 0.95;
                                 else if (c.valore === 'Re') expectedTricks += 0.85;
@@ -2268,9 +2288,9 @@ io.on('connection', (socket) => {
                     }
                 }
 
-                // Se la mano ha più di 1 carta e contiene l'Asso di Ori, la scommessa minima deve essere 1.
+                // Se la mano ha più di 1 carta e contiene l'Asso di Denari, la scommessa minima deve essere 1.
                 // Se la scommessa da 1 viola il vincolo del mazziere, dichiara 2.
-                if (qta > 1 && p.mano.some(c => c.seme === 'Ori' && c.valore === 'Asso')) {
+                if (qta > 1 && p.mano.some(c => c.seme === 'Denari' && c.valore === 'Asso')) {
                     if (s < 1) {
                         s = 1;
                     }
@@ -2354,9 +2374,9 @@ io.on('connection', (socket) => {
                             }
                         } else {
                             if (wantsToWin) {
-                                const briscole = manoV.filter(c => c.seme === 'Ori');
+                                const briscole = manoV.filter(c => c.seme === 'Denari');
                                 if (briscole.length > 0) {
-                                    const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
+                                    const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Denari') ? vincenteAttuale.card.forza : 0;
                                     const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
 
                                     if (briscoleUtili.length > 0) {
@@ -2392,7 +2412,7 @@ io.on('connection', (socket) => {
                             if (cartaRegnante) {
                                 cartaDaGiocare = cartaRegnante;
                             } else {
-                                const nonBriscoleForti = manoV.filter(c => c.seme !== 'Ori' && (c.valore === 'Asso' || c.valore === '3'));
+                                const nonBriscoleForti = manoV.filter(c => c.seme !== 'Denari' && (c.valore === 'Asso' || c.valore === '3'));
                                 if (nonBriscoleForti.length > 0) {
                                     cartaDaGiocare = nonBriscoleForti.sort((a, b) => b.forza - a.forza)[0];
                                 } else {
@@ -2400,7 +2420,7 @@ io.on('connection', (socket) => {
                                 }
                             }
                         } else {
-                            const nonBriscole = manoV.filter(c => c.seme !== 'Ori');
+                            const nonBriscole = manoV.filter(c => c.seme !== 'Denari');
                             cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                         }
                     } else {
@@ -2436,9 +2456,9 @@ io.on('connection', (socket) => {
                             }
                         } else {
                             if (wantsToWin) {
-                                const briscole = manoV.filter(c => c.seme === 'Ori');
+                                const briscole = manoV.filter(c => c.seme === 'Denari');
                                 if (briscole.length > 0) {
-                                    const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
+                                    const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Denari') ? vincenteAttuale.card.forza : 0;
                                     const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
 
                                     if (briscoleUtili.length > 0) {
@@ -2451,14 +2471,14 @@ io.on('connection', (socket) => {
                                             cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
                                         }
                                     } else {
-                                        const nonBriscole = manoV.filter(c => c.seme !== 'Ori');
+                                        const nonBriscole = manoV.filter(c => c.seme !== 'Denari');
                                         cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                                     }
                                 } else {
                                     cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
                                 }
                             } else {
-                                const nonBriscole = manoV.filter(c => c.seme !== 'Ori');
+                                const nonBriscole = manoV.filter(c => c.seme !== 'Denari');
                                 cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                             }
                         }
@@ -2596,7 +2616,7 @@ io.on('connection', (socket) => {
                 expectedTricks = (probVittoria > 0.5) ? 1 : 0;
             } else {
                 p.mano.forEach(c => {
-                    if (c.seme === 'Ori') {
+                    if (c.seme === 'Denari') {
                         if (c.valore === 'Asso') expectedTricks += 1.0;
                         else if (c.valore === '3') expectedTricks += 0.95;
                         else if (c.valore === 'Re') expectedTricks += 0.85;
@@ -2636,7 +2656,7 @@ io.on('connection', (socket) => {
 
             // Se la mano ha più di 1 carta e contiene l'Asso di Ori, la scommessa minima deve essere 1.
             // Se la scommessa da 1 viola il vincolo del mazziere, dichiara 2.
-            if (qta > 1 && p.mano.some(c => c.seme === 'Ori' && c.valore === 'Asso')) {
+            if (qta > 1 && p.mano.some(c => c.seme === 'Denari' && c.valore === 'Asso')) {
                 if (s < 1) {
                     s = 1;
                 }
@@ -2691,7 +2711,7 @@ io.on('connection', (socket) => {
                     if (cartaRegnante) {
                         cartaDaGiocare = cartaRegnante;
                     } else {
-                        const nonBriscoleForti = carteValide.filter(c => c.seme !== 'Ori' && (c.valore === 'Asso' || c.valore === '3'));
+                        const nonBriscoleForti = carteValide.filter(c => c.seme !== 'Denari' && (c.valore === 'Asso' || c.valore === '3'));
                         if (nonBriscoleForti.length > 0) {
                             cartaDaGiocare = nonBriscoleForti.sort((a, b) => b.forza - a.forza)[0];
                         } else {
@@ -2699,7 +2719,7 @@ io.on('connection', (socket) => {
                         }
                     }
                 } else {
-                    const nonBriscole = carteValide.filter(c => c.seme !== 'Ori');
+                    const nonBriscole = carteValide.filter(c => c.seme !== 'Denari');
                     cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
                 }
             } else {
@@ -2735,9 +2755,9 @@ io.on('connection', (socket) => {
                     }
                 } else {
                     if (wantsToWin) {
-                        const briscole = carteValide.filter(c => c.seme === 'Ori');
+                        const briscole = carteValide.filter(c => c.seme === 'Denari');
                         if (briscole.length > 0) {
-                            const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
+                            const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Denari') ? vincenteAttuale.card.forza : 0;
                             const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
 
                             if (briscoleUtili.length > 0) {
@@ -2750,14 +2770,14 @@ io.on('connection', (socket) => {
                                     cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
                                 }
                             } else {
-                                const nonBriscole = carteValide.filter(c => c.seme !== 'Ori');
+                                const nonBriscole = carteValide.filter(c => c.seme !== 'Denari');
                                 cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
                             }
                         } else {
                             cartaDaGiocare = carteValide.sort((a, b) => a.forza - b.forza)[0];
                         }
                     } else {
-                        const nonBriscole = carteValide.filter(c => c.seme !== 'Ori');
+                        const nonBriscole = carteValide.filter(c => c.seme !== 'Denari');
                         cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => b.forza - a.forza)[0] : carteValide.sort((a, b) => a.forza - b.forza)[0];
                     }
                 }
@@ -2902,7 +2922,7 @@ async function simulazionePartitaSingola() {
                         else if (c.valore === 'Fante') powerScore += 55;
                         else powerScore += 15;
 
-                        if (c.seme === 'Ori') powerScore += 50;
+                        if (c.seme === 'Denari') powerScore += 50;
                         if (c.seme === 'Spade') powerScore += 30;
                         if (c.seme === 'Coppe') powerScore += 10;
                     });
@@ -2956,7 +2976,7 @@ async function simulazionePartitaSingola() {
                     expectedTricks = (probVittoria > 0.5) ? 1 : 0;
                 } else {
                     p.mano.forEach(c => {
-                        if (c.seme === 'Ori') {
+                        if (c.seme === 'Denari') {
                             if (c.valore === 'Asso') expectedTricks += 1.0;
                             else if (c.valore === '3') expectedTricks += 0.95;
                             else if (c.valore === 'Re') expectedTricks += 0.85;
@@ -2990,7 +3010,7 @@ async function simulazionePartitaSingola() {
             }
             // Se la mano ha più di 1 carta e contiene l'Asso di Ori, la scommessa minima deve essere 1.
             // Se la scommessa da 1 viola il vincolo del mazziere, dichiara 2.
-            if (qta > 1 && p.mano.some(c => c.seme === 'Ori' && c.valore === 'Asso')) {
+            if (qta > 1 && p.mano.some(c => c.seme === 'Denari' && c.valore === 'Asso')) {
                 if (s < 1) {
                     s = 1;
                 }
@@ -3071,9 +3091,9 @@ async function simulazionePartitaSingola() {
                         }
                     } else {
                         if (wantsToWin) {
-                            const briscole = manoV.filter(c => c.seme === 'Ori');
+                            const briscole = manoV.filter(c => c.seme === 'Denari');
                             if (briscole.length > 0) {
-                                const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
+                                const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Denari') ? vincenteAttuale.card.forza : 0;
                                 const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
                                 if (briscoleUtili.length > 0) {
                                     const siamoUltimi = numMancanti === 0;
@@ -3106,7 +3126,7 @@ async function simulazionePartitaSingola() {
                         if (cartaRegnante) {
                             cartaDaGiocare = cartaRegnante;
                         } else {
-                            const nonBriscoleForti = manoV.filter(c => c.seme !== 'Ori' && (c.valore === 'Asso' || c.valore === '3'));
+                            const nonBriscoleForti = manoV.filter(c => c.seme !== 'Denari' && (c.valore === 'Asso' || c.valore === '3'));
                             if (nonBriscoleForti.length > 0) {
                                 cartaDaGiocare = nonBriscoleForti.sort((a, b) => b.forza - a.forza)[0];
                             } else {
@@ -3114,7 +3134,7 @@ async function simulazionePartitaSingola() {
                             }
                         }
                     } else {
-                        const nonBriscole = manoV.filter(c => c.seme !== 'Ori');
+                        const nonBriscole = manoV.filter(c => c.seme !== 'Denari');
                         cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                     }
                 } else {
@@ -3149,9 +3169,9 @@ async function simulazionePartitaSingola() {
                         }
                     } else {
                         if (wantsToWin) {
-                            const briscole = manoV.filter(c => c.seme === 'Ori');
+                            const briscole = manoV.filter(c => c.seme === 'Denari');
                             if (briscole.length > 0) {
-                                const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Ori') ? vincenteAttuale.card.forza : 0;
+                                const forzaBriscolaVincente = (vincenteAttuale.card.seme === 'Denari') ? vincenteAttuale.card.forza : 0;
                                 const briscoleUtili = briscole.filter(c => c.forza > forzaBriscolaVincente);
                                 if (briscoleUtili.length > 0) {
                                     const siamoUltimi = numMancanti === 0;
@@ -3162,14 +3182,14 @@ async function simulazionePartitaSingola() {
                                         cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
                                     }
                                 } else {
-                                    const nonBriscole = game.players[game.turnoAttuale].mano.filter(c => !c.giocata && c.seme !== 'Ori'); // Fix reference: manoV
+                                    const nonBriscole = game.players[game.turnoAttuale].mano.filter(c => !c.giocata && c.seme !== 'Denari'); // Fix reference: manoV
                                     cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => a.forza - b.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                                 }
                             } else {
                                 cartaDaGiocare = manoV.sort((a, b) => a.forza - b.forza)[0];
                             }
                         } else {
-                            const nonBriscole = manoV.filter(c => c.seme !== 'Ori');
+                            const nonBriscole = manoV.filter(c => c.seme !== 'Denari');
                             cartaDaGiocare = nonBriscole.length > 0 ? nonBriscole.sort((a, b) => b.forza - a.forza)[0] : manoV.sort((a, b) => a.forza - b.forza)[0];
                         }
                     }

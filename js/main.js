@@ -443,7 +443,7 @@ function renderStepReplay(stepIdx) {
             isHuman: isMover ? move.isHuman : false
         });
     }
-    const REPLAY_PESO_SEME = { "Ori": 400, "Spade": 300, "Coppe": 200, "Bastoni": 100 };
+    const REPLAY_PESO_SEME = { "Ori": 400, "Denari": 400, "Spade": 300, "Coppe": 200, "Bastoni": 100 };
     const REPLAY_PESO_VALORE = { "Asso": 12, "3": 11, "Re": 10, "Cavallo": 9, "Fante": 8, "7": 7, "6": 6, "5": 5, "4": 4, "2": 3 };
 
     if (move.allHands && move.allHands.length > 0) {
@@ -818,7 +818,8 @@ socket.on('vincitore_presa', ({ playerId }) => {
 
 function getSemeSimbolo(seme) {
     switch (seme) {
-        case 'Ori': return '🪙';
+        case 'Ori':
+        case 'Denari': return '🪙';
         case 'Spade': return '🗡️';
         case 'Coppe': return '🍷';
         case 'Bastoni': return '🏏';
@@ -1451,6 +1452,39 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function traduciMossa(mossa, d) {
+    if (!mossa) return '';
+    if (mossa.startsWith('scommessa ')) {
+        const num = mossa.split(' ')[1];
+        return `${d.betAction || 'scommessa'} ${num}`;
+    }
+    
+    // Altrimenti è del tipo "Asso di Denari" o "3 di Spade"
+    const parti = mossa.split(' di ');
+    if (parti.length === 2) {
+        let valore = parti[0];
+        let seme = parti[1];
+        
+        // Traduzione valore se presente in dizionario
+        const valKey = `val${valore}`;
+        if (d[valKey]) {
+            valore = d[valKey];
+        }
+        
+        // Traduzione seme se presente in dizionario
+        if (seme === 'Ori') seme = 'Denari';
+        const semeKey = `suit${seme}`;
+        if (d[semeKey]) {
+            seme = d[semeKey];
+        }
+        
+        const prep = d.prepDi || 'di';
+        return `${valore} ${prep} ${seme}`;
+    }
+    
+    return mossa;
+}
+
 function updateChatVisibility(giocatori) {
     const chatWrapper = document.getElementById('chat-wrapper');
     const playerCountEl = document.getElementById('chat-player-count');
@@ -1464,7 +1498,8 @@ function updateChatVisibility(giocatori) {
         chatWrapper.style.display = 'block';
         if (playerCountEl) {
             const lang = localStorage.getItem('lucas_lang') || 'it';
-            playerCountEl.innerText = lang === 'it' ? `(${humanCount} umani online)` : `(${humanCount} humans online)`;
+            const d = dictionary[lang];
+            playerCountEl.innerText = `(${humanCount} ${d.humansOnline || 'umani online'})`;
         }
     } else {
         chatWrapper.style.display = 'none';
@@ -1476,6 +1511,10 @@ function updateChatVisibility(giocatori) {
 }
 
 socket.on('mossa_automatica', (d) => {
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const dDict = dictionary[lang];
+    const mossaTradotta = traduciMossa(d.mossa, dDict);
+    
     const messagesCont = document.getElementById('chat-messages');
     if (messagesCont) {
         const msgDiv = document.createElement('div');
@@ -1488,7 +1527,7 @@ socket.on('mossa_automatica', (d) => {
         msgDiv.style.textAlign = 'center';
         msgDiv.innerHTML = `
             <div style="color: #e74c3c; font-style: italic; font-weight: bold; font-size: 0.8rem; padding: 4px;">
-                ⏱️ ${d.nickname} ha esaurito il tempo! Mossa automatica: ${d.mossa}
+                ⏱️ ${d.nickname} ${dDict.timeoutWarning || 'ha esaurito il tempo! Mossa automatica:'} ${mossaTradotta}
             </div>
         `;
         messagesCont.appendChild(msgDiv);
