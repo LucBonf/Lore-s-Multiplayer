@@ -1366,9 +1366,12 @@ io.on('connection', (socket) => {
                     nome: dati.nome,
                     token: dati.token,
                     uniqueCode: dati.uniqueCode,
-                    elo: socket.userElo || 1000
+                    elo: socket.userElo || 1000,
+                    isHuman: true
                 }]
             };
+            socket.userNickname = dati.nome;
+            socket.userUniqueCode = dati.uniqueCode;
             socket.join(code);
             socket.roomCode = code;
             const giocatoriConStemma = lobbies[code].giocatori.map(g => ({
@@ -1440,6 +1443,11 @@ io.on('connection', (socket) => {
 
         const wasHost = (foundLobbyPlayer.id === lobby.host);
         foundLobbyPlayer.id = socket.id;
+        socket.userNickname = foundLobbyPlayer.nome;
+        socket.userUniqueCode = foundLobbyPlayer.uniqueCode;
+        if (foundLobbyPlayer.elo) {
+            socket.userElo = foundLobbyPlayer.elo;
+        }
         if (wasHost) {
             lobby.host = socket.id;
         }
@@ -1482,10 +1490,13 @@ io.on('connection', (socket) => {
                         nome: dati.nome,
                         token: dati.token,
                         uniqueCode: dati.uniqueCode,
-                        elo: socket.userElo || 1000
+                        elo: socket.userElo || 1000,
+                        isHuman: true
                     }],
                     isFast: true
                 };
+                socket.userNickname = dati.nome;
+                socket.userUniqueCode = dati.uniqueCode;
                 socket.join("FAST");
                 socket.roomCode = "FAST";
                 avviaPartita("FAST");
@@ -1507,8 +1518,11 @@ io.on('connection', (socket) => {
                     nome: dati.nome,
                     token: dati.token,
                     uniqueCode: dati.uniqueCode,
-                    elo: socket.userElo || 1000
+                    elo: socket.userElo || 1000,
+                    isHuman: true
                 });
+                socket.userNickname = dati.nome;
+                socket.userUniqueCode = dati.uniqueCode;
                 socket.join(dati.code);
                 socket.roomCode = dati.code;
                 inviaAggiornamentoLobby(dati.code);
@@ -1740,8 +1754,11 @@ io.on('connection', (socket) => {
             const matchId = lobby?.gameInstance?.matchId || null;
             const roomCode = lobby ? Object.keys(lobbies).find(key => lobbies[key] === lobby) : null;
 
+            const playerInLobby = lobby?.giocatori?.find(p => p.id === socket.id);
+            const nickname = playerInLobby ? playerInLobby.nome : (socket.userNickname || "Anonimo");
+
             const newReport = new Report({
-                nickname: socket.userNickname || 'Anonimo',
+                nickname: nickname,
                 testo: testo.substring(0, 500),
                 roomCode: roomCode,
                 matchId: matchId
@@ -1761,7 +1778,7 @@ io.on('connection', (socket) => {
             // Verifichiamo quanti umani sono presenti (id non null e isHuman true)
             // Possiamo usare lobbies[code].giocatori che tiene traccia dei connessi
             const lobby = lobbies[code];
-            const humanPlayers = lobby.giocatori.filter(p => p.id !== null);
+            const humanPlayers = lobby.giocatori.filter(p => p.id !== null && p.isHuman !== false);
             
             if (humanPlayers.length < 2) {
                 return; // Requisito: almeno 2 umani
@@ -1769,8 +1786,11 @@ io.on('connection', (socket) => {
 
             if (!msg || typeof msg !== 'string' || msg.trim() === '') return;
 
+            const playerInLobby = lobby.giocatori.find(p => p.id === socket.id);
+            const senderNickname = playerInLobby ? playerInLobby.nome : (socket.userNickname || "Anonimo");
+
             const messageData = {
-                sender: socket.userNickname || "Anonimo",
+                sender: senderNickname,
                 text: filter.clean(msg).substring(0, 200),
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
@@ -2233,6 +2253,17 @@ io.on('connection', (socket) => {
                     }
                 }
 
+                // Se la mano ha più di 1 carta e contiene l'Asso di Ori, la scommessa minima deve essere 1.
+                // Se la scommessa da 1 viola il vincolo del mazziere, dichiara 2.
+                if (qta > 1 && p.mano.some(c => c.seme === 'Ori' && c.valore === 'Asso')) {
+                    if (s < 1) {
+                        s = 1;
+                    }
+                    if (currentGame.turnoAttuale === currentGame.indiceMazziere && (currentGame.sommaScommesse + s === qta)) {
+                        s = 2;
+                    }
+                }
+
                 s = Math.max(0, Math.min(s, qta));
 
                 p.dichiarazione = s;
@@ -2473,7 +2504,8 @@ io.on('connection', (socket) => {
                         isMe: (p.id === giocatoreUmano.id),
                         stemma: ottieniStemma(p.uniqueCode, p.nome),
                         cartaFronte: (qta === 1) ? p.mano.find(c => !c.giocata) : null,
-                        mano: manoDaInviare
+                        mano: manoDaInviare,
+                        isHuman: p.isHuman
                     };
                 })
             };
@@ -2682,6 +2714,17 @@ async function simulazionePartitaSingola() {
                     }
                 }
             }
+            // Se la mano ha più di 1 carta e contiene l'Asso di Ori, la scommessa minima deve essere 1.
+            // Se la scommessa da 1 viola il vincolo del mazziere, dichiara 2.
+            if (qta > 1 && p.mano.some(c => c.seme === 'Ori' && c.valore === 'Asso')) {
+                if (s < 1) {
+                    s = 1;
+                }
+                if (game.turnoAttuale === game.indiceMazziere && (game.sommaScommesse + s === qta)) {
+                    s = 2;
+                }
+            }
+
             s = Math.max(0, Math.min(s, qta));
 
             p.dichiarazione = s;
