@@ -2526,6 +2526,9 @@ io.on('connection', (socket) => {
                     };
                 })
             };
+            if (giocatoreUmano.id) {
+                io.to(giocatoreUmano.id).emit('conferma_inizio_partita', payload);
+            }
         });
     }
 
