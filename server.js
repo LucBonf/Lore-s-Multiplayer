@@ -979,7 +979,7 @@ app.post('/elimina-report-777', authAdmin, express.json(), async (req, res) => {
 
 const SEMI = ["Coppe", "Denari", "Bastoni", "Spade"];
 const VALORI = ["Asso", "2", "3", "4", "5", "6", "7", "Fante", "Cavallo", "Re"];
-const PESO_SEME = { "Denari": 400, "Denari": 400, "Spade": 300, "Coppe": 200, "Bastoni": 100 };
+const PESO_SEME = { "Denari": 400, "Ori": 400, "Spade": 300, "Coppe": 200, "Bastoni": 100 };
 const PESO_VALORE = { "Asso": 12, "3": 11, "Re": 10, "Cavallo": 9, "Fante": 8, "7": 7, "6": 6, "5": 5, "4": 4, "2": 3 };
 
 class Card {
