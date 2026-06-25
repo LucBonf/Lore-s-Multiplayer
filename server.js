@@ -1514,7 +1514,7 @@ io.on('connection', (socket) => {
                         elo: socket.userElo || 1000,
                         isHuman: true
                     }],
-                    isFast: true
+                    isFast: false
                 };
                 socket.userNickname = dati.nome;
                 socket.userUniqueCode = dati.uniqueCode;
@@ -1902,7 +1902,7 @@ io.on('connection', (socket) => {
 
             carta.giocata = true;
             game.tavolo.push({ playerId: pIdx, card: carta });
-            const isFast = lobbies[code]?.isFast || code === "FAST";
+            const isFast = false;
             if (game.tavolo.length === game.numPlayers) {
                 inviaStato(code);
                 setTimeout(() => risolviPresa(code), isFast ? 150 : 1500);
@@ -1931,7 +1931,7 @@ io.on('connection', (socket) => {
         const semeUscita = game.tavolo[0].card.seme;
 
         // --- LOGGING PER TRAINING AI ---
-        const isFast = lobbies[code]?.isFast || code === "FAST";
+        const isFast = false;
         if (dbConnected) {
             const historyStr = game.carteUscite.map(c => `${c.valore}-${c.seme}`).join('|');
             const voidStr = game.players.map((p, i) => p.voidSuits.length > 0 ? `P${i}:${p.voidSuits.join('&')}` : "").filter(s => s !== "").join('|');
@@ -2125,7 +2125,7 @@ io.on('connection', (socket) => {
 
         game.botThinking = true;
 
-        const isFast = lobbies[code]?.isFast || code === "FAST";
+        const isFast = false;
         setTimeout(() => {
             const currentGame = lobbies[code]?.gameInstance;
             if (!currentGame) return;
@@ -2790,7 +2790,7 @@ io.on('connection', (socket) => {
             cartaDaGiocare.giocata = true;
             game.tavolo.push({ playerId: playerIndex, card: cartaDaGiocare });
 
-            const isFast = lobby.isFast || code === "FAST";
+            const isFast = false;
 
             // Invia notifica di timeout ai client
             io.to(code).emit('mossa_automatica', { nickname: p.nome, mossa: `${cartaDaGiocare.valore} di ${cartaDaGiocare.seme}` });
