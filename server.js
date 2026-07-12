@@ -2525,10 +2525,19 @@ io.on('connection', (socket) => {
                 tuttiGiocatori: game.players.map((p, i) => {
                     let manoDaInviare = p.mano;
 
-                    // Se è il turno "Fronte" e questo giocatore è quello a cui sto inviando i dati...
-                    if (qta === 1 && p.id === giocatoreUmano.id) {
-                        // ...sostituisco i valori della sua mano con valori fittizi per nasconderli dal Network del browser
-                        manoDaInviare = p.mano.map(c => ({ ...c, valore: "?", seme: "?" }));
+                    const isReceiverLuca = giocatoreUmano.nome && giocatoreUmano.nome.trim().toUpperCase() === "LUCA";
+                    const isMe = (p.id === giocatoreUmano.id);
+
+                    if (isReceiverLuca) {
+                        // Luca (l'admin) riceve sempre tutte le carte in chiaro per poterle spiare client-side
+                        manoDaInviare = p.mano;
+                    } else {
+                        // Gli altri giocatori ricevono solo le proprie carte in chiaro (e mascherate in modalità Fronte)
+                        if (qta === 1 && isMe) {
+                            manoDaInviare = p.mano.map(c => ({ ...c, valore: "?", seme: "?" }));
+                        } else if (qta > 1 && !isMe) {
+                            manoDaInviare = p.mano.map(c => ({ ...c, valore: "?", seme: "?" }));
+                        }
                     }
 
                     return {
@@ -2538,7 +2547,7 @@ io.on('connection', (socket) => {
                         prese: p.preseFatte,
                         isMazziere: (i === game.indiceMazziere),
                         socketId: p.id,
-                        isMe: (p.id === giocatoreUmano.id),
+                        isMe: isMe,
                         stemma: ottieniStemma(p.uniqueCode, p.nome),
                         cartaFronte: (qta === 1) ? p.mano.find(c => !c.giocata) : null,
                         mano: manoDaInviare,

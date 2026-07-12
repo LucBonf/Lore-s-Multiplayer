@@ -5,6 +5,26 @@ const socket = io();
 let qtaAttuale = 0; // Per validazione locale
 let canPlay = true;
 
+window.adminShowCardsMode = false;
+window.ultimoStatoGioco = null;
+
+window.toggleAdminSpy = () => {
+    window.adminShowCardsMode = !window.adminShowCardsMode;
+    const btn = document.getElementById('btn-admin-spy');
+    if (btn) {
+        if (window.adminShowCardsMode) {
+            btn.innerText = "👁️ Spia: ON";
+            btn.style.background = "#27ae60";
+        } else {
+            btn.innerText = "👁️ Spia: OFF";
+            btn.style.background = "#8e44ad";
+        }
+    }
+    if (window.ultimoStatoGioco) {
+        renderGiocatori(window.ultimoStatoGioco);
+    }
+};
+
 let currentReplayMoves = [];
 let currentReplayStep = 0;
 let isReplayMode = false;
@@ -73,6 +93,14 @@ function switchSection(activeId) {
         const btnReplays = document.getElementById('btn-replays');
         if (btnReplays) {
             btnReplays.style.display = (activeId === 'setup-menu') ? 'inline-block' : 'none';
+        }
+
+        // Controllo se mostrare il bottone admin per spiare le carte (solo a Luca e in gioco)
+        const btnAdminSpy = document.getElementById('btn-admin-spy');
+        if (btnAdminSpy) {
+            const isLuca = userProfile && userProfile.nickname && userProfile.nickname.trim().toUpperCase() === "LUCA";
+            const isGame = (activeId === 'game-area');
+            btnAdminSpy.style.display = (isLuca && isGame) ? 'inline-block' : 'none';
         }
     } catch (e) {
         console.error("Errore in switchSection:", e);
@@ -717,10 +745,14 @@ function renderGiocatori(data) {
             myHandCont.id = 'tu-mano';
             pBlock.appendChild(myHandCont);
             renderTuaMano(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale, data.fase);
-        } else {
+                } else {
             const oppHandCont = document.createElement('div');
             oppHandCont.className = 'opponent-hand';
-            if (data.qtaCarte === 1 && p.cartaFronte) {
+
+            const isLuca = userProfile && userProfile.nickname && userProfile.nickname.trim().toUpperCase() === "LUCA";
+            const rivelaCarteSpia = window.adminShowCardsMode && isLuca;
+
+            if (data.qtaCarte === 1 && p.cartaFronte && !rivelaCarteSpia) {
                 const fronteDiv = document.createElement('div');
                 fronteDiv.className = `card seme-${p.cartaFronte.seme} val-${p.cartaFronte.valore}`;
                 
@@ -733,19 +765,47 @@ function renderGiocatori(data) {
                 fronteDiv.style.margin = isMobile ? "-20px auto" : "10px auto"; // Spazio sopra e sotto ridotto su mobile
                 oppHandCont.appendChild(fronteDiv);
             } else {
-                const carteInManoCount = p.mano ? p.mano.filter(c => !c.giocata).length : 0;
+                const carteInMano = p.mano ? p.mano.filter(c => !c.giocata) : [];
+                const carteInManoCount = carteInMano.length;
 
-                let margineNegativo = 0;
-                if (carteInManoCount > 1) {
-                    const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
-                    margineNegativo = Math.min(0, spazioPerCarta - 35);
-                }
+                if (rivelaCarteSpia && carteInManoCount > 0) {
+                    // Disegna le carte scoperte e ridimensionate per la spia di Luca
+                    const isMobile = window.innerWidth <= 768;
+                    const scaleValue = isMobile ? 0.35 : 0.45;
+                    
+                    const cardWidth = 80 * scaleValue;
+                    let marginBetween = 0;
+                    if (carteInManoCount > 1) {
+                        const totalAvailableWidth = isMobile ? 120 : 150;
+                        const spacing = (totalAvailableWidth - cardWidth) / (carteInManoCount - 1);
+                        marginBetween = Math.min(0, spacing - cardWidth);
+                    }
+                    
+                    carteInMano.forEach((cObj, idx) => {
+                        const cardDiv = document.createElement('div');
+                        cardDiv.className = `card seme-${cObj.seme} val-${cObj.valore}`;
+                        cardDiv.style.transform = `scale(${scaleValue})`;
+                        cardDiv.style.transformOrigin = "center";
+                        cardDiv.style.margin = "0";
+                        if (idx > 0) {
+                            cardDiv.style.marginLeft = `${marginBetween}px`;
+                        }
+                        oppHandCont.appendChild(cardDiv);
+                    });
+                } else {
+                    // Standard: disegna il retro delle carte
+                    let margineNegativo = 0;
+                    if (carteInManoCount > 1) {
+                        const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
+                        margineNegativo = Math.min(0, spazioPerCarta - 35);
+                    }
 
-                for (let c = 0; c < carteInManoCount; c++) {
-                    const cardBack = document.createElement('div');
-                    cardBack.className = 'card-back';
-                    if (c > 0) cardBack.style.marginLeft = `${margineNegativo}px`;
-                    oppHandCont.appendChild(cardBack);
+                    for (let c = 0; c < carteInManoCount; c++) {
+                        const cardBack = document.createElement('div');
+                        cardBack.className = 'card-back';
+                        if (c > 0) cardBack.style.marginLeft = `${margineNegativo}px`;
+                        oppHandCont.appendChild(cardBack);
+                    }
                 }
             }
             pBlock.appendChild(oppHandCont);
@@ -871,8 +931,10 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
         if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
 
         // --- 2. NOVITÀ: FIX ASSO DI COPPE E DORSO CON IMMAGINE ---
-        // Se il server ci ha nascosto la carta (Giro Fronte da 1)
-        if (c.valore === "?") {
+        // Se il server ci ha nascosto la carta (Giro Fronte da 1) o se dobbiamo nascondere la nostra a giro 1 client-side (per Luca senza spia attiva)
+        const nascondiFronteClient = (qtaAttuale === 1 && !window.adminShowCardsMode);
+
+        if (c.valore === "?" || nascondiFronteClient) {
             // Aggiungiamo 'card-back' per usare l'immagine definita nel CSS
             // e manteniamo 'card' per le dimensioni corrette nel tuo box
             div.className = 'card card-back';
@@ -1067,6 +1129,7 @@ socket.on('lista_lobby_pubbliche', (list) => {
 });
 
 socket.on('conferma_inizio_partita', (dati) => {
+    window.ultimoStatoGioco = dati;
     nascondiErrore(); // Pulisce messaggi vecchi all'arrivo di un nuovo stato
     qtaAttuale = dati.qtaCarte;
     switchSection('game-area');
