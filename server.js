@@ -2525,19 +2525,12 @@ io.on('connection', (socket) => {
                 tuttiGiocatori: game.players.map((p, i) => {
                     let manoDaInviare = p.mano;
 
-                    const isReceiverLuca = giocatoreUmano.nome && giocatoreUmano.nome.trim().toUpperCase() === "LUCA";
                     const isMe = (p.id === giocatoreUmano.id);
 
-                    if (isReceiverLuca) {
-                        // Luca (l'admin) riceve sempre tutte le carte in chiaro per poterle spiare client-side
-                        manoDaInviare = p.mano;
-                    } else {
-                        // Gli altri giocatori ricevono solo le proprie carte in chiaro (e mascherate in modalità Fronte)
-                        if (qta === 1 && isMe) {
-                            manoDaInviare = p.mano.map(c => ({ ...c, valore: "?", seme: "?" }));
-                        } else if (qta > 1 && !isMe) {
-                            manoDaInviare = p.mano.map(c => ({ ...c, valore: "?", seme: "?" }));
-                        }
+                    if (qta === 1 && isMe) {
+                        manoDaInviare = p.mano.map(c => ({ ...c, valore: "?", seme: "?" }));
+                    } else if (qta > 1 && !isMe) {
+                        manoDaInviare = p.mano.map(c => ({ ...c, valore: "?", seme: "?" }));
                     }
 
                     return {
