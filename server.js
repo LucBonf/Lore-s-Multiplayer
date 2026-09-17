@@ -1183,6 +1183,9 @@ function ottieniStemma(uniqueCode, nome) {
     if (nome && nome.trim().toUpperCase() === "LUCA") {
         stemmi.push("admin");
     }
+    if (nome && nome.trim().toUpperCase() === "IDF") {
+        stemmi.push("idf");
+    }
     if (dbConnected && top3Cached && top3Cached.length > 0) {
         const idx = top3Cached.findIndex(u => u.uniqueCode === uniqueCode);
         if (idx === 0) stemmi.push("oro");

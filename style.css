@@ -649,6 +649,36 @@ button {
     border-color: #f1c40f;
 }
 
+#sound-btn-container {
+    position: fixed;
+    bottom: 20px;
+    right: 80px;
+    z-index: 4000;
+}
+
+#sound-btn {
+    width: 50px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.8rem;
+    font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
+}
+
+#sound-btn:hover {
+    transform: scale(1.1) rotate(-5deg);
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #2ecc71;
+}
+
 #report-btn-container {
     position: fixed;
     bottom: 20px;
@@ -707,6 +737,15 @@ button {
         right: 15px;
     }
     #language-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 1.5rem;
+    }
+    #sound-btn-container {
+        bottom: 15px;
+        right: 68px;
+    }
+    #sound-btn {
         width: 45px;
         height: 45px;
         font-size: 1.5rem;
@@ -1202,6 +1241,10 @@ button {
     animation: badge-pulse-admin 2s infinite ease-in-out;
 }
 
+.badge-idf {
+    animation: badge-pulse-idf 2s infinite ease-in-out;
+}
+
 @keyframes badge-shine {
     0%, 100% {
         transform: scale(1);
@@ -1221,6 +1264,17 @@ button {
     50% {
         transform: scale(1.25) rotate(5deg);
         filter: drop-shadow(0 0 8px #e74c3c);
+    }
+}
+
+@keyframes badge-pulse-idf {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+        filter: drop-shadow(0 0 2px #005eb8);
+    }
+    50% {
+        transform: scale(1.25) rotate(-5deg);
+        filter: drop-shadow(0 0 8px #00a8ff);
     }
 }
 

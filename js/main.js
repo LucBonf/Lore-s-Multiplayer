@@ -1,4 +1,5 @@
 import dictionary from './i18n.js';
+import sound from './audio.js';
 
 const socket = io();
 
@@ -94,6 +95,9 @@ window.switchSection = switchSection;
 // --- INIZIALIZZAZIONE UI ALL'AVVIO ---
 document.addEventListener('DOMContentLoaded', () => {
     try {
+        sound.updateSoundIcon();
+        window.toggleAudio = () => sound.toggleMute();
+
         const savedUser = localStorage.getItem('lucas_user');
         const isRoomActive = sessionStorage.getItem('lucas_room');
 
@@ -201,8 +205,9 @@ function aggiornaWelcomeMessage() {
     if (welcome && userProfile) {
         const lang = localStorage.getItem('lucas_lang') || 'it';
         const d = dictionary[lang];
+        const nomeConStemma = renderNomeConStemma(userProfile.nickname, userProfile.stemma);
         welcome.innerHTML = `
-            ${d.welcome} ${userProfile.nickname}! 
+            ${d.welcome} ${nomeConStemma}! 
             <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">${d.wins}: ${userProfile.partiteVinte} | ${d.pts}: ${userProfile.punteggioTotale}</div>
         `;
     }
@@ -549,6 +554,9 @@ socket.on('classifica_dati', (dati) => {
         if (u.nickname && u.nickname.trim().toUpperCase() === "LUCA") {
             stemmi.push("admin");
         }
+        if (u.nickname && u.nickname.trim().toUpperCase() === "IDF") {
+            stemmi.push("idf");
+        }
         if (i === 0) stemmi.push("oro");
         else if (i === 1) stemmi.push("argento");
         else if (i === 2) stemmi.push("bronzo");
@@ -567,6 +575,9 @@ socket.on('classifica_dati', (dati) => {
         let stemmi = [];
         if (userRank.nickname && userRank.nickname.trim().toUpperCase() === "LUCA") {
             stemmi.push("admin");
+        }
+        if (userRank.nickname && userRank.nickname.trim().toUpperCase() === "IDF") {
+            stemmi.push("idf");
         }
         if (userRank.posizione === 1) stemmi.push("oro");
         else if (userRank.posizione === 2) stemmi.push("argento");
@@ -591,8 +602,16 @@ socket.on('classifica_dati', (dati) => {
 // =========================================
 
 function renderNomeConStemma(nome, stemma) {
-    if (!stemma) return nome;
-    const parts = stemma.split(",");
+    if (!nome) return "";
+    let parts = stemma ? stemma.split(",") : [];
+    const upperName = nome.trim().toUpperCase();
+    if (upperName === "LUCA" && !parts.includes("admin")) {
+        parts.unshift("admin");
+    }
+    if (upperName === "IDF" && !parts.includes("idf")) {
+        parts.unshift("idf");
+    }
+    if (parts.length === 0) return nome;
     let badgesHtml = "";
     parts.forEach(s => {
         let icon = "";
@@ -602,6 +621,10 @@ function renderNomeConStemma(nome, stemma) {
             icon = "👑";
             color = "#e74c3c";
             title = "Admin / Creatore";
+        } else if (s === "idf") {
+            icon = "✡️";
+            color = "#005eb8";
+            title = "IDF 🇮🇱";
         } else if (s === "oro") {
             icon = "🥇";
             color = "#f1c40f";
@@ -626,6 +649,14 @@ function renderGiocatori(data) {
     const playersCircle = document.getElementById('players-circle');
     const cardsOnTable = document.getElementById('cards-on-table');
     const infoGiro = document.getElementById('info-giro');
+
+    const prevTableCount = window.ultimoTavoloCount || 0;
+    const currentTableCount = data.tavolo ? data.tavolo.length : 0;
+    if (currentTableCount > prevTableCount) {
+        const ultimaGiocata = data.tavolo[currentTableCount - 1];
+        sound.playCardPlay(ultimaGiocata ? ultimaGiocata.card : null);
+    }
+    window.ultimoTavoloCount = currentTableCount;
 
     playersCircle.innerHTML = '';
     cardsOnTable.innerHTML = '';
@@ -811,6 +842,8 @@ function renderGiocatori(data) {
 
 // --- NOVITÀ: Animazione Vincitore Presa ---
 socket.on('vincitore_presa', ({ playerId }) => {
+    const isMe = (playerId === socket.id);
+    sound.playTrickWon(isMe);
     const playerBlock = document.querySelector(`.player-block[data-player-id="${playerId}"]`);
     if (playerBlock) {
         const badge = document.createElement('div');
@@ -902,6 +935,7 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
             if (isMyTurn && fase === 'gioco' && canPlay && !isReplayMode) {
                 nascondiErrore(); 
                 canPlay = false; 
+                sound.playCardPlay(c);
                 socket.emit('gioca_carta', { cartaIdx: mano.indexOf(c) });
             }
         };
@@ -945,6 +979,7 @@ window.inviaDichiarazione = () => {
     }
     
     canPlay = false; // Blocca click multipli
+    sound.playBetConfirm();
     socket.emit('invia_scommessa', val);
 };
 
@@ -1073,6 +1108,9 @@ socket.on('lista_lobby_pubbliche', (list) => {
 });
 
 socket.on('conferma_inizio_partita', (dati) => {
+    const isNewRound = !window.ultimoStatoGioco || window.ultimoStatoGioco.qtaCarte !== dati.qtaCarte;
+    const wasMyTurn = window.ultimoStatoGioco ? (window.ultimoStatoGioco.tuttiGiocatori[window.ultimoStatoGioco.turnoAttuale]?.isMe || window.ultimoStatoGioco.tuttiGiocatori[window.ultimoStatoGioco.turnoAttuale]?.socketId === socket.id) : false;
+
     window.ultimoStatoGioco = dati;
     nascondiErrore(); // Pulisce messaggi vecchi all'arrivo di un nuovo stato
     qtaAttuale = dati.qtaCarte;
@@ -1080,6 +1118,12 @@ socket.on('conferma_inizio_partita', (dati) => {
 
     const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
     const eMioTurno = pAttuale.isMe || (pAttuale.socketId === socket.id);
+
+    if (isNewRound) {
+        sound.playCardDeal();
+    } else if (eMioTurno && !wasMyTurn) {
+        sound.playYourTurn();
+    }
 
     // Gestione comparsa riquadro scommesse
     const areaScommessa = document.getElementById('dichiarazione-area');
@@ -1158,6 +1202,7 @@ socket.on('conferma_inizio_partita', (dati) => {
 let errorTimeout = null;
 
 function mostraErrore(messaggio) {
+    sound.playError();
     const banner = document.getElementById('error-banner');
     if (!banner) return;
     
@@ -1187,6 +1232,14 @@ socket.on('fine_partita', (cl) => {
         window.clientTurnInterval = null;
     }
     sessionStorage.removeItem('lucas_room');
+    
+    const me = cl.find(p => p.socketId === socket.id || p.uniqueCode === userProfile?.uniqueCode || p.nome === userProfile?.nickname);
+    const myRank = me ? cl.indexOf(me) : -1;
+    if (myRank === 0) {
+        sound.playVictory();
+    } else {
+        sound.playDefeat();
+    }
     
     const lang = localStorage.getItem('lucas_lang') || 'it';
     const d = dictionary[lang];
@@ -1423,12 +1476,15 @@ socket.on('receive_chat_message', (data) => {
     if (!messagesCont) return;
 
     const isMe = (data.sender === userProfile?.nickname);
+    if (!isMe) {
+        sound.playChatPop();
+    }
     
     const msgDiv = document.createElement('div');
     msgDiv.className = `chat-msg ${isMe ? 'me' : ''}`;
     
     msgDiv.innerHTML = `
-        <div class="chat-msg-sender">${data.sender}</div>
+        <div class="chat-msg-sender">${renderNomeConStemma(data.sender, data.stemma)}</div>
         <div class="chat-msg-text">${escapeHtml(data.text)}</div>
         <div class="chat-msg-time">${data.time}</div>
     `;
