@@ -1,7 +1,63 @@
 import dictionary from './i18n.js';
 import sound from './audio.js';
+import voiceManager from './voice.js';
 
 const socket = io();
+
+// Inizializzazione Chat Vocale WebRTC
+voiceManager.init(socket);
+
+function updateVoiceUI(isEnabled, isMuted) {
+    const btn = document.getElementById('voice-btn');
+    const icon = document.getElementById('voice-icon');
+    const badge = document.getElementById('voice-status-badge');
+    if (!btn || !icon || !badge) return;
+
+    if (!isEnabled) {
+        btn.className = '';
+        btn.setAttribute('title', 'Chat Vocale Disattivata (Clicca per attivare)');
+        icon.innerText = '🎙️';
+        badge.className = 'voice-badge-off';
+    } else if (isMuted) {
+        btn.className = 'voice-muted';
+        btn.setAttribute('title', 'Microfono Muto (Clicca per parlare)');
+        icon.innerText = '🔇';
+        badge.className = 'voice-badge-muted';
+    } else {
+        btn.className = 'voice-active';
+        btn.setAttribute('title', 'Microfono Attivo (Clicca per mutare)');
+        icon.innerText = '🎙️';
+        badge.className = 'voice-badge-on';
+    }
+}
+
+function updateSpeakingUI(peerId, isSpeaking) {
+    const targetId = (peerId === 'me') ? 'me' : peerId;
+    const blocks = document.querySelectorAll(`[data-socket-id="${targetId}"]`);
+    blocks.forEach(el => {
+        if (isSpeaking) {
+            el.classList.add('speaking');
+        } else {
+            el.classList.remove('speaking');
+        }
+    });
+}
+
+voiceManager.onStateChange = ({ isEnabled, isMuted }) => {
+    updateVoiceUI(isEnabled, isMuted);
+};
+
+voiceManager.onSpeakingChange = (peerId, isSpeaking) => {
+    updateSpeakingUI(peerId, isSpeaking);
+};
+
+window.toggleVoiceChat = async () => {
+    if (!voiceManager.isEnabled) {
+        await voiceManager.startVoice();
+    } else {
+        voiceManager.toggleMute();
+    }
+};
 
 let qtaAttuale = 0; // Per validazione locale
 let canPlay = true;
@@ -89,6 +145,16 @@ function switchSection(activeId) {
         const showLang = ['login-menu', 'setup-menu', 'lobby-wait'].includes(activeId);
         langSelector.style.display = showLang ? 'block' : 'none';
     }
+
+    // Gestione visibilità pulsante chat vocale (visibile in lobby e partita)
+    const voiceBtnContainer = document.getElementById('voice-btn-container');
+    if (voiceBtnContainer) {
+        const inRoom = ['lobby-wait', 'game-area', 'classifica-finale-container'].includes(activeId);
+        voiceBtnContainer.style.display = inRoom ? 'block' : 'none';
+        if (!inRoom && voiceManager.isEnabled) {
+            voiceManager.leaveVoice();
+        }
+    }
 }
 window.switchSection = switchSection;
 
@@ -97,6 +163,17 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         sound.updateSoundIcon();
         window.toggleAudio = () => sound.toggleMute();
+
+        const voiceBtnEl = document.getElementById('voice-btn');
+        if (voiceBtnEl) {
+            voiceBtnEl.addEventListener('dblclick', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (voiceManager.isEnabled) {
+                    voiceManager.leaveVoice();
+                }
+            });
+        }
 
         const savedUser = localStorage.getItem('lucas_user');
         const isRoomActive = sessionStorage.getItem('lucas_room');
@@ -722,6 +799,7 @@ function renderGiocatori(data) {
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
         pBlock.setAttribute('data-player-id', serverPlayerIndex);
+        pBlock.setAttribute('data-socket-id', isMe ? 'me' : (p.socketId || ''));
         if (isMe) pBlock.classList.add('me');
         if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
         
@@ -993,8 +1071,9 @@ window.esciDallaPartita = () => {
         chiudiReplayViewer();
         return;
     }
-    console.log("Uscita dalla partita (Fast Exit)...");
+    console.log("Uscita dalla partita...");
     sessionStorage.removeItem('lucas_room');
+    voiceManager.leaveVoice();
     socket.emit('esci_partita');
     // Torniamo alla schermata di setup
     window.switchSection('setup-menu');

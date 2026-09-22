@@ -1229,6 +1229,7 @@ let isSimulando = false;
 let turboEnabled = false; // Interruttore Maestro AI
 const lobbies = {};
 const turnTimers = {};
+const voiceRooms = {};
 
 
 io.on('connection', (socket) => {
@@ -1552,6 +1553,7 @@ io.on('connection', (socket) => {
         try {
             const code = socket.roomCode;
             if (!code) return;
+            leaveVoice(socket, code);
 
             // --- FIX: Lasciamo la stanza subito per non ricevere l'aggiornamento di stato successivo ---
             socket.leave(code);
@@ -1566,6 +1568,7 @@ io.on('connection', (socket) => {
 
                 if (lobby.giocatori.length === 0) {
                     delete lobbies[code];
+                    if (voiceRooms[code]) delete voiceRooms[code];
                     if (turnTimers[code]) {
                         clearTimeout(turnTimers[code]);
                         delete turnTimers[code];
@@ -1608,6 +1611,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         try {
             console.log(`Giocatore disconnesso: ${socket.id}`);
+            leaveVoice(socket);
 
             // Cerchiamo in quale lobby si trovava
             for (const code in lobbies) {
@@ -1806,6 +1810,78 @@ io.on('connection', (socket) => {
             io.to(code).emit('receive_chat_message', messageData);
         } catch (e) {
             console.error("Errore chat:", e);
+        }
+    });
+
+    // ==========================================
+    // CHAT VOCALE WEBRTC (Signaling P2P)
+    // ==========================================
+    function leaveVoice(s, specificCode = null) {
+        const code = specificCode || s.roomCode;
+        if (code && voiceRooms[code]) {
+            if (voiceRooms[code].has(s.id)) {
+                voiceRooms[code].delete(s.id);
+                s.to(code).emit('voice_peer_left', { peerId: s.id });
+            }
+            if (voiceRooms[code].size === 0) {
+                delete voiceRooms[code];
+            }
+        }
+    }
+
+    socket.on('voice_join', () => {
+        try {
+            const code = socket.roomCode;
+            if (!code || !lobbies[code]) return;
+            if (!voiceRooms[code]) voiceRooms[code] = new Set();
+
+            // Lista dei peer già presenti nella voice room
+            const existingPeers = Array.from(voiceRooms[code]).filter(id => id !== socket.id);
+            socket.emit('voice_peers_list', existingPeers);
+
+            // Aggiungiamo questo socket alla voice room
+            voiceRooms[code].add(socket.id);
+
+            // Notifichiamo agli altri peer che qualcuno si è connesso alla voce
+            socket.to(code).emit('voice_peer_joined', { peerId: socket.id });
+        } catch (e) {
+            console.error("Errore voice_join:", e);
+        }
+    });
+
+    socket.on('voice_signal', (data) => {
+        try {
+            const code = socket.roomCode;
+            if (!code || !lobbies[code] || !data || !data.to || !data.signal) return;
+            // Inoltro diretto al peer destinatario
+            io.to(data.to).emit('voice_signal', {
+                from: socket.id,
+                signal: data.signal
+            });
+        } catch (e) {
+            console.error("Errore voice_signal:", e);
+        }
+    });
+
+    socket.on('voice_state', (data) => {
+        try {
+            const code = socket.roomCode;
+            if (!code) return;
+            socket.to(code).emit('voice_peer_state', {
+                peerId: socket.id,
+                isMuted: !!(data && data.isMuted),
+                isSpeaking: !!(data && data.isSpeaking)
+            });
+        } catch (e) {
+            console.error("Errore voice_state:", e);
+        }
+    });
+
+    socket.on('voice_leave', () => {
+        try {
+            leaveVoice(socket);
+        } catch (e) {
+            console.error("Errore voice_leave:", e);
         }
     });
 
