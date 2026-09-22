@@ -1381,7 +1381,7 @@ io.on('connection', (socket) => {
             let code;
             do {
                 code = Math.random().toString(36).substring(2, 6).toUpperCase();
-            } while (code === "FAST" || lobbies[code]);
+            } while (lobbies[code]);
             lobbies[code] = {
                 host: socket.id,
                 parametri: dati,
@@ -1502,35 +1502,12 @@ io.on('connection', (socket) => {
         try {
             if (!dati || !dati.code) return socket.emit('errore', "Codice stanza mancante.");
             const roomCode = dati.code.trim().toUpperCase();
-            if (roomCode === "FAST") {
-                if (lobbies["FAST"]) {
-                    delete lobbies["FAST"];
-                }
-                lobbies["FAST"] = {
-                    host: socket.id,
-                    parametri: { numGiocatori: "8" },
-                    giocatori: [{
-                        id: socket.id,
-                        nome: dati.nome,
-                        token: dati.token,
-                        uniqueCode: dati.uniqueCode,
-                        elo: socket.userElo || 1000,
-                        isHuman: true
-                    }],
-                    isFast: false
-                };
-                socket.userNickname = dati.nome;
-                socket.userUniqueCode = dati.uniqueCode;
-                socket.join("FAST");
-                socket.roomCode = "FAST";
-                avviaPartita("FAST");
-                return;
-            }
-            const lobby = lobbies[dati.code];
+            const lobby = lobbies[roomCode] || lobbies[dati.code];
+            const targetCode = lobbies[roomCode] ? roomCode : dati.code;
             if (lobby) {
                 let existingPlayer = lobby.giocatori.find(p => p.token && p.token === dati.token);
                 if (existingPlayer) {
-                    return gestisciRiconnessione(socket, dati.code, dati.token);
+                    return gestisciRiconnessione(socket, targetCode, dati.token);
                 }
 
                 if (lobby.giocatori.length >= parseInt(lobby.parametri.numGiocatori)) {
@@ -1547,10 +1524,10 @@ io.on('connection', (socket) => {
                 });
                 socket.userNickname = dati.nome;
                 socket.userUniqueCode = dati.uniqueCode;
-                socket.join(dati.code);
-                socket.roomCode = dati.code;
-                inviaAggiornamentoLobby(dati.code);
-                salvaStatoMatch(dati.code);
+                socket.join(targetCode);
+                socket.roomCode = targetCode;
+                inviaAggiornamentoLobby(targetCode);
+                salvaStatoMatch(targetCode);
                 if (lobby.pubblica) {
                     inviaLobbyPubblicheTutti();
                 }
@@ -1905,16 +1882,15 @@ io.on('connection', (socket) => {
 
             carta.giocata = true;
             game.tavolo.push({ playerId: pIdx, card: carta });
-            const isFast = false;
             if (game.tavolo.length === game.numPlayers) {
                 inviaStato(code);
-                setTimeout(() => risolviPresa(code), isFast ? 150 : 1500);
+                setTimeout(() => risolviPresa(code), 1500);
             } else {
                 game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
 
                 // --- MICRO-RITARDO SUL SERVER (Previene carte istantanee) ---
                 game.acceptInput = false;
-                setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, isFast ? 50 : 400);
+                setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 400);
 
                 inviaStato(code);
                 gestisciIA(code);
@@ -1934,7 +1910,6 @@ io.on('connection', (socket) => {
         const semeUscita = game.tavolo[0].card.seme;
 
         // --- LOGGING PER TRAINING AI ---
-        const isFast = false;
         if (dbConnected) {
             const historyStr = game.carteUscite.map(c => `${c.valore}-${c.seme}`).join('|');
             const voidStr = game.players.map((p, i) => p.voidSuits.length > 0 ? `P${i}:${p.voidSuits.join('&')}` : "").filter(s => s !== "").join('|');
@@ -2009,7 +1984,7 @@ io.on('connection', (socket) => {
 
         // --- MICRO-RITARDO SUL SERVER AL CAMBIO PRESA ---
         game.acceptInput = false;
-        setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, isFast ? 50 : 500);
+        setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 500);
 
         // --- FIX 3: Ora la mano finisce SOLO se TUTTI i giocatori hanno davvero giocato tutte le carte ---
         if (game.players.every(p => p.mano.every(c => c.giocata))) {
@@ -2128,7 +2103,6 @@ io.on('connection', (socket) => {
 
         game.botThinking = true;
 
-        const isFast = false;
         setTimeout(() => {
             const currentGame = lobbies[code]?.gameInstance;
             if (!currentGame) return;
@@ -2500,7 +2474,7 @@ io.on('connection', (socket) => {
 
                 if (currentGame.tavolo.length === currentGame.numPlayers) {
                     inviaStato(code);
-                    setTimeout(() => risolviPresa(code), isFast ? 150 : 1500);
+                    setTimeout(() => risolviPresa(code), 1500);
                 } else {
                     currentGame.turnoAttuale = (currentGame.turnoAttuale + 1) % currentGame.numPlayers;
                     inviaStato(code);
@@ -2508,7 +2482,7 @@ io.on('connection', (socket) => {
                     avviaTimerTurno(code);
                 }
             }
-        }, isFast ? 50 : 1200);
+        }, 1200);
     }
 
     function inviaStato(code) {
@@ -2795,14 +2769,12 @@ io.on('connection', (socket) => {
             cartaDaGiocare.giocata = true;
             game.tavolo.push({ playerId: playerIndex, card: cartaDaGiocare });
 
-            const isFast = false;
-
             // Invia notifica di timeout ai client
             io.to(code).emit('mossa_automatica', { nickname: p.nome, mossa: `${cartaDaGiocare.valore} di ${cartaDaGiocare.seme}` });
 
             if (game.tavolo.length === game.numPlayers) {
                 inviaStato(code);
-                setTimeout(() => risolviPresa(code), isFast ? 150 : 1500);
+                setTimeout(() => risolviPresa(code), 1500);
             } else {
                 game.turnoAttuale = (game.turnoAttuale + 1) % game.numPlayers;
                 inviaStato(code);
