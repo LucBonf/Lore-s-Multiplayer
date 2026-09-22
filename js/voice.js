@@ -12,18 +12,32 @@ const ICE_SERVERS = {
     ]
 };
 
+// Soglia di volume RMS per il rilevamento voce (0-255 su scala frequenza)
+const VAD_THRESHOLD = 14;
+
+// Intervallo di polling VAD in ms
+const VAD_POLL_INTERVAL = 100;
+
+// Debounce per speaking remoto (ms) — evita flickering animazione
+const REMOTE_SPEAKING_DEBOUNCE = 200;
+
+// Throttle minimo tra invii voice_state al server (ms)
+const SPEAKING_EMIT_THROTTLE = 250;
+
 class VoiceChatManager {
     constructor() {
         this.socket = null;
         this.localStream = null;
-        this.peers = new Map(); // peerId -> { pc, audio, analyser, dataArray }
+        this.peers = new Map(); // peerId -> { pc, audio, analyser, dataArray, iceCandidateQueue, remoteDescriptionSet, lastSpeaking, lastSpeakingTime }
         this.isEnabled = false;
         this.isMuted = false;
         this.audioCtx = null;
         this.localAnalyser = null;
+        this.localDataArray = null;
         this.vadInterval = null;
         this.lastSpeakingState = false;
         this.speakingThrottle = 0;
+        this._pendingSpeakingEmit = null; // Timer per garantire l'invio dell'ultimo stato
 
         // Callback per notificare l'interfaccia
         this.onStateChange = null;
@@ -52,15 +66,25 @@ class VoiceChatManager {
             }
         });
 
-        // Un nuovo peer si è connesso: chi era già nella stanza aspetta l'offerta dal nuovo arrivato
+        // Un nuovo peer si è connesso: prepariamo la connessione (aspettiamo la sua offerta)
+        // Il nuovo arrivato crea le offerte tramite voice_peers_list, noi rispondiamo via voice_signal
         this.socket.on('voice_peer_joined', async ({ peerId }) => {
             if (!this.isEnabled || !this.localStream) return;
+            // Pre-creiamo la peer connection in attesa della sua offerta SDP
+            // In questo modo i candidati ICE che arrivano prima dell'offerta vengono correttamente accodati
+            if (!this.peers.has(peerId)) {
+                await this._createPeerConnection(peerId, false);
+            }
         });
 
         // Segnali WebRTC in arrivo (offer, answer, candidate)
         this.socket.on('voice_signal', async ({ from, signal }) => {
             if (!this.isEnabled || !this.localStream) return;
-            await this._handleSignal(from, signal);
+            try {
+                await this._handleSignal(from, signal);
+            } catch (err) {
+                console.error("Errore gestione segnale da", from, err);
+            }
         });
 
         // Stato muto/speaking di un peer remoto
@@ -147,6 +171,12 @@ class VoiceChatManager {
     }
 
     leaveVoice() {
+        // Ferma timer pendente di speaking
+        if (this._pendingSpeakingEmit) {
+            clearTimeout(this._pendingSpeakingEmit);
+            this._pendingSpeakingEmit = null;
+        }
+
         // Ferma i track locali
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());
@@ -164,10 +194,14 @@ class VoiceChatManager {
             this.vadInterval = null;
         }
 
+        // Chiude AudioContext (rilascio risorse hardware)
         if (this.audioCtx && this.audioCtx.state !== 'closed') {
             try { this.audioCtx.close(); } catch (e) {}
             this.audioCtx = null;
         }
+
+        this.localAnalyser = null;
+        this.localDataArray = null;
 
         if (this.socket && this.isEnabled) {
             this.socket.emit('voice_leave');
@@ -175,6 +209,7 @@ class VoiceChatManager {
 
         this.isEnabled = false;
         this.isMuted = false;
+        this.lastSpeakingState = false;
 
         if (this.onSpeakingChange) {
             this.onSpeakingChange('me', false);
@@ -184,12 +219,27 @@ class VoiceChatManager {
     }
 
     async _createPeerConnection(peerId, isInitiator) {
+        // Se la connessione esiste già ed è ancora attiva, riusala
         if (this.peers.has(peerId)) {
-            return this.peers.get(peerId).pc;
+            const existing = this.peers.get(peerId);
+            if (existing.pc && existing.pc.connectionState !== 'failed' && existing.pc.connectionState !== 'closed') {
+                return existing.pc;
+            }
+            // Connessione in stato invalido, la rimuoviamo per ricrearla
+            this._removePeer(peerId);
         }
 
         const pc = new RTCPeerConnection(ICE_SERVERS);
-        const peerData = { pc, audio: null, analyser: null, dataArray: null };
+        const peerData = {
+            pc,
+            audio: null,
+            analyser: null,
+            dataArray: null,
+            iceCandidateQueue: [],           // Coda per candidati ICE arrivati prima di remoteDescription
+            remoteDescriptionSet: false,     // Flag che indica se setRemoteDescription è stato chiamato
+            lastSpeaking: false,             // Ultimo stato speaking rilevato (per debounce)
+            lastSpeakingTime: 0              // Timestamp ultimo cambio stato speaking
+        };
         this.peers.set(peerId, peerData);
 
         // Aggiungiamo i track locali al peer
@@ -212,6 +262,8 @@ class VoiceChatManager {
         // Ricezione dello stream audio remoto
         pc.ontrack = (event) => {
             const remoteStream = event.streams[0];
+            if (!remoteStream) return;
+
             let audioEl = peerData.audio;
             if (!audioEl) {
                 audioEl = document.createElement('audio');
@@ -227,8 +279,23 @@ class VoiceChatManager {
             this._attachRemoteAnalyser(peerId, remoteStream);
         };
 
+        // Gestione cambio stato connessione con riconnessione automatica
         pc.onconnectionstatechange = () => {
-            if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+            const state = pc.connectionState;
+            if (state === 'failed') {
+                // Tentativo di ICE restart prima di rimuovere il peer
+                console.warn(`Connessione fallita con ${peerId}, tentativo ICE restart...`);
+                this._attemptIceRestart(peerId);
+            } else if (state === 'disconnected') {
+                // Potrebbe essere un'interruzione temporanea; aspettiamo prima di rimuovere
+                setTimeout(() => {
+                    const pd = this.peers.get(peerId);
+                    if (pd && pd.pc && pd.pc.connectionState === 'disconnected') {
+                        console.warn(`Peer ${peerId} ancora disconnesso dopo timeout, tentativo ICE restart...`);
+                        this._attemptIceRestart(peerId);
+                    }
+                }, 3000);
+            } else if (state === 'closed') {
                 this._removePeer(peerId);
             }
         };
@@ -249,19 +316,55 @@ class VoiceChatManager {
             }
         }
 
+        this._notifyState();
         return pc;
     }
 
+    async _attemptIceRestart(peerId) {
+        const peerData = this.peers.get(peerId);
+        if (!peerData || !peerData.pc) return;
+
+        try {
+            const pc = peerData.pc;
+            if (pc.connectionState === 'closed') {
+                this._removePeer(peerId);
+                return;
+            }
+            // Reset candidati e flag per il nuovo ciclo ICE
+            peerData.iceCandidateQueue = [];
+            peerData.remoteDescriptionSet = false;
+
+            const offer = await pc.createOffer({ iceRestart: true });
+            await pc.setLocalDescription(offer);
+            if (this.socket) {
+                this.socket.emit('voice_signal', {
+                    to: peerId,
+                    signal: { sdp: pc.localDescription }
+                });
+            }
+        } catch (err) {
+            console.error("ICE restart fallito per", peerId, err);
+            this._removePeer(peerId);
+        }
+    }
+
     async _handleSignal(peerId, signal) {
-        let pc = this.peers.get(peerId)?.pc;
+        let peerData = this.peers.get(peerId);
+        let pc = peerData?.pc;
 
         if (signal.sdp) {
             const sdp = signal.sdp;
             if (sdp.type === 'offer') {
                 if (!pc) {
                     pc = await this._createPeerConnection(peerId, false);
+                    peerData = this.peers.get(peerId);
                 }
                 await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                peerData.remoteDescriptionSet = true;
+
+                // Processa eventuali candidati ICE arrivati prima del setRemoteDescription
+                await this._flushIceCandidateQueue(peerId);
+
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
                 if (this.socket) {
@@ -273,15 +376,47 @@ class VoiceChatManager {
             } else if (sdp.type === 'answer') {
                 if (pc) {
                     await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                    if (peerData) {
+                        peerData.remoteDescriptionSet = true;
+                        // Processa eventuali candidati ICE arrivati prima dell'answer
+                        await this._flushIceCandidateQueue(peerId);
+                    }
                 }
             }
         } else if (signal.candidate) {
-            if (pc) {
+            if (!pc) {
+                // Il peer non esiste ancora; creiamolo e accodiamo il candidato
+                pc = await this._createPeerConnection(peerId, false);
+                peerData = this.peers.get(peerId);
+            }
+            if (peerData && !peerData.remoteDescriptionSet) {
+                // Remote description non ancora impostata: accodiamo il candidato ICE
+                peerData.iceCandidateQueue.push(signal.candidate);
+            } else if (pc) {
                 try {
                     await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
                 } catch (e) {
-                    console.error("Errore aggiunta ICE candidate:", e);
+                    console.warn("Errore aggiunta ICE candidate:", e);
                 }
+            }
+        }
+    }
+
+    /**
+     * Processa i candidati ICE in coda (arrivati prima di setRemoteDescription)
+     */
+    async _flushIceCandidateQueue(peerId) {
+        const peerData = this.peers.get(peerId);
+        if (!peerData || !peerData.pc || peerData.iceCandidateQueue.length === 0) return;
+
+        const queue = peerData.iceCandidateQueue;
+        peerData.iceCandidateQueue = [];
+
+        for (const candidate of queue) {
+            try {
+                await peerData.pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (e) {
+                console.warn("Errore aggiunta ICE candidate dalla coda:", e);
             }
         }
     }
@@ -292,6 +427,10 @@ class VoiceChatManager {
 
         try {
             if (peerData.pc) {
+                // Rimuovi tutti gli event handler per evitare callback post-chiusura
+                peerData.pc.onicecandidate = null;
+                peerData.pc.ontrack = null;
+                peerData.pc.onconnectionstatechange = null;
                 peerData.pc.close();
             }
             if (peerData.audio) {
@@ -306,6 +445,8 @@ class VoiceChatManager {
         if (this.onSpeakingChange) {
             this.onSpeakingChange(peerId, false);
         }
+
+        this._notifyState();
     }
 
     _initLocalAnalyser() {
@@ -315,16 +456,22 @@ class VoiceChatManager {
             if (!AudioCtx) return;
             if (!this.audioCtx) this.audioCtx = new AudioCtx();
 
+            // Riprendi AudioContext se sospeso (policy autoplay dei browser)
+            if (this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume().catch(() => {});
+            }
+
             const source = this.audioCtx.createMediaStreamSource(this.localStream);
             this.localAnalyser = this.audioCtx.createAnalyser();
             this.localAnalyser.fftSize = 256;
+            this.localAnalyser.smoothingTimeConstant = 0.5; // Liscia i valori per ridurre jitter
             source.connect(this.localAnalyser);
 
             this.localDataArray = new Uint8Array(this.localAnalyser.frequencyBinCount);
 
             // Avvia il loop di rilevamento attività vocale (VAD)
             if (!this.vadInterval) {
-                this.vadInterval = setInterval(() => this._checkVoiceActivity(), 100);
+                this.vadInterval = setInterval(() => this._checkVoiceActivity(), VAD_POLL_INTERVAL);
             }
         } catch (e) {
             console.warn("Impossibile avviare analizzatore vocale locale:", e);
@@ -339,12 +486,18 @@ class VoiceChatManager {
             }
             if (!this.audioCtx) return;
 
+            // Riprendi AudioContext se sospeso (policy autoplay dei browser)
+            if (this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume().catch(() => {});
+            }
+
             const peerData = this.peers.get(peerId);
             if (!peerData) return;
 
             const source = this.audioCtx.createMediaStreamSource(stream);
             const analyser = this.audioCtx.createAnalyser();
             analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.5; // Liscia i valori per ridurre jitter
             source.connect(analyser);
 
             peerData.analyser = analyser;
@@ -365,22 +518,19 @@ class VoiceChatManager {
                 sum += this.localDataArray[i];
             }
             const average = sum / this.localDataArray.length;
-            const isSpeaking = average > 14; // Soglia sensibilità microfono
+            const isSpeaking = average > VAD_THRESHOLD;
 
             if (isSpeaking !== this.lastSpeakingState) {
                 this.lastSpeakingState = isSpeaking;
                 if (this.onSpeakingChange) {
                     this.onSpeakingChange('me', isSpeaking);
                 }
-                // Notifichiamo agli altri peer con throttling
-                if (now - this.speakingThrottle > 250 && this.socket) {
-                    this.speakingThrottle = now;
-                    this.socket.emit('voice_state', { isMuted: false, isSpeaking: isSpeaking });
-                }
+                // Invia lo stato al server con throttle, ma garantisci l'ultimo aggiornamento
+                this._emitSpeakingStateThrottled(isSpeaking, now);
             }
         }
 
-        // 2. Controllo peer remoti
+        // 2. Controllo peer remoti (con debounce per evitare flickering dell'animazione)
         for (const [peerId, peerData] of this.peers.entries()) {
             if (peerData.analyser && peerData.dataArray) {
                 peerData.analyser.getByteFrequencyData(peerData.dataArray);
@@ -389,11 +539,52 @@ class VoiceChatManager {
                     sum += peerData.dataArray[i];
                 }
                 const average = sum / peerData.dataArray.length;
-                const isSpeaking = average > 14;
-                if (this.onSpeakingChange) {
-                    this.onSpeakingChange(peerId, isSpeaking);
+                const isSpeaking = average > VAD_THRESHOLD;
+
+                // Debounce: aggiorna l'UI solo se lo stato è cambiato E è passato abbastanza tempo
+                const prevSpeaking = peerData.lastSpeaking || false;
+                if (isSpeaking !== prevSpeaking) {
+                    const timeSinceLastChange = now - (peerData.lastSpeakingTime || 0);
+                    if (timeSinceLastChange >= REMOTE_SPEAKING_DEBOUNCE) {
+                        peerData.lastSpeaking = isSpeaking;
+                        peerData.lastSpeakingTime = now;
+                        if (this.onSpeakingChange) {
+                            this.onSpeakingChange(peerId, isSpeaking);
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    /**
+     * Invio throttled dello stato speaking al server.
+     * Garantisce che l'ultimo cambiamento di stato venga sempre inviato,
+     * anche se cade durante il periodo di throttle.
+     */
+    _emitSpeakingStateThrottled(isSpeaking, now) {
+        // Cancella eventuali invii pendenti
+        if (this._pendingSpeakingEmit) {
+            clearTimeout(this._pendingSpeakingEmit);
+            this._pendingSpeakingEmit = null;
+        }
+
+        if (now - this.speakingThrottle >= SPEAKING_EMIT_THROTTLE) {
+            // Possiamo inviare subito
+            this.speakingThrottle = now;
+            if (this.socket) {
+                this.socket.emit('voice_state', { isMuted: false, isSpeaking: isSpeaking });
+            }
+        } else {
+            // Programmiamo l'invio per quando il throttle scade (garantisce ultimo stato)
+            const remaining = SPEAKING_EMIT_THROTTLE - (now - this.speakingThrottle);
+            this._pendingSpeakingEmit = setTimeout(() => {
+                this._pendingSpeakingEmit = null;
+                this.speakingThrottle = Date.now();
+                if (this.socket && this.isEnabled) {
+                    this.socket.emit('voice_state', { isMuted: this.isMuted, isSpeaking: this.lastSpeakingState });
+                }
+            }, remaining);
         }
     }
 

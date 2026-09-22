@@ -1835,6 +1835,9 @@ io.on('connection', (socket) => {
             if (!code || !lobbies[code]) return;
             if (!voiceRooms[code]) voiceRooms[code] = new Set();
 
+            // Previeni doppio join
+            if (voiceRooms[code].has(socket.id)) return;
+
             // Lista dei peer già presenti nella voice room
             const existingPeers = Array.from(voiceRooms[code]).filter(id => id !== socket.id);
             socket.emit('voice_peers_list', existingPeers);
@@ -1853,6 +1856,10 @@ io.on('connection', (socket) => {
         try {
             const code = socket.roomCode;
             if (!code || !lobbies[code] || !data || !data.to || !data.signal) return;
+            // Verifica che il mittente sia nella voice room
+            if (!voiceRooms[code] || !voiceRooms[code].has(socket.id)) return;
+            // Verifica che il destinatario sia nella stessa voice room
+            if (!voiceRooms[code].has(data.to)) return;
             // Inoltro diretto al peer destinatario
             io.to(data.to).emit('voice_signal', {
                 from: socket.id,
@@ -1867,6 +1874,8 @@ io.on('connection', (socket) => {
         try {
             const code = socket.roomCode;
             if (!code) return;
+            // Invia solo se il mittente è nella voice room
+            if (!voiceRooms[code] || !voiceRooms[code].has(socket.id)) return;
             socket.to(code).emit('voice_peer_state', {
                 peerId: socket.id,
                 isMuted: !!(data && data.isMuted),
