@@ -55,6 +55,11 @@ class SoundEngine {
         const btn = document.getElementById('sound-btn');
         if (btn) {
             btn.setAttribute('title', this.muted ? 'Suoni Disattivati' : 'Suoni Attivati');
+            btn.className = this.muted ? 'sound-muted' : 'sound-active';
+        }
+        const badge = document.getElementById('sound-status-badge');
+        if (badge) {
+            badge.className = this.muted ? 'sound-badge-muted' : 'sound-badge-on';
         }
     }
 

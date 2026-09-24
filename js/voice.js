@@ -8,8 +8,27 @@ const ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' }
-    ]
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        // Server TURN gratuiti come fallback per connessioni dietro NAT simmetrico
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        }
+    ],
+    iceCandidatePoolSize: 2
 };
 
 // Soglia di volume RMS per il rilevamento voce (0-255 su scala frequenza)
@@ -261,8 +280,12 @@ class VoiceChatManager {
 
         // Ricezione dello stream audio remoto
         pc.ontrack = (event) => {
+            console.log(`[Voice] ontrack ricevuto da ${peerId}, streams: ${event.streams.length}, track kind: ${event.track.kind}`);
             const remoteStream = event.streams[0];
-            if (!remoteStream) return;
+            if (!remoteStream) {
+                console.warn(`[Voice] ontrack senza stream da ${peerId}`);
+                return;
+            }
 
             let audioEl = peerData.audio;
             if (!audioEl) {
@@ -270,34 +293,68 @@ class VoiceChatManager {
                 audioEl.autoplay = true;
                 audioEl.playsInline = true;
                 audioEl.volume = 1.0;
+                // Stile nascosto ma presente nel DOM
+                audioEl.style.position = 'absolute';
+                audioEl.style.opacity = '0';
+                audioEl.style.pointerEvents = 'none';
                 document.body.appendChild(audioEl);
                 peerData.audio = audioEl;
             }
             audioEl.srcObject = remoteStream;
 
+            // Forza il play (necessario per policy autoplay di alcuni browser)
+            const playPromise = audioEl.play();
+            if (playPromise) {
+                playPromise.catch(e => {
+                    console.warn(`[Voice] Autoplay bloccato per ${peerId}, tentativo dopo user gesture:`, e);
+                    // Riprova al prossimo click dell'utente
+                    const resumePlay = () => {
+                        audioEl.play().catch(() => {});
+                        document.removeEventListener('click', resumePlay);
+                        document.removeEventListener('touchstart', resumePlay);
+                    };
+                    document.addEventListener('click', resumePlay, { once: true });
+                    document.addEventListener('touchstart', resumePlay, { once: true });
+                });
+            }
+
             // Collega l'analizzatore audio per monitorare chi parla
+            // Usa un clone dello stream per non interferire con la riproduzione dell'elemento <audio>
             this._attachRemoteAnalyser(peerId, remoteStream);
         };
 
         // Gestione cambio stato connessione con riconnessione automatica
         pc.onconnectionstatechange = () => {
             const state = pc.connectionState;
-            if (state === 'failed') {
+            console.log(`[Voice] connectionState con ${peerId}: ${state}`);
+            if (state === 'connected') {
+                console.log(`[Voice] ✅ Connessione P2P stabilita con ${peerId}`);
+            } else if (state === 'failed') {
                 // Tentativo di ICE restart prima di rimuovere il peer
-                console.warn(`Connessione fallita con ${peerId}, tentativo ICE restart...`);
+                console.warn(`[Voice] ❌ Connessione fallita con ${peerId}, tentativo ICE restart...`);
                 this._attemptIceRestart(peerId);
             } else if (state === 'disconnected') {
                 // Potrebbe essere un'interruzione temporanea; aspettiamo prima di rimuovere
+                console.warn(`[Voice] ⚠️ Peer ${peerId} disconnesso, attendo 5s...`);
                 setTimeout(() => {
                     const pd = this.peers.get(peerId);
                     if (pd && pd.pc && pd.pc.connectionState === 'disconnected') {
-                        console.warn(`Peer ${peerId} ancora disconnesso dopo timeout, tentativo ICE restart...`);
+                        console.warn(`[Voice] Peer ${peerId} ancora disconnesso dopo timeout, tentativo ICE restart...`);
                         this._attemptIceRestart(peerId);
                     }
-                }, 3000);
+                }, 5000);
             } else if (state === 'closed') {
                 this._removePeer(peerId);
             }
+        };
+
+        // Log dettagliato sullo stato ICE gathering
+        pc.onicegatheringstatechange = () => {
+            console.log(`[Voice] ICE gathering state con ${peerId}: ${pc.iceGatheringState}`);
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            console.log(`[Voice] ICE connection state con ${peerId}: ${pc.iceConnectionState}`);
         };
 
         // Se siamo l'iniziatore, creiamo e inviamo l'offerta SDP
@@ -431,12 +488,18 @@ class VoiceChatManager {
                 peerData.pc.onicecandidate = null;
                 peerData.pc.ontrack = null;
                 peerData.pc.onconnectionstatechange = null;
+                peerData.pc.onicegatheringstatechange = null;
+                peerData.pc.oniceconnectionstatechange = null;
                 peerData.pc.close();
             }
             if (peerData.audio) {
                 peerData.audio.pause();
                 peerData.audio.srcObject = null;
                 peerData.audio.remove();
+            }
+            // Ferma lo stream clonato dell'analizzatore
+            if (peerData.analyserStream) {
+                peerData.analyserStream.getTracks().forEach(t => t.stop());
             }
         } catch (e) {}
 
@@ -447,6 +510,7 @@ class VoiceChatManager {
         }
 
         this._notifyState();
+        console.log(`[Voice] Peer ${peerId} rimosso`);
     }
 
     _initLocalAnalyser() {
@@ -494,16 +558,27 @@ class VoiceChatManager {
             const peerData = this.peers.get(peerId);
             if (!peerData) return;
 
-            const source = this.audioCtx.createMediaStreamSource(stream);
+            // IMPORTANTE: Cloniamo lo stream per l'analisi.
+            // Usare createMediaStreamSource sullo stesso stream collegato a un <audio>
+            // può causare problemi di routing audio in alcuni browser (Chrome/Safari)
+            // dove l'audio smette di uscire dall'elemento <audio>.
+            const clonedStream = stream.clone();
+            const source = this.audioCtx.createMediaStreamSource(clonedStream);
             const analyser = this.audioCtx.createAnalyser();
             analyser.fftSize = 256;
             analyser.smoothingTimeConstant = 0.5; // Liscia i valori per ridurre jitter
             source.connect(analyser);
+            // NON colleghiamo alla destinazione: l'analyser è solo per VAD,
+            // la riproduzione avviene tramite l'elemento <audio>
 
             peerData.analyser = analyser;
             peerData.dataArray = new Uint8Array(analyser.frequencyBinCount);
+            // Salviamo il clone per poterlo fermare quando rimuoviamo il peer
+            peerData.analyserStream = clonedStream;
+
+            console.log(`[Voice] Analizzatore remoto collegato per ${peerId}`);
         } catch (e) {
-            console.warn("Impossibile collegare analizzatore remoto:", e);
+            console.warn("[Voice] Impossibile collegare analizzatore remoto:", e);
         }
     }
 

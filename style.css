@@ -670,13 +670,44 @@ button {
     font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s, border-color 0.3s, box-shadow 0.3s;
+    position: relative;
 }
 
 #sound-btn:hover {
     transform: scale(1.1) rotate(-5deg);
     background: rgba(255, 255, 255, 0.2);
+}
+
+#sound-btn.sound-active {
+    background: rgba(46, 204, 113, 0.2);
     border-color: #2ecc71;
+    box-shadow: 0 0 15px rgba(46, 204, 113, 0.5);
+}
+
+#sound-btn.sound-muted {
+    background: rgba(231, 76, 60, 0.25);
+    border-color: #e74c3c;
+    box-shadow: 0 0 15px rgba(231, 76, 60, 0.5);
+}
+
+#sound-status-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid #0d0d0d;
+}
+
+.sound-badge-on {
+    background-color: #2ecc71;
+    box-shadow: 0 0 6px #2ecc71;
+}
+
+.sound-badge-muted {
+    background-color: #e74c3c;
 }
 
 #voice-btn-container {
