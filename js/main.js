@@ -7,11 +7,33 @@ const socket = io();
 // Inizializzazione Chat Vocale WebRTC
 voiceManager.init(socket);
 
+function isUserRegistered() {
+    if (userProfile && userProfile.uniqueCode) {
+        return !userProfile.uniqueCode.startsWith('GUEST_');
+    }
+    try {
+        const saved = localStorage.getItem('lucas_user');
+        if (saved) {
+            const u = JSON.parse(saved);
+            return !!(u && u.uniqueCode && !u.uniqueCode.startsWith('GUEST_'));
+        }
+    } catch (e) {}
+    return false;
+}
+
 function updateVoiceUI(isEnabled, isMuted) {
     const btn = document.getElementById('voice-btn');
     const icon = document.getElementById('voice-icon');
     const badge = document.getElementById('voice-status-badge');
     if (!btn || !icon || !badge) return;
+
+    if (!isUserRegistered()) {
+        btn.className = '';
+        btn.setAttribute('title', 'Chat Vocale (Richiede account registrato)');
+        icon.innerHTML = '🎙️';
+        badge.className = 'voice-badge-off';
+        return;
+    }
 
     if (!isEnabled) {
         btn.className = '';
@@ -52,6 +74,13 @@ voiceManager.onSpeakingChange = (peerId, isSpeaking) => {
 };
 
 window.toggleVoiceChat = async () => {
+    if (!isUserRegistered()) {
+        const lang = localStorage.getItem('lucas_lang') || 'it';
+        const d = dictionary[lang] || dictionary['it'];
+        mostraErrore(d.voiceLoginRequired || "La chat vocale è disponibile solo per gli utenti registrati. Accedi con il tuo account!");
+        return;
+    }
+
     if (!voiceManager.isEnabled) {
         await voiceManager.startVoice();
     } else {
@@ -324,6 +353,9 @@ socket.on('login_ok', (profile) => {
     // Persistenza identità
     localStorage.setItem('lucas_user', JSON.stringify({ uniqueCode: profile.uniqueCode, nickname: profile.nickname }));
     
+    // Aggiorna stato UI voce in base ai permessi account
+    updateVoiceUI(voiceManager.isEnabled, voiceManager.isMuted);
+
     // Mostriamo il menu di setup solo se non siamo già in partita
     if (!sessionStorage.getItem('lucas_room')) {
         switchSection('setup-menu');

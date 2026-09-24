@@ -101,7 +101,8 @@ const dictionary = {
         'valFante': 'Fante',
         'prepDi': 'di',
         'betAction': 'scommessa',
-        'humansOnline': 'umani online'
+        'humansOnline': 'umani online',
+        'voiceLoginRequired': 'La chat vocale è disponibile solo per gli utenti registrati. Accedi con il tuo account!'
     },
     'en': {
         'chooseLanguage': 'Choose Language',
@@ -197,7 +198,8 @@ const dictionary = {
         'valFante': 'Jack',
         'prepDi': 'of',
         'betAction': 'bid',
-        'humansOnline': 'humans online'
+        'humansOnline': 'humans online',
+        'voiceLoginRequired': 'Voice chat is available only for registered users. Log in with your account!'
     },
     'fr': {
         'chooseLanguage': 'Choisissez la Langue',
@@ -293,7 +295,8 @@ const dictionary = {
         'valFante': 'Valet',
         'prepDi': 'de',
         'betAction': 'annonce',
-        'humansOnline': 'humains en ligne'
+        'humansOnline': 'humains en ligne',
+        'voiceLoginRequired': 'Le chat vocal est réservé aux utilisateurs enregistrés. Connectez-vous avec votre compte !'
     },
     'es': {
         'chooseLanguage': 'Elige el Idioma',
@@ -389,7 +392,8 @@ const dictionary = {
         'valFante': 'Sota',
         'prepDi': 'de',
         'betAction': 'declaración',
-        'humansOnline': 'humanos en línea'
+        'humansOnline': 'humanos en línea',
+        'voiceLoginRequired': '¡El chat de voz está disponible solo para usuarios registrados. Inicia sesión con tu cuenta!'
     },
     'de': {
         'chooseLanguage': 'Sprache Wählen',
@@ -485,7 +489,8 @@ const dictionary = {
         'valFante': 'Bube',
         'prepDi': 'von',
         'betAction': 'Ansage',
-        'humansOnline': 'Menschen online'
+        'humansOnline': 'Menschen online',
+        'voiceLoginRequired': 'Der Sprachchat ist nur für registrierte Benutzer verfügbar. Melde dich mit deinem Konto an!'
     }
 };
 

@@ -1833,6 +1833,16 @@ io.on('connection', (socket) => {
         try {
             const code = socket.roomCode;
             if (!code || !lobbies[code]) return;
+
+            // Consenti la chat vocale solo agli utenti registrati con account (non ospiti / anonimi)
+            const lobby = lobbies[code];
+            const playerInLobby = lobby.giocatori && lobby.giocatori.find(p => p.id === socket.id);
+            const uCode = socket.userUniqueCode || (playerInLobby && playerInLobby.uniqueCode);
+            const isRegistered = uCode && !uCode.startsWith("GUEST_");
+            if (!isRegistered) {
+                return socket.emit('errore', "La chat vocale è riservata agli utenti registrati. Accedi con il tuo account!");
+            }
+
             if (!voiceRooms[code]) voiceRooms[code] = new Set();
 
             // Previeni doppio join
