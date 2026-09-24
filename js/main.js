@@ -16,17 +16,17 @@ function updateVoiceUI(isEnabled, isMuted) {
     if (!isEnabled) {
         btn.className = '';
         btn.setAttribute('title', 'Chat Vocale Disattivata (Clicca per attivare)');
-        icon.innerText = '🎙️';
+        icon.innerHTML = '🎙️';
         badge.className = 'voice-badge-off';
     } else if (isMuted) {
         btn.className = 'voice-muted';
         btn.setAttribute('title', 'Microfono Muto (Clicca per parlare)');
-        icon.innerText = '🔇';
+        icon.innerHTML = '<span class="mic-muted-icon"><span class="mic-base">🎙️</span><span class="mic-slash"></span></span>';
         badge.className = 'voice-badge-muted';
     } else {
         btn.className = 'voice-active';
         btn.setAttribute('title', 'Microfono Attivo (Clicca per mutare)');
-        icon.innerText = '🎙️';
+        icon.innerHTML = '🎙️';
         badge.className = 'voice-badge-on';
     }
 }

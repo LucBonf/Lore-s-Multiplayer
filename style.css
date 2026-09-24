@@ -776,6 +776,40 @@ button {
     background-color: #e67e22;
 }
 
+#voice-icon {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    line-height: 1;
+}
+
+.mic-muted-icon {
+    position: relative;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    line-height: 1;
+}
+
+.mic-muted-icon .mic-base {
+    display: inline-block;
+    line-height: 1;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
+}
+
+.mic-muted-icon .mic-slash {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 125%;
+    height: 3.5px;
+    background: #e74c3c;
+    border-radius: 2px;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.9), 0 0 6px rgba(231, 76, 60, 0.7);
+    pointer-events: none;
+}
+
 @keyframes voiceBadgePulse {
     0% { transform: scale(0.9); opacity: 0.8; }
     50% { transform: scale(1.2); opacity: 1; }
