@@ -50,6 +50,7 @@ class VoiceChatManager {
         this.peers = new Map(); // peerId -> { pc, audio, analyser, dataArray, iceCandidateQueue, remoteDescriptionSet, lastSpeaking, lastSpeakingTime }
         this.isEnabled = false;
         this.isMuted = false;
+        this.isDeafened = false;
         this.audioCtx = null;
         this.localAnalyser = null;
         this.localDataArray = null;
@@ -147,6 +148,7 @@ class VoiceChatManager {
 
             this.isEnabled = true;
             this.isMuted = false;
+            this.isDeafened = false;
 
             // Inizializza l'analizzatore di volume locale per la Voice Activity Detection (VAD)
             this._initLocalAnalyser();
@@ -189,6 +191,20 @@ class VoiceChatManager {
         return this.isMuted;
     }
 
+    toggleDeafen() {
+        if (!this.isEnabled) return false;
+        this.isDeafened = !this.isDeafened;
+
+        for (const peerData of this.peers.values()) {
+            if (peerData.audio) {
+                peerData.audio.muted = this.isDeafened;
+            }
+        }
+
+        this._notifyState();
+        return this.isDeafened;
+    }
+
     leaveVoice() {
         // Ferma timer pendente di speaking
         if (this._pendingSpeakingEmit) {
@@ -228,6 +244,7 @@ class VoiceChatManager {
 
         this.isEnabled = false;
         this.isMuted = false;
+        this.isDeafened = false;
         this.lastSpeakingState = false;
 
         if (this.onSpeakingChange) {
@@ -301,6 +318,7 @@ class VoiceChatManager {
                 peerData.audio = audioEl;
             }
             audioEl.srcObject = remoteStream;
+            audioEl.muted = this.isDeafened;
 
             // Forza il play (necessario per policy autoplay di alcuni browser)
             const playPromise = audioEl.play();
@@ -668,6 +686,7 @@ class VoiceChatManager {
             this.onStateChange({
                 isEnabled: this.isEnabled,
                 isMuted: this.isMuted,
+                isDeafened: this.isDeafened,
                 peersCount: this.peers.size
             });
         }

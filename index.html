@@ -71,11 +71,20 @@
         </div>
     </div>
 
-    <!-- Pulsante Chat Vocale WebRTC (Attiva / Muto) -->
+    <!-- Pulsante Chat Vocale WebRTC (Attiva / Muto / Ascolto / Esci) -->
     <div id="voice-btn-container" style="display: none;">
         <div id="voice-btn" onclick="window.toggleVoiceChat()" title="Chat Vocale Disattivata">
             <span id="voice-icon">🎙️</span>
             <span id="voice-status-badge" class="voice-badge-off"></span>
+        </div>
+        <div id="voice-active-controls" style="display: none;">
+            <div id="voice-deafen-btn" class="voice-active" onclick="window.toggleVoiceDeafen()" title="Ascolto Attivo (Clicca per silenziare gli altri)">
+                <span id="voice-deafen-icon">🎧</span>
+                <span id="voice-deafen-badge" class="voice-badge-on"></span>
+            </div>
+            <div id="voice-leave-btn" onclick="window.leaveVoiceChat()" title="Disconnetti dalla Chat Vocale">
+                <span>🚪</span>
+            </div>
         </div>
     </div>
 

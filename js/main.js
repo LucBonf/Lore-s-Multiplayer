@@ -21,10 +21,14 @@ function isUserRegistered() {
     return false;
 }
 
-function updateVoiceUI(isEnabled, isMuted) {
+function updateVoiceUI(isEnabled, isMuted, isDeafened) {
     const btn = document.getElementById('voice-btn');
     const icon = document.getElementById('voice-icon');
     const badge = document.getElementById('voice-status-badge');
+    const controls = document.getElementById('voice-active-controls');
+    const deafenBtn = document.getElementById('voice-deafen-btn');
+    const deafenIcon = document.getElementById('voice-deafen-icon');
+    const deafenBadge = document.getElementById('voice-deafen-badge');
     if (!btn || !icon || !badge) return;
 
     if (!isUserRegistered()) {
@@ -32,24 +36,46 @@ function updateVoiceUI(isEnabled, isMuted) {
         btn.setAttribute('title', 'Chat Vocale (Richiede account registrato)');
         icon.innerHTML = '🎙️';
         badge.className = 'voice-badge-off';
+        if (controls) controls.style.display = 'none';
         return;
     }
 
     if (!isEnabled) {
         btn.className = '';
-        btn.setAttribute('title', 'Chat Vocale Disattivata (Clicca per attivare)');
+        btn.setAttribute('title', 'Chat Vocale Disattivata (Clicca per entrare)');
         icon.innerHTML = '🎙️';
         badge.className = 'voice-badge-off';
-    } else if (isMuted) {
-        btn.className = 'voice-muted';
-        btn.setAttribute('title', 'Microfono Muto (Clicca per parlare)');
-        icon.innerHTML = '<span class="mic-muted-icon"><span class="mic-base">🎙️</span><span class="mic-slash"></span></span>';
-        badge.className = 'voice-badge-muted';
+        if (controls) controls.style.display = 'none';
     } else {
-        btn.className = 'voice-active';
-        btn.setAttribute('title', 'Microfono Attivo (Clicca per mutare)');
-        icon.innerHTML = '🎙️';
-        badge.className = 'voice-badge-on';
+        if (controls) controls.style.display = 'flex';
+
+        // 1. Stato Microfono (Parla / Muto ma senti gli altri)
+        if (isMuted) {
+            btn.className = 'voice-muted';
+            btn.setAttribute('title', 'Microfono Muto (Clicca per parlare)');
+            icon.innerHTML = '<span class="mic-muted-icon"><span class="mic-base">🎙️</span><span class="mic-slash"></span></span>';
+            badge.className = 'voice-badge-muted';
+        } else {
+            btn.className = 'voice-active';
+            btn.setAttribute('title', 'Microfono Attivo (Clicca per mutare)');
+            icon.innerHTML = '🎙️';
+            badge.className = 'voice-badge-on';
+        }
+
+        // 2. Stato Ascolto / Deafen (Senti gli altri / Silenzia gli altri)
+        if (deafenBtn && deafenIcon && deafenBadge) {
+            if (isDeafened) {
+                deafenBtn.className = 'voice-deafened';
+                deafenBtn.setAttribute('title', 'Altri Silenziati (Clicca per ascoltare)');
+                deafenIcon.innerHTML = '<span class="headphone-muted-icon"><span class="headphone-base">🎧</span><span class="headphone-slash"></span></span>';
+                deafenBadge.className = 'voice-badge-muted';
+            } else {
+                deafenBtn.className = 'voice-active';
+                deafenBtn.setAttribute('title', 'Ascolto Attivo (Clicca per silenziare gli altri)');
+                deafenIcon.innerHTML = '🎧';
+                deafenBadge.className = 'voice-badge-on';
+            }
+        }
     }
 }
 
@@ -65,8 +91,8 @@ function updateSpeakingUI(peerId, isSpeaking) {
     });
 }
 
-voiceManager.onStateChange = ({ isEnabled, isMuted }) => {
-    updateVoiceUI(isEnabled, isMuted);
+voiceManager.onStateChange = ({ isEnabled, isMuted, isDeafened }) => {
+    updateVoiceUI(isEnabled, isMuted, isDeafened);
 };
 
 voiceManager.onSpeakingChange = (peerId, isSpeaking) => {
@@ -85,6 +111,16 @@ window.toggleVoiceChat = async () => {
         await voiceManager.startVoice();
     } else {
         voiceManager.toggleMute();
+    }
+};
+
+window.toggleVoiceDeafen = () => {
+    voiceManager.toggleDeafen();
+};
+
+window.leaveVoiceChat = () => {
+    if (voiceManager.isEnabled) {
+        voiceManager.leaveVoice();
     }
 };
 
@@ -354,7 +390,7 @@ socket.on('login_ok', (profile) => {
     localStorage.setItem('lucas_user', JSON.stringify({ uniqueCode: profile.uniqueCode, nickname: profile.nickname }));
     
     // Aggiorna stato UI voce in base ai permessi account
-    updateVoiceUI(voiceManager.isEnabled, voiceManager.isMuted);
+    updateVoiceUI(voiceManager.isEnabled, voiceManager.isMuted, voiceManager.isDeafened);
 
     // Mostriamo il menu di setup solo se non siamo già in partita
     if (!sessionStorage.getItem('lucas_room')) {
