@@ -21,7 +21,7 @@ function isUserRegistered() {
     return false;
 }
 
-function updateVoiceUI(isEnabled, isMuted, isDeafened) {
+function updateVoiceUI(isEnabled, isMuted, isDeafened, peersCount = 0) {
     const btn = document.getElementById('voice-btn');
     const icon = document.getElementById('voice-icon');
     const badge = document.getElementById('voice-status-badge');
@@ -49,15 +49,17 @@ function updateVoiceUI(isEnabled, isMuted, isDeafened) {
     } else {
         if (controls) controls.style.display = 'flex';
 
+        const peersText = peersCount > 0 ? ` (${peersCount} altr${peersCount === 1 ? 'o' : 'i'} conness${peersCount === 1 ? 'o' : 'i'})` : ' (In attesa di altri giocatori...)';
+
         // 1. Stato Microfono (Parla / Muto ma senti gli altri)
         if (isMuted) {
             btn.className = 'voice-muted';
-            btn.setAttribute('title', 'Microfono Muto (Clicca per parlare)');
+            btn.setAttribute('title', `Microfono Muto${peersText} - Clicca per parlare`);
             icon.innerHTML = '<span class="mic-muted-icon"><span class="mic-base">🎙️</span><span class="mic-slash"></span></span>';
             badge.className = 'voice-badge-muted';
         } else {
             btn.className = 'voice-active';
-            btn.setAttribute('title', 'Microfono Attivo (Clicca per mutare)');
+            btn.setAttribute('title', `Microfono Attivo${peersText} - Clicca per mutare`);
             icon.innerHTML = '🎙️';
             badge.className = 'voice-badge-on';
         }
@@ -91,8 +93,8 @@ function updateSpeakingUI(peerId, isSpeaking) {
     });
 }
 
-voiceManager.onStateChange = ({ isEnabled, isMuted, isDeafened }) => {
-    updateVoiceUI(isEnabled, isMuted, isDeafened);
+voiceManager.onStateChange = ({ isEnabled, isMuted, isDeafened, peersCount }) => {
+    updateVoiceUI(isEnabled, isMuted, isDeafened, peersCount);
 };
 
 voiceManager.onSpeakingChange = (peerId, isSpeaking) => {
@@ -104,6 +106,11 @@ window.toggleVoiceChat = async () => {
         const lang = localStorage.getItem('lucas_lang') || 'it';
         const d = dictionary[lang] || dictionary['it'];
         mostraErrore(d.voiceLoginRequired || "La chat vocale è disponibile solo per gli utenti registrati. Accedi con il tuo account!");
+        return;
+    }
+
+    if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        alert("La chat vocale richiede una connessione protetta HTTPS per accedere al microfono sul telefono.");
         return;
     }
 
@@ -390,7 +397,7 @@ socket.on('login_ok', (profile) => {
     localStorage.setItem('lucas_user', JSON.stringify({ uniqueCode: profile.uniqueCode, nickname: profile.nickname }));
     
     // Aggiorna stato UI voce in base ai permessi account
-    updateVoiceUI(voiceManager.isEnabled, voiceManager.isMuted, voiceManager.isDeafened);
+    updateVoiceUI(voiceManager.isEnabled, voiceManager.isMuted, voiceManager.isDeafened, voiceManager.peers.size);
 
     // Mostriamo il menu di setup solo se non siamo già in partita
     if (!sessionStorage.getItem('lucas_room')) {
@@ -1175,7 +1182,10 @@ socket.on('lobby_creata', (d) => {
         privacyCheckbox.disabled = !isHost;
     }
     
-    document.getElementById('joined-players-list').innerHTML = d.giocatori.map(p => `<div>👤 ${renderNomeConStemma(p.nome, p.stemma)}</div>`).join('');
+    document.getElementById('joined-players-list').innerHTML = d.giocatori.map(p => {
+        const isMe = p.id === socket.id;
+        return `<div class="lobby-player-item" data-socket-id="${isMe ? 'me' : p.id}">👤 ${renderNomeConStemma(p.nome, p.stemma)}</div>`;
+    }).join('');
     updateChatVisibility(d.giocatori);
 });
 
@@ -1200,7 +1210,10 @@ socket.on('aggiorna_lobby', (dati) => {
         privacyCheckbox.disabled = !isHost;
     }
 
-    document.getElementById('joined-players-list').innerHTML = dati.giocatori.map(p => `<div>👤 ${renderNomeConStemma(p.nome, p.stemma)}</div>`).join('');
+    document.getElementById('joined-players-list').innerHTML = dati.giocatori.map(p => {
+        const isMe = p.id === socket.id;
+        return `<div class="lobby-player-item" data-socket-id="${isMe ? 'me' : p.id}">👤 ${renderNomeConStemma(p.nome, p.stemma)}</div>`;
+    }).join('');
     updateChatVisibility(dati.giocatori);
 });
 
