@@ -213,22 +213,22 @@ if (process.env.MONGODB_URI) {
 
             // Inizializza collezioni Capped (Limite spazio)
             try {
-                // LOG AI (50MB - Ridotto per liberare spazio per i replay umani, totale Atlas 512MB)
+                // LOG AI (40MB - Ridotto per liberare spazio per i replay umani, totale Atlas 512MB)
                 const collectionsMatch = await mongoose.connection.db.listCollections({ name: 'matchlogs' }).toArray();
                 if (collectionsMatch.length === 0) {
                     await mongoose.connection.db.createCollection('matchlogs', {
                         capped: true,
-                        size: 50 * 1024 * 1024,
-                        max: 200000
+                        size: 40 * 1024 * 1024,
+                        max: 150000
                     });
-                    console.log("📦 Collezione 'matchlogs' (Capped 50MB) creata.");
+                    console.log("📦 Collezione 'matchlogs' (Capped 40MB) creata.");
                 } else {
                     try {
-                        await mongoose.connection.db.command({ collMod: 'matchlogs', cappedSize: 50 * 1024 * 1024, cappedMax: 200000 });
-                        console.log("📦 Collezione 'matchlogs' ridimensionata a 50MB.");
+                        await mongoose.connection.db.command({ collMod: 'matchlogs', cappedSize: 40 * 1024 * 1024, cappedMax: 150000 });
+                        console.log("📦 Collezione 'matchlogs' ridimensionata a 40MB.");
                     } catch (e) {
                         try {
-                            await mongoose.connection.db.command({ collMod: 'matchlogs', cappedSize: 50 * 1024 * 1024 });
+                            await mongoose.connection.db.command({ collMod: 'matchlogs', cappedSize: 40 * 1024 * 1024 });
                         } catch (e2) { }
                     }
                 }
@@ -249,23 +249,23 @@ if (process.env.MONGODB_URI) {
                     } catch (e) { }
                 }
 
-                // HUMAN LOGS (250MB - Memoria espansa da 10MB a 250MB per migliaia di partite reali)
+                // HUMAN LOGS (200MB - Memoria espansa da 10MB a 200MB per migliaia di partite reali)
                 const collectionsHuman = await mongoose.connection.db.listCollections({ name: 'humanlogs' }).toArray();
                 if (collectionsHuman.length === 0) {
                     await mongoose.connection.db.createCollection('humanlogs', {
                         capped: true,
-                        size: 250 * 1024 * 1024,
-                        max: 500000
+                        size: 200 * 1024 * 1024,
+                        max: 400000
                     });
-                    console.log("📦 Collezione 'humanlogs' (Capped 250MB) creata.");
+                    console.log("📦 Collezione 'humanlogs' (Capped 200MB) creata.");
                 } else {
                     try {
-                        await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 250 * 1024 * 1024, cappedMax: 500000 });
-                        console.log("📦 Collezione 'humanlogs' ridimensionata con successo a 250MB (max 500.000 mosse).");
+                        await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 200 * 1024 * 1024, cappedMax: 400000 });
+                        console.log("📦 Collezione 'humanlogs' ridimensionata con successo a 200MB (max 400.000 mosse).");
                     } catch (e) {
                         try {
-                            await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 250 * 1024 * 1024 });
-                            console.log("📦 Collezione 'humanlogs' ridimensionata con successo a 250MB (solo size).");
+                            await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 200 * 1024 * 1024 });
+                            console.log("📦 Collezione 'humanlogs' ridimensionata con successo a 200MB (solo size).");
                         } catch (e2) {
                             console.log("Nota su humanlogs:", e2.message);
                         }
@@ -681,8 +681,8 @@ app.post('/reset-turbo-logs-777', authAdmin, express.json(), async (req, res) =>
         await mongoose.connection.db.collection('matchlogs').drop();
         await mongoose.connection.db.createCollection('matchlogs', {
             capped: true,
-            size: 50 * 1024 * 1024,
-            max: 200000
+            size: 40 * 1024 * 1024,
+            max: 150000
         });
 
         res.json({ ok: true });
@@ -780,11 +780,11 @@ app.post('/api/admin/expand-replays', authAdmin, async (req, res) => {
     try {
         let msg = "";
         try {
-            await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 250 * 1024 * 1024, cappedMax: 500000 });
-            msg = "Memoria humanlogs espansa a 250MB (max 500.000 mosse).";
+            await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 200 * 1024 * 1024, cappedMax: 400000 });
+            msg = "Memoria humanlogs espansa a 200MB (max 400.000 mosse).";
         } catch (err1) {
-            await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 250 * 1024 * 1024 });
-            msg = "Memoria humanlogs espansa a 250MB (solo size).";
+            await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 200 * 1024 * 1024 });
+            msg = "Memoria humanlogs espansa a 200MB (solo size).";
         }
         let humanStats = null;
         try {
@@ -950,16 +950,16 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                         <h3>💾 DATASET TURBO (AI)</h3>
                         <div class="metric">Mosse registrate: ${totaleTurbo.toLocaleString()}</div>
                         <div class="metric">Partite: ${partiteTurbo}</div>
-                        <div class="metric">Memoria: ${turboStats ? (turboStats.size / (1024 * 1024)).toFixed(1) + ' MB' : 'N/D'} / ${turboStats && turboStats.maxSize ? (turboStats.maxSize / (1024 * 1024)).toFixed(0) + ' MB' : '50 MB'}</div>
+                        <div class="metric">Memoria: ${turboStats ? (turboStats.size / (1024 * 1024)).toFixed(1) + ' MB' : 'N/D'} / ${turboStats && turboStats.maxSize ? (turboStats.maxSize / (1024 * 1024)).toFixed(0) + ' MB' : '40 MB'}</div>
                         <a href="/scarica-dataset-lucas-777?type=turbo" class="btn">SCARICA TURBO CSV</a>
                     </div>
                     <div style="border-left: 1px solid #00ff00; padding-left: 20px;">
                         <h3>💎 DATASET UMANO (REPLAY)</h3>
                         <div class="metric">Mosse registrate: ${totaleHuman.toLocaleString()}</div>
                         <div class="metric">Partite archiviate: ${partiteHuman}</div>
-                        <div class="metric">Memoria: ${humanStats ? (humanStats.size / (1024 * 1024)).toFixed(1) + ' MB' : 'N/D'} / ${humanStats && humanStats.maxSize ? (humanStats.maxSize / (1024 * 1024)).toFixed(0) + ' MB' : '250 MB'}</div>
+                        <div class="metric">Memoria: ${humanStats ? (humanStats.size / (1024 * 1024)).toFixed(1) + ' MB' : 'N/D'} / ${humanStats && humanStats.maxSize ? (humanStats.maxSize / (1024 * 1024)).toFixed(0) + ' MB' : '200 MB'}</div>
                         <a href="/scarica-dataset-lucas-777?type=human" class="btn">SCARICA HUMAN CSV</a>
-                        <button class="btn" style="border-color:#3498db; color:#3498db; margin-top:10px; display:block;" onclick="espandiReplay()">🚀 Espandi Memoria Replay a 250MB</button>
+                        <button class="btn" style="border-color:#3498db; color:#3498db; margin-top:10px; display:block;" onclick="espandiReplay()">🚀 Espandi Memoria Replay a 200MB</button>
                     </div>
                 </div>
                 
@@ -975,7 +975,7 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                 const socket = io({ query: { role: 'admin' } });
 
                 async function espandiReplay() {
-                    if (confirm("Vuoi assicurarti che la memoria dei replay umani sia espansa a 250MB su MongoDB?")) {
+                    if (confirm("Vuoi assicurarti che la memoria dei replay umani sia espansa a 200MB su MongoDB?")) {
                         try {
                             const res = await fetch('/api/admin/expand-replays', { method: 'POST' });
                             const data = await res.json();
