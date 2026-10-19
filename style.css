@@ -1518,6 +1518,11 @@ button {
     animation: badge-pulse-idf 2s infinite ease-in-out;
 }
 
+.badge-aquila,
+.badge-crazy {
+    animation: badge-pulse-aquila 2s infinite ease-in-out;
+}
+
 @keyframes badge-shine {
     0%, 100% {
         transform: scale(1);
@@ -1548,6 +1553,48 @@ button {
     50% {
         transform: scale(1.25) rotate(-5deg);
         filter: drop-shadow(0 0 8px #00a8ff);
+    }
+}
+
+@keyframes badge-pulse-aquila {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+        filter: drop-shadow(0 0 2px #d35400);
+    }
+    50% {
+        transform: scale(1.25) rotate(4deg);
+        filter: drop-shadow(0 0 8px #f39c12);
+    }
+}
+
+.badge-fuoco {
+    animation: badge-pulse-fuoco 2s infinite ease-in-out;
+}
+
+.badge-diamante,
+.badge-stella {
+    animation: badge-pulse-stella 2s infinite ease-in-out;
+}
+
+@keyframes badge-pulse-fuoco {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+        filter: drop-shadow(0 0 2px #e74c3c);
+    }
+    50% {
+        transform: scale(1.25) rotate(-4deg);
+        filter: drop-shadow(0 0 8px #ff4757);
+    }
+}
+
+@keyframes badge-pulse-stella {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+        filter: drop-shadow(0 0 2px #f1c40f);
+    }
+    50% {
+        transform: scale(1.25) rotate(5deg);
+        filter: drop-shadow(0 0 8px #feca57);
     }
 }
 

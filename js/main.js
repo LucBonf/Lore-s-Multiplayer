@@ -702,18 +702,7 @@ socket.on('classifica_dati', (dati) => {
     }
 
     let html = top10.map((u, i) => {
-        let stemmi = [];
-        if (u.nickname && u.nickname.trim().toUpperCase() === "LUCA") {
-            stemmi.push("admin");
-        }
-        if (u.nickname && u.nickname.trim().toUpperCase() === "IDF") {
-            stemmi.push("idf");
-        }
-        if (i === 0) stemmi.push("oro");
-        else if (i === 1) stemmi.push("argento");
-        else if (i === 2) stemmi.push("bronzo");
-
-        const nicknameConStemma = renderNomeConStemma(u.nickname, stemmi.join(","));
+        const nicknameConStemma = renderNomeConStemma(u.nickname, u.stemma);
         return `
             <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #555; padding: 10px 0;">
                 <span><strong>${i+1}°.</strong> ${nicknameConStemma}</span>
@@ -724,18 +713,7 @@ socket.on('classifica_dati', (dati) => {
 
     if (userRank) {
         const formattedPos = userRank.posizione.toLocaleString('it-IT');
-        let stemmi = [];
-        if (userRank.nickname && userRank.nickname.trim().toUpperCase() === "LUCA") {
-            stemmi.push("admin");
-        }
-        if (userRank.nickname && userRank.nickname.trim().toUpperCase() === "IDF") {
-            stemmi.push("idf");
-        }
-        if (userRank.posizione === 1) stemmi.push("oro");
-        else if (userRank.posizione === 2) stemmi.push("argento");
-        else if (userRank.posizione === 3) stemmi.push("bronzo");
-
-        const nicknameConStemma = renderNomeConStemma(userRank.nickname, stemmi.join(","));
+        const nicknameConStemma = renderNomeConStemma(userRank.nickname, userRank.stemma);
         html += `
             <div style="margin-top: 20px; border-top: 2px solid #e67e22; padding-top: 15px; background: rgba(230, 126, 34, 0.1); border-radius: 0 0 8px 8px; padding: 15px;">
                 <div style="display:flex; justify-content:space-between; color: #f1c40f; font-weight: bold;">
@@ -750,52 +728,76 @@ socket.on('classifica_dati', (dati) => {
 });
 
 // =========================================
-//   NUOVO RENDER GIOCATORI CIRCOLARE (MAIN.JS)
+//   CATALOGO STEMMI & RENDER GIOCATORI
 // =========================================
+
+const BADGE_DEFINITIONS = {
+    admin: { icon: "👑", color: "#e74c3c", title: "Admin / Creatore" },
+    idf: { icon: "✡️", color: "#005eb8", title: "IDF 🇮🇱" },
+    aquila: { icon: "🦅", color: "#f39c12", title: "Aquila 🦅" },
+    crazy: { icon: "🦅", color: "#f39c12", title: "Aquila 🦅" },
+    stella: { icon: "⭐", color: "#f1c40f", title: "Stella / VIP" },
+    fuoco: { icon: "🔥", color: "#e74c3c", title: "Fuoco / Campione" },
+    diamante: { icon: "💎", color: "#00d2d3", title: "Diamante" },
+    fulmine: { icon: "⚡", color: "#feca57", title: "Fulmine" },
+    cuore: { icon: "❤️", color: "#ff4757", title: "Cuore" },
+    teschio: { icon: "💀", color: "#a4b0be", title: "Teschio" },
+    drago: { icon: "🐉", color: "#2ed573", title: "Drago" },
+    lupo: { icon: "🐺", color: "#747d8c", title: "Lupo" },
+    leone: { icon: "🦁", color: "#ffa502", title: "Leone" },
+    volpe: { icon: "🦊", color: "#ff7f50", title: "Volpe" },
+    alieno: { icon: "👽", color: "#2ed573", title: "Alieno" },
+    robot: { icon: "🤖", color: "#70a1ff", title: "Robot" },
+    mago: { icon: "🧙", color: "#9b59b6", title: "Mago" },
+    scudo: { icon: "🛡️", color: "#3498db", title: "Scudo" },
+    spada: { icon: "⚔️", color: "#e74c3c", title: "Guerriero" },
+    trifoglio: { icon: "🍀", color: "#2ecc71", title: "Fortuna" },
+    joker: { icon: "🃏", color: "#9b59b6", title: "Joker" },
+    razzo: { icon: "🚀", color: "#e056fd", title: "Razzo" },
+    trofeo: { icon: "🏆", color: "#f1c40f", title: "Trofeo Speciale" },
+    oro: { icon: "🥇", color: "#f1c40f", title: "1° in Classifica" },
+    argento: { icon: "🥈", color: "#bdc3c7", title: "2° in Classifica" },
+    bronzo: { icon: "🥉", color: "#e67e22", title: "3° in Classifica" }
+};
 
 function renderNomeConStemma(nome, stemma) {
     if (!nome) return "";
-    let parts = stemma ? stemma.split(",") : [];
-    const upperName = nome.trim().toUpperCase();
-    if (upperName === "LUCA" && !parts.includes("admin")) {
-        parts.unshift("admin");
-    }
-    if (upperName === "IDF" && !parts.includes("idf")) {
-        parts.unshift("idf");
-    }
+    let parts = stemma ? stemma.split(",").map(p => p.trim()).filter(Boolean) : [];
     if (parts.length === 0) return nome;
+
     let badgesHtml = "";
     parts.forEach(s => {
+        const sKey = s.toLowerCase();
+        let def = BADGE_DEFINITIONS[sKey];
         let icon = "";
-        let color = "";
+        let color = "#f1c40f";
         let title = "";
-        if (s === "admin") {
-            icon = "👑";
-            color = "#e74c3c";
-            title = "Admin / Creatore";
-        } else if (s === "idf") {
-            icon = "✡️";
-            color = "#005eb8";
-            title = "IDF 🇮🇱";
-        } else if (s === "oro") {
-            icon = "🥇";
-            color = "#f1c40f";
-            title = "1° in Classifica";
-        } else if (s === "argento") {
-            icon = "🥈";
-            color = "#bdc3c7";
-            title = "2° in Classifica";
-        } else if (s === "bronzo") {
-            icon = "🥉";
-            color = "#e67e22";
-            title = "3° in Classifica";
+
+        if (def) {
+            icon = def.icon;
+            color = def.color;
+            title = def.title;
+        } else {
+            // Supporto emoji o testo personalizzato
+            icon = s;
+            title = s;
         }
+
         if (icon) {
-            badgesHtml += `<span class="badge-player badge-${s}" style="color: ${color}; margin-right: 4px;" title="${title}">${icon}</span>`;
+            badgesHtml += `<span class="badge-player badge-${escapeHtml(sKey)}" style="color: ${color}; margin-right: 4px;" title="${escapeHtml(title)}">${icon}</span>`;
         }
     });
     return badgesHtml + nome;
 }
+
+socket.on('stemma_aggiornato', (data) => {
+    if (!data) return;
+    if (userProfile && (userProfile.uniqueCode === data.uniqueCode || userProfile.nickname === data.nickname)) {
+        userProfile.stemma = data.stemma;
+        userProfile.stemmi = data.stemmi;
+        aggiornaWelcomeMessage();
+    }
+});
 
 function renderGiocatori(data) {
     const playersCircle = document.getElementById('players-circle');
@@ -1259,7 +1261,7 @@ socket.on('lista_lobby_pubbliche', (list) => {
     listEl.innerHTML = list.map(l => `
         <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; margin-bottom: 4px;">
             <div>
-                <span style="font-weight: bold; color: #f1c40f;">${l.hostName}</span>
+                <span style="font-weight: bold; color: #f1c40f;">${renderNomeConStemma(l.hostName, l.stemma)}</span>
                 <span style="color: #bbb; font-size: 0.9rem; margin-left: 8px;">(${l.playersCount}/${l.maxPlayers})</span>
             </div>
             <button onclick="window.uniscitiAPartitaPubblica('${l.code}')" style="background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 0.85rem; font-weight: bold; width: auto; height: auto;">Entra</button>

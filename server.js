@@ -45,7 +45,8 @@ const userSchema = new mongoose.Schema({
     partiteVinte: { type: Number, default: 0 },
     punteggioTotale: { type: Number, default: 0 },
     elo: { type: Number, default: 1000 },
-    lastLogin: { type: Date, default: Date.now }
+    lastLogin: { type: Date, default: Date.now },
+    stemmi: { type: [String], default: [] }
 });
 
 // INDICI PER PERFORMANCE (Classifiche e Ricerche istantanee)
@@ -55,6 +56,55 @@ userSchema.index({ lastLogin: -1 });
 userSchema.index({ nickname: 'text' }); // Per ricerca veloce per nome
 
 const User = mongoose.model('User', userSchema);
+
+// Catalogo stemmi disponibili
+const BADGE_CATALOG = [
+    { id: "admin", icon: "👑", name: "Admin / Creatore", color: "#e74c3c" },
+    { id: "aquila", icon: "🦅", name: "Aquila", color: "#f39c12" },
+    { id: "idf", icon: "✡️", name: "IDF 🇮🇱", color: "#005eb8" },
+    { id: "stella", icon: "⭐", name: "Stella / VIP", color: "#f1c40f" },
+    { id: "fuoco", icon: "🔥", name: "Fuoco / Campione", color: "#e74c3c" },
+    { id: "diamante", icon: "💎", name: "Diamante", color: "#00d2d3" },
+    { id: "fulmine", icon: "⚡", name: "Fulmine", color: "#feca57" },
+    { id: "cuore", icon: "❤️", name: "Cuore", color: "#ff4757" },
+    { id: "teschio", icon: "💀", name: "Teschio", color: "#a4b0be" },
+    { id: "drago", icon: "🐉", name: "Drago", color: "#2ed573" },
+    { id: "lupo", icon: "🐺", name: "Lupo", color: "#747d8c" },
+    { id: "leone", icon: "🦁", name: "Leone", color: "#ffa502" },
+    { id: "volpe", icon: "🦊", name: "Volpe", color: "#ff7f50" },
+    { id: "alieno", icon: "👽", name: "Alieno", color: "#2ed573" },
+    { id: "robot", icon: "🤖", name: "Robot", color: "#70a1ff" },
+    { id: "mago", icon: "🧙", name: "Mago", color: "#9b59b6" },
+    { id: "scudo", icon: "🛡️", name: "Scudo", color: "#3498db" },
+    { id: "spada", icon: "⚔️", name: "Guerriero", color: "#e74c3c" },
+    { id: "trifoglio", icon: "🍀", name: "Fortuna", color: "#2ecc71" },
+    { id: "joker", icon: "🃏", name: "Joker", color: "#9b59b6" },
+    { id: "razzo", icon: "🚀", name: "Razzo", color: "#e056fd" },
+    { id: "trofeo", icon: "🏆", name: "Trofeo Speciale", color: "#f1c40f" }
+];
+
+const userStemmiMap = new Map();
+const userStemmiByName = new Map();
+
+async function initStemmiCache() {
+    if (!dbConnected) return;
+    try {
+        await User.updateOne({ nickname: new RegExp("^LUCA$", "i"), stemmi: { $exists: false } }, { $set: { stemmi: ["admin"] } });
+        await User.updateOne({ nickname: new RegExp("^IDF$", "i"), stemmi: { $exists: false } }, { $set: { stemmi: ["idf"] } });
+        await User.updateOne({ nickname: new RegExp("^CRAZY$", "i"), stemmi: { $exists: false } }, { $set: { stemmi: ["aquila"] } });
+
+        const allUsersWithBadges = await User.find({ stemmi: { $exists: true, $not: { $size: 0 } } });
+        userStemmiMap.clear();
+        userStemmiByName.clear();
+        allUsersWithBadges.forEach(u => {
+            if (u.uniqueCode) userStemmiMap.set(u.uniqueCode, u.stemmi);
+            if (u.nickname) userStemmiByName.set(u.nickname.trim().toUpperCase(), u.stemmi);
+        });
+        console.log(`🏅 Cache stemmi caricata: ${allUsersWithBadges.length} utenti con stemmi personalizzati.`);
+    } catch (e) {
+        console.error("Errore inizializzazione stemmi cache:", e);
+    }
+}
 
 // Schema Segnalazioni Bug
 const reportSchema = new mongoose.Schema({
@@ -228,6 +278,7 @@ if (process.env.MONGODB_URI) {
 
             // --- NUOVO: Ripristino stati match ---
             await caricaStatiMatch();
+            await initStemmiCache();
         })
         .catch(err => console.error('Errore connessione MongoDB:', err));
 } else {
@@ -295,6 +346,64 @@ app.post('/admin-login-verify', express.urlencoded({ extended: true }), (req, re
 });
 
 // --- ROTTE PROTETTE DA authAdmin ---
+app.get('/api/admin/badges-catalog', authAdmin, (req, res) => {
+    res.json({ success: true, catalog: BADGE_CATALOG });
+});
+
+app.post('/api/admin/user/:uniqueCode/badges', authAdmin, express.json(), async (req, res) => {
+    if (!dbConnected) return res.status(500).json({ success: false, error: "DB non connesso" });
+    try {
+        const { uniqueCode } = req.params;
+        let { stemmi } = req.body;
+        if (!Array.isArray(stemmi)) {
+            stemmi = [];
+        }
+        stemmi = [...new Set(stemmi.map(s => String(s).trim()).filter(Boolean))];
+
+        const user = await User.findOneAndUpdate(
+            { uniqueCode: uniqueCode },
+            { $set: { stemmi: stemmi } },
+            { new: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({ success: false, error: "Utente non trovato" });
+        }
+
+        userStemmiMap.set(user.uniqueCode, user.stemmi);
+        if (user.nickname) {
+            userStemmiByName.set(user.nickname.trim().toUpperCase(), user.stemmi);
+        }
+
+        const stemmaCalcolato = ottieniStemma(user.uniqueCode, user.nickname);
+
+        io.emit('stemma_aggiornato', {
+            uniqueCode: user.uniqueCode,
+            nickname: user.nickname,
+            stemma: stemmaCalcolato,
+            stemmi: user.stemmi
+        });
+
+        for (const code in lobbies) {
+            let modified = false;
+            lobbies[code].giocatori.forEach(g => {
+                if (g.uniqueCode === user.uniqueCode || (g.nome && g.nome.trim().toUpperCase() === user.nickname.trim().toUpperCase())) {
+                    g.stemma = stemmaCalcolato;
+                    modified = true;
+                }
+            });
+            if (modified) {
+                inviaAggiornamentoLobby(code);
+            }
+        }
+
+        res.json({ success: true, stemmi: user.stemmi, stemma: stemmaCalcolato });
+    } catch (e) {
+        console.error("Errore salvataggio stemmi:", e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 app.get('/api/admin/find-user/:query', authAdmin, async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
     try {
@@ -308,7 +417,13 @@ app.get('/api/admin/find-user/:query', authAdmin, async (req, res) => {
         }).limit(20);
 
         if (users.length === 0) return res.json({ success: false, error: "Nessun utente trovato" });
-        res.json({ success: true, users });
+        const usersWithStemmi = users.map(u => {
+            const uObj = u.toObject ? u.toObject() : { ...u };
+            uObj.stemma = ottieniStemma(u.uniqueCode, u.nickname);
+            uObj.stemmi = u.stemmi || (userStemmiMap.get(u.uniqueCode) || []);
+            return uObj;
+        });
+        res.json({ success: true, users: usersWithStemmi });
     } catch (e) {
         res.json({ success: false, error: e.message });
     }
@@ -321,7 +436,13 @@ app.get('/api/admin/all-users', authAdmin, async (req, res) => {
     try {
         // Grazie agli indici aggiunti prima, questa query è velocissima anche con molti utenti
         const users = await User.find().sort({ lastLogin: -1 }).limit(1000);
-        res.json({ success: true, users });
+        const usersWithStemmi = users.map(u => {
+            const uObj = u.toObject ? u.toObject() : { ...u };
+            uObj.stemma = ottieniStemma(u.uniqueCode, u.nickname);
+            uObj.stemmi = u.stemmi || (userStemmiMap.get(u.uniqueCode) || []);
+            return uObj;
+        });
+        res.json({ success: true, users: usersWithStemmi });
     } catch (e) {
         console.error("Errore rotta all-users:", e);
         res.json({ success: false, error: e.message });
@@ -697,19 +818,53 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                 </div>
 
                 <div class="card">
-                    <h2>👤 Gestione Utente</h2>
+                    <h2>👤 Gestione Utente & Stemmi</h2>
                     <div style="display:flex; gap:10px; margin-bottom:10px;">
                         <input type="text" id="user-query" placeholder="Nickname o UniqueID..." style="flex-grow:1; padding:8px; border-radius:5px; border:1px solid #444; background:#222; color:white;">
                         <button class="btn" onclick="cercaUtente()">🔍 Cerca</button>
                         <button class="btn" onclick="caricaTuttiUtenti()">📋 Lista Completa</button>
                     </div>
-                    <div id="user-info-box" style="display:none; background:rgba(0,0,0,0.3); padding:10px; border-radius:5px; font-size:0.9em; border:1px solid #555; margin-bottom: 10px;">
-                        <p><strong>Nome:</strong> <span id="info-nick">-</span></p>
-                        <p><strong>ID:</strong> <span id="info-code">-</span></p>
-                        <p><strong>Partite:</strong> <span id="info-matches">-</span></p>
+                    
+                    <div id="user-info-box" style="display:none; background:rgba(0,0,0,0.4); padding:15px; border-radius:8px; font-size:0.95em; border:1px solid #00ff00; margin-bottom: 15px; box-shadow: 0 0 10px rgba(0,255,0,0.15);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; padding-bottom:8px; margin-bottom:10px;">
+                            <h3 style="margin:0; color:#00ff00;">👤 Dettagli: <span id="info-nick" style="color:#f1c40f;">-</span></h3>
+                            <span style="font-size:0.8em; color:#888;">ID: <span id="info-code" style="font-family:monospace; color:#aaa;">-</span></span>
+                        </div>
+                        
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap:10px; margin-bottom:15px; background:rgba(255,255,255,0.03); padding:8px; border-radius:5px;">
+                            <div><strong>Partite:</strong> <span id="info-matches" style="color:#f1c40f;">0</span></div>
+                            <div><strong>Vinte:</strong> <span id="info-wins" style="color:#2ecc71;">0</span></div>
+                            <div><strong>Punti:</strong> <span id="info-points" style="color:#e67e22;">0</span></div>
+                            <div><strong>ELO:</strong> <span id="info-elo" style="color:#3498db;">1000</span></div>
+                        </div>
+
+                        <!-- SEZIONE STEMMI (BADGES) -->
+                        <div style="border:1px solid #444; background:rgba(0,0,0,0.3); border-radius:6px; padding:12px; margin-bottom:15px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <strong style="color:#f1c40f; font-size:1.05em;">🏅 Stemmi Assegnati:</strong>
+                                <span id="badge-save-status" style="font-size:0.85em; color:#2ecc71; font-weight:bold; display:none;">✅ Modifiche salvate!</span>
+                            </div>
+                            
+                            <!-- Contenitore chips stemmi -->
+                            <div id="current-badges-container" style="display:flex; flex-wrap:wrap; gap:8px; min-height:36px; padding:8px; background:#111; border-radius:5px; border:1px dashed #555; align-items:center;">
+                                <span style="color:#666; font-style:italic; font-size:0.85em;">Nessuno stemma assegnato</span>
+                            </div>
+
+                            <!-- Controlli per aggiungere stemmi -->
+                            <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                                <select id="badge-select" style="padding:7px 10px; background:#222; color:#fff; border:1px solid #555; border-radius:5px; font-size:0.9em; cursor:pointer;">
+                                </select>
+                                
+                                <input type="text" id="custom-badge-input" placeholder="Emoji personalizzato (es: 🎯)" style="display:none; width:180px; padding:7px; background:#222; color:white; border:1px solid #00ff00; border-radius:5px; font-size:0.9em;">
+                                
+                                <button class="btn" onclick="aggiungiStemmaUtente()" style="margin:0; padding:7px 14px; border-color:#f1c40f; color:#f1c40f; font-weight:bold;">➕ Aggiungi</button>
+                                <button class="btn" onclick="salvaStemmiUtente()" style="margin:0; padding:7px 16px; border-color:#2ecc71; color:#2ecc71; font-weight:bold; background:rgba(46, 204, 113, 0.1);">💾 Salva Stemmi</button>
+                            </div>
+                        </div>
+
                         <div style="display:flex; gap:10px;">
-                            <button class="btn btn-danger" id="btn-delete-user" style="flex:1; margin-top:10px;">❌ ELIMINA</button>
-                            <button class="btn" id="btn-ban-user" style="flex:1; margin-top:10px; border-color:#e67e22; color:#e67e22;">🚫 BAN & ELIMINA</button>
+                            <button class="btn btn-danger" id="btn-delete-user" style="flex:1; margin-top:0;">❌ ELIMINA UTENTE</button>
+                            <button class="btn" id="btn-ban-user" style="flex:1; margin-top:0; border-color:#e67e22; color:#e67e22;">🚫 BAN & ELIMINA</button>
                         </div>
                     </div>
 
@@ -718,11 +873,13 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                             <thead style="background:#111; position:sticky; top:0;">
                                 <tr>
                                     <th style="padding:5px; border:1px solid #333;">Nick</th>
+                                    <th style="padding:5px; border:1px solid #333;">Stemmi</th>
                                     <th style="padding:5px; border:1px solid #333;">Punti</th>
                                     <th style="padding:5px; border:1px solid #333;">ELO</th>
                                     <th style="padding:5px; border:1px solid #333;">Giocate</th>
                                     <th style="padding:5px; border:1px solid #333;">Vinte</th>
                                     <th style="padding:5px; border:1px solid #333;">Last Login</th>
+                                    <th style="padding:5px; border:1px solid #333;">Azioni</th>
                                 </tr>
                             </thead>
                             <tbody id="users-tbody"></tbody>
@@ -789,9 +946,163 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                     }
                 }
 
+                const BADGE_CATALOG = ${JSON.stringify(BADGE_CATALOG)};
+                let currentUserSelected = null;
+                let currentEditingBadges = [];
+
+                function escapeHtml(str) {
+                    if (!str) return '';
+                    return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+                }
+
+                function popolaSelectStemmi() {
+                    const sel = document.getElementById('badge-select');
+                    if (!sel) return;
+                    sel.innerHTML = '<option value="">-- Scegli uno stemma da aggiungere --</option>' +
+                        BADGE_CATALOG.map(b => \`<option value="\${b.id}">\${b.icon} \${b.name}</option>\`).join('') +
+                        '<option value="__custom__">🎨 Altro (Emoji o testo personalizzato)...</option>';
+                    
+                    sel.onchange = () => {
+                        const customInput = document.getElementById('custom-badge-input');
+                        if (sel.value === '__custom__') {
+                            customInput.style.display = 'inline-block';
+                            customInput.focus();
+                        } else {
+                            customInput.style.display = 'none';
+                        }
+                    };
+                }
+
+                function apriDettaglioUtente(user) {
+                    currentUserSelected = user;
+                    currentEditingBadges = Array.isArray(user.stemmi) ? [...user.stemmi] : [];
+                    
+                    if (currentEditingBadges.length === 0 && user.stemma) {
+                        currentEditingBadges = user.stemma.split(',').map(s => s.trim()).filter(s => s && !['oro', 'argento', 'bronzo'].includes(s));
+                    }
+
+                    const box = document.getElementById('user-info-box');
+                    box.style.display = 'block';
+                    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                    document.getElementById('info-nick').innerText = user.nickname;
+                    document.getElementById('info-code').innerText = user.uniqueCode;
+                    document.getElementById('info-matches').innerText = user.partiteGiocate ?? 0;
+                    document.getElementById('info-wins').innerText = user.partiteVinte ?? 0;
+                    document.getElementById('info-points').innerText = user.punteggioTotale ?? 0;
+                    document.getElementById('info-elo').innerText = user.elo ?? 1000;
+
+                    renderBadgesChips();
+
+                    document.getElementById('btn-delete-user').onclick = () => eseguiAzioneUtente('delete', user);
+                    document.getElementById('btn-ban-user').onclick = () => eseguiAzioneUtente('ban', user);
+                }
+
+                function renderBadgesChips() {
+                    const container = document.getElementById('current-badges-container');
+                    if (!container) return;
+
+                    if (!currentEditingBadges || currentEditingBadges.length === 0) {
+                        container.innerHTML = '<span style="color:#888; font-style:italic; font-size:0.85em;">Nessuno stemma assegnato. Scegli uno stemma qui sotto per aggiungerlo.</span>';
+                        return;
+                    }
+
+                    container.innerHTML = currentEditingBadges.map((badgeKey, idx) => {
+                        const found = BADGE_CATALOG.find(b => b.id.toLowerCase() === badgeKey.toLowerCase());
+                        const icon = found ? found.icon : badgeKey;
+                        const name = found ? found.name : badgeKey;
+                        return \`
+                            <span style="display:inline-flex; align-items:center; gap:6px; background:#222; border:1px solid #555; padding:5px 10px; border-radius:15px; font-size:0.9em; box-shadow:0 2px 4px rgba(0,0,0,0.5);">
+                                <span style="font-size:1.15em;">\${icon}</span>
+                                <span style="color:#eee; font-weight:500;">\${escapeHtml(name)}</span>
+                                <button type="button" onclick="rimuoviStemma(\${idx})" style="background:transparent; border:none; color:#ff4d4d; font-weight:bold; cursor:pointer; font-size:1em; padding:0 2px; margin-left:4px;" title="Rimuovi stemma">✕</button>
+                            </span>
+                        \`;
+                    }).join('');
+                }
+
+                function aggiungiStemmaUtente() {
+                    if (!currentUserSelected) return alert("Seleziona prima un utente!");
+                    const sel = document.getElementById('badge-select');
+                    let val = sel.value;
+                    if (!val) return alert("Seleziona uno stemma dalla lista o scegli 'Altro'!");
+
+                    if (val === '__custom__') {
+                        const customInput = document.getElementById('custom-badge-input');
+                        val = customInput.value.trim();
+                        if (!val) return alert("Inserisci un emoji o un testo per lo stemma personalizzato!");
+                    }
+
+                    if (currentEditingBadges.some(b => b.toLowerCase() === val.toLowerCase())) {
+                        return alert("Questo stemma è già presente nella lista dell'utente!");
+                    }
+
+                    currentEditingBadges.push(val);
+                    renderBadgesChips();
+
+                    sel.value = "";
+                    const customInput = document.getElementById('custom-badge-input');
+                    customInput.value = "";
+                    customInput.style.display = "none";
+                }
+
+                function rimuoviStemma(index) {
+                    if (index >= 0 && index < currentEditingBadges.length) {
+                        currentEditingBadges.splice(index, 1);
+                        renderBadgesChips();
+                    }
+                }
+
+                async function salvaStemmiUtente() {
+                    if (!currentUserSelected) return alert("Nessun utente selezionato.");
+                    
+                    try {
+                        const res = await fetch('/api/admin/user/' + encodeURIComponent(currentUserSelected.uniqueCode) + '/badges', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ stemmi: currentEditingBadges })
+                        });
+
+                        if (res.status === 401) {
+                            alert("Sessione scaduta! Ricarica la pagina.");
+                            return location.reload();
+                        }
+
+                        const data = await res.json();
+                        if (data.success) {
+                            currentUserSelected.stemmi = data.stemmi;
+                            currentUserSelected.stemma = data.stemma;
+                            const statusEl = document.getElementById('badge-save-status');
+                            if (statusEl) {
+                                statusEl.style.display = 'inline';
+                                setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+                            }
+                            aggiornaRigaUtenteTabella(currentUserSelected);
+                        } else {
+                            alert("Errore salvataggio: " + (data.error || "Sconosciuto"));
+                        }
+                    } catch (e) {
+                        alert("Errore di connessione: " + e.message);
+                    }
+                }
+
+                function aggiornaRigaUtenteTabella(user) {
+                    const row = document.getElementById('row-user-' + user.uniqueCode);
+                    if (!row) return;
+                    const badges = Array.isArray(user.stemmi) ? user.stemmi : [];
+                    const badgesIcons = badges.map(bKey => {
+                        const f = BADGE_CATALOG.find(b => b.id.toLowerCase() === bKey.toLowerCase());
+                        return f ? f.icon : bKey;
+                    }).join(' ');
+                    if (row.children && row.children[1]) {
+                        row.children[1].innerText = badgesIcons || '-';
+                        row.children[1].title = badges.join(', ');
+                    }
+                }
+
                 async function cercaUtente() {
                     try {
-                        const q = document.getElementById('user-query').value;
+                        const q = document.getElementById('user-query').value.trim();
                         if (!q) return;
                         const res = await fetch('/api/admin/find-user/' + encodeURIComponent(q));
                         
@@ -802,22 +1113,11 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                         
                         const data = await res.json();
                         const box = document.getElementById('user-info-box');
-                        const resultsContainer = document.getElementById('users-tbody');
-                        const resultsWrapper = document.getElementById('all-users-container');
                         
-                        if (data.success) {
-                            // Se ne trova uno solo, mostriamo il box dettagliato
+                        if (data.success && data.users.length > 0) {
                             if (data.users.length === 1) {
-                                const user = data.users[0];
-                                box.style.display = 'block';
-                                document.getElementById('info-nick').innerText = user.nickname;
-                                document.getElementById('info-code').innerText = user.uniqueCode;
-                                document.getElementById('info-matches').innerText = user.partiteGiocate;
-                                
-                                document.getElementById('btn-delete-user').onclick = () => eseguiAzioneUtente('delete', user);
-                                document.getElementById('btn-ban-user').onclick = () => eseguiAzioneUtente('ban', user);
+                                apriDettaglioUtente(data.users[0]);
                             } else {
-                                // Se ne trova molti, mostriamo la tabella
                                 box.style.display = 'none';
                                 renderListaUtenti(data.users);
                             }
@@ -825,19 +1125,19 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                             alert("Utente non trovato!");
                             box.style.display = 'none';
                         }
-                    } catch(e) { alert("Errore durante la ricerca"); }
+                    } catch(e) { alert("Errore durante la ricerca: " + e.message); }
                 }
 
                 async function eseguiAzioneUtente(tipo, user) {
                     const msg = tipo === 'ban' 
-                        ? "ATTENZIONE: Vuoi BANNARTE e ELIMINARE l'utente " + user.nickname + "? Non potrà più registrarsi con questo nome."
+                        ? "ATTENZIONE: Vuoi BANNARE ed ELIMINARE l'utente " + user.nickname + "? Non potrà più registrarsi con questo nome."
                         : "Sei sicuro di voler eliminare l'utente " + user.nickname + "?";
                     
                     if (!confirm(msg)) return;
 
                     try {
                         const url = tipo === 'ban' ? '/api/admin/ban-user/' : '/api/admin/delete-user/';
-                        const res = await fetch(url + user.uniqueCode);
+                        const res = await fetch(url + encodeURIComponent(user.uniqueCode));
                         if (res.status === 401) return location.reload();
                         
                         const resData = await res.json();
@@ -862,40 +1162,63 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
 
                     users.forEach(u => {
                         const tr = document.createElement('tr');
+                        tr.id = 'row-user-' + u.uniqueCode;
                         const lastDate = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'N/A';
                         const elo = u.elo || 1000;
+
+                        const badges = Array.isArray(u.stemmi) ? u.stemmi : (u.stemma ? u.stemma.split(',') : []);
+                        const badgesIcons = badges.map(bKey => {
+                            const f = BADGE_CATALOG.find(b => b.id.toLowerCase() === bKey.toLowerCase());
+                            return f ? f.icon : bKey;
+                        }).join(' ');
                         
                         const tdNick = document.createElement('td');
-                        tdNick.style = "padding:5px; border:1px solid #333; color:#f1c40f; cursor:pointer;";
-                        tdNick.innerText = u.nickname;
-                        tdNick.onclick = () => setSearch(u.uniqueCode);
+                        tdNick.style = "padding:6px; border:1px solid #333; color:#f1c40f; cursor:pointer;";
+                        tdNick.innerHTML = \`<strong>\${escapeHtml(u.nickname)}</strong>\`;
+                        tdNick.onclick = () => apriDettaglioUtente(u);
+
+                        const tdStemmi = document.createElement('td');
+                        tdStemmi.style = "padding:6px; border:1px solid #333; text-align:center; font-size:1.15em;";
+                        tdStemmi.innerText = badgesIcons || '-';
+                        tdStemmi.title = badges.join(', ');
                         
                         const tdPunti = document.createElement('td');
-                        tdPunti.style = "padding:5px; border:1px solid #333; text-align:center;";
-                        tdPunti.innerText = u.punteggioTotale;
+                        tdPunti.style = "padding:6px; border:1px solid #333; text-align:center;";
+                        tdPunti.innerText = u.punteggioTotale || 0;
                         
                         const tdElo = document.createElement('td');
-                        tdElo.style = "padding:5px; border:1px solid #333; text-align:center; color:#00ff00;";
+                        tdElo.style = "padding:6px; border:1px solid #333; text-align:center; color:#00ff00;";
                         tdElo.innerText = elo;
                         
                         const tdGiocate = document.createElement('td');
-                        tdGiocate.style = "padding:5px; border:1px solid #333; text-align:center;";
-                        tdGiocate.innerText = u.partiteGiocate;
+                        tdGiocate.style = "padding:6px; border:1px solid #333; text-align:center;";
+                        tdGiocate.innerText = u.partiteGiocate || 0;
                         
                         const tdVinte = document.createElement('td');
-                        tdVinte.style = "padding:5px; border:1px solid #333; text-align:center;";
-                        tdVinte.innerText = u.partiteVinte;
+                        tdVinte.style = "padding:6px; border:1px solid #333; text-align:center;";
+                        tdVinte.innerText = u.partiteVinte || 0;
                         
                         const tdData = document.createElement('td');
-                        tdData.style = "padding:5px; border:1px solid #333; text-align:center; font-size:0.8em;";
+                        tdData.style = "padding:6px; border:1px solid #333; text-align:center; font-size:0.8em;";
                         tdData.innerText = lastDate;
+
+                        const tdAzioni = document.createElement('td');
+                        tdAzioni.style = "padding:6px; border:1px solid #333; text-align:center;";
+                        const btnEdit = document.createElement('button');
+                        btnEdit.className = 'btn';
+                        btnEdit.style = "margin:0; padding:4px 8px; font-size:0.8em; border-color:#f1c40f; color:#f1c40f;";
+                        btnEdit.innerText = "✏️ Modifica";
+                        btnEdit.onclick = () => apriDettaglioUtente(u);
+                        tdAzioni.appendChild(btnEdit);
                         
                         tr.appendChild(tdNick);
+                        tr.appendChild(tdStemmi);
                         tr.appendChild(tdPunti);
                         tr.appendChild(tdElo);
                         tr.appendChild(tdGiocate);
                         tr.appendChild(tdVinte);
                         tr.appendChild(tdData);
+                        tr.appendChild(tdAzioni);
                         
                         tbody.appendChild(tr);
                     });
@@ -919,7 +1242,7 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                                     <div>
                                         <div style="color:#f1c40f; font-weight:bold;">\${r.hostNickname} • \${new Date(r.timestamp).toLocaleString()}</div>
                                         <div style="font-size:0.8em; color:#888;">
-                                            👥 \${r.numPlayers} Players (\${r.humanPlayers.join(', ')})
+                                             👥 \${r.numPlayers} Players (\${r.humanPlayers.join(', ')})
                                             \${statusHtml}
                                         </div>
                                     </div>
@@ -953,6 +1276,9 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                     document.getElementById('user-query').value = code;
                     cercaUtente();
                 }
+
+                // Inizializza dropdown stemmi
+                popolaSelectStemmi();
             </script>
         </body>
         </html>
@@ -1180,18 +1506,37 @@ setTimeout(aggiornaTop3Cache, 5000);
 
 function ottieniStemma(uniqueCode, nome) {
     let stemmi = [];
-    if (nome && nome.trim().toUpperCase() === "LUCA") {
-        stemmi.push("admin");
+    const upperName = nome ? nome.trim().toUpperCase() : "";
+
+    // 1. Recupera stemmi salvati dal database/cache
+    let customStemmi = null;
+    if (uniqueCode && userStemmiMap.has(uniqueCode)) {
+        customStemmi = userStemmiMap.get(uniqueCode);
+    } else if (upperName && userStemmiByName.has(upperName)) {
+        customStemmi = userStemmiByName.get(upperName);
     }
-    if (nome && nome.trim().toUpperCase() === "IDF") {
-        stemmi.push("idf");
+
+    if (customStemmi && Array.isArray(customStemmi)) {
+        customStemmi.forEach(s => {
+            if (s && !stemmi.includes(s)) stemmi.push(s);
+        });
     }
+
+    // Fallback storico solo se la cache è vuota (es. prima della connessione DB)
+    if (userStemmiMap.size === 0) {
+        if (upperName === "LUCA" && !stemmi.includes("admin")) stemmi.push("admin");
+        if (upperName === "IDF" && !stemmi.includes("idf")) stemmi.push("idf");
+        if (upperName === "CRAZY" && !stemmi.includes("aquila")) stemmi.push("aquila");
+    }
+
+    // 2. Classifica Top 3 (Oro, Argento, Bronzo) dinamica
     if (dbConnected && top3Cached && top3Cached.length > 0) {
-        const idx = top3Cached.findIndex(u => u.uniqueCode === uniqueCode);
-        if (idx === 0) stemmi.push("oro");
-        else if (idx === 1) stemmi.push("argento");
-        else if (idx === 2) stemmi.push("bronzo");
+        const idx = top3Cached.findIndex(u => (uniqueCode && u.uniqueCode === uniqueCode) || (upperName && u.nickname && u.nickname.trim().toUpperCase() === upperName));
+        if (idx === 0 && !stemmi.includes("oro")) stemmi.push("oro");
+        else if (idx === 1 && !stemmi.includes("argento")) stemmi.push("argento");
+        else if (idx === 2 && !stemmi.includes("bronzo")) stemmi.push("bronzo");
     }
+
     return stemmi.length > 0 ? stemmi.join(",") : null;
 }
 
@@ -1215,6 +1560,7 @@ function inviaLobbyPubblicheTutti() {
             publicLobbies.push({
                 code: code,
                 hostName: hostName,
+                stemma: hostPlayer ? ottieniStemma(hostPlayer.uniqueCode, hostPlayer.nome) : null,
                 playersCount: l.giocatori.length,
                 maxPlayers: parseInt(l.parametri.numGiocatori)
             });
@@ -1311,7 +1657,9 @@ io.on('connection', (socket) => {
             socket.userUniqueCode = user.uniqueCode;
             socket.userNickname = user.nickname;
             socket.userElo = user.elo || 1000;
-            socket.emit('login_ok', user);
+            const userPayload = user.toObject ? user.toObject() : { ...user };
+            userPayload.stemma = ottieniStemma(user.uniqueCode, user.nickname);
+            socket.emit('login_ok', userPayload);
         } catch (e) {
             socket.emit('login_err', 'Errore DB: ' + e.message);
         }
@@ -1351,6 +1699,11 @@ io.on('connection', (socket) => {
         if (!dbConnected) return socket.emit('classifica_dati', { top10: [], userRank: null });
         try {
             let top10 = await User.find().sort({ punteggioTotale: -1 }).limit(10);
+            const top10ConStemma = top10.map(u => {
+                const uObj = u.toObject ? u.toObject() : { ...u };
+                uObj.stemma = ottieniStemma(u.uniqueCode, u.nickname);
+                return uObj;
+            });
 
             let userRank = null;
             if (socket.userUniqueCode) {
@@ -1365,12 +1718,13 @@ io.on('connection', (socket) => {
                             nickname: user.nickname,
                             punteggioTotale: user.punteggioTotale,
                             partiteVinte: user.partiteVinte,
-                            posizione: count + 1
+                            posizione: count + 1,
+                            stemma: ottieniStemma(user.uniqueCode, user.nickname)
                         };
                     }
                 }
             }
-            socket.emit('classifica_dati', { top10, userRank });
+            socket.emit('classifica_dati', { top10: top10ConStemma, userRank });
         } catch (e) {
             console.error("Errore richiedi_classifica:", e);
         }
@@ -1434,6 +1788,7 @@ io.on('connection', (socket) => {
                 publicLobbies.push({
                     code: code,
                     hostName: hostName,
+                    stemma: hostPlayer ? ottieniStemma(hostPlayer.uniqueCode, hostPlayer.nome) : null,
                     playersCount: l.giocatori.length,
                     maxPlayers: parseInt(l.parametri.numGiocatori)
                 });
@@ -1803,6 +2158,7 @@ io.on('connection', (socket) => {
 
             const messageData = {
                 sender: senderNickname,
+                stemma: ottieniStemma(playerInLobby ? playerInLobby.uniqueCode : socket.userUniqueCode, senderNickname),
                 text: filter.clean(msg).substring(0, 200),
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
