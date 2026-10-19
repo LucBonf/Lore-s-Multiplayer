@@ -426,23 +426,33 @@ window.chiudiClassifica = () => {
 //   LOGICA REPLAY
 // =========================================
 
-window.apriReplays = async (isSearch = false) => {
+let currentReplayLimit = 50;
+
+window.apriReplays = async (isSearch = false, limit = 50) => {
+    if (!isSearch && limit === 50) {
+        currentReplayLimit = 50;
+    } else if (limit) {
+        currentReplayLimit = limit;
+    }
+
     document.getElementById('modal-replays').style.display = 'block';
     const container = document.getElementById('replays-list');
     const lang = localStorage.getItem('lucas_lang') || 'it';
     const d = dictionary[lang];
     
-    container.innerHTML = `<p style="text-align:center;">${d.loadingReplays}</p>`;
+    if (currentReplayLimit === 50) {
+        container.innerHTML = `<p style="text-align:center;">${d.loadingReplays}</p>`;
+    }
     
     const searchVal = isSearch ? document.getElementById('replays-search-input').value.trim() : "";
 
     try {
         const uCode = userProfile ? userProfile.uniqueCode : 'anon';
-        const res = await fetch(`/api/replays/${uCode}?search=${encodeURIComponent(searchVal)}`);
+        const res = await fetch(`/api/replays/${uCode}?search=${encodeURIComponent(searchVal)}&limit=${currentReplayLimit}`);
         const data = await res.json();
         
         if (data.success && data.replays.length > 0) {
-            container.innerHTML = data.replays.map(r => `
+            let html = data.replays.map(r => `
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding: 12px 0;">
                     <div style="flex-grow:1;">
                         <div style="font-weight:bold; color:#f1c40f; font-size: 1.0rem;">
@@ -464,6 +474,17 @@ window.apriReplays = async (isSearch = false) => {
                     <button onclick="avviaReplay('${r._id}')" style="background:#3498db; color:white; border:none; padding: 10px 18px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9rem; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">${d.watchBtn}</button>
                 </div>
             `).join('');
+
+            if (data.replays.length >= currentReplayLimit && currentReplayLimit < 200) {
+                html += `
+                    <div style="text-align:center; margin-top:15px; margin-bottom:10px;">
+                        <button onclick="window.apriReplays(${isSearch ? 'true' : 'false'}, ${currentReplayLimit + 50})" style="background:#2c3e50; border:1px solid #3498db; color:white; padding:10px 20px; border-radius:8px; cursor:pointer; font-size:0.9rem; font-weight:bold; transition: background 0.2s;">
+                            ⏬ ${d.loadMoreReplays || 'Carica altre partite'} (${currentReplayLimit + 50})
+                        </button>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
         } else {
             container.innerHTML = `<p style="text-align:center;">${d.noReplays}</p>`;
         }

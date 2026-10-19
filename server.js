@@ -213,21 +213,24 @@ if (process.env.MONGODB_URI) {
 
             // Inizializza collezioni Capped (Limite spazio)
             try {
-                // LOG AI (100MB - Ripristinato limite per evitare superamento piano gratuito)
+                // LOG AI (50MB - Ridotto per liberare spazio per i replay umani, totale Atlas 512MB)
                 const collectionsMatch = await mongoose.connection.db.listCollections({ name: 'matchlogs' }).toArray();
                 if (collectionsMatch.length === 0) {
                     await mongoose.connection.db.createCollection('matchlogs', {
                         capped: true,
-                        size: 100 * 1024 * 1024,
-                        max: 400000
+                        size: 50 * 1024 * 1024,
+                        max: 200000
                     });
-                    console.log("📦 Collezione 'matchlogs' (Capped 100MB) creata.");
+                    console.log("📦 Collezione 'matchlogs' (Capped 50MB) creata.");
                 } else {
-                    // Ridimensioniamo forzatamente al ribasso nel caso in cui fosse stata allargata a 500MB
                     try {
-                        await mongoose.connection.db.command({ collMod: 'matchlogs', cappedSize: 100 * 1024 * 1024 });
-                        console.log("📦 Collezione 'matchlogs' ridimensionata a 100MB.");
-                    } catch (e) { }
+                        await mongoose.connection.db.command({ collMod: 'matchlogs', cappedSize: 50 * 1024 * 1024, cappedMax: 200000 });
+                        console.log("📦 Collezione 'matchlogs' ridimensionata a 50MB.");
+                    } catch (e) {
+                        try {
+                            await mongoose.connection.db.command({ collMod: 'matchlogs', cappedSize: 50 * 1024 * 1024 });
+                        } catch (e2) { }
+                    }
                 }
 
                 // REPORT BUG (5MB - 1000 report)
@@ -246,20 +249,27 @@ if (process.env.MONGODB_URI) {
                     } catch (e) { }
                 }
 
-                // HUMAN LOGS (10MB - Dati umani separati)
+                // HUMAN LOGS (250MB - Memoria espansa da 10MB a 250MB per migliaia di partite reali)
                 const collectionsHuman = await mongoose.connection.db.listCollections({ name: 'humanlogs' }).toArray();
                 if (collectionsHuman.length === 0) {
                     await mongoose.connection.db.createCollection('humanlogs', {
                         capped: true,
-                        size: 10 * 1024 * 1024,
-                        max: 50000
+                        size: 250 * 1024 * 1024,
+                        max: 500000
                     });
-                    console.log("📦 Collezione 'humanlogs' (Capped) creata.");
+                    console.log("📦 Collezione 'humanlogs' (Capped 250MB) creata.");
                 } else {
                     try {
-                        await mongoose.connection.db.command({ convertToCapped: 'humanlogs', size: 10 * 1024 * 1024 });
-                        console.log("📦 Collezione 'humanlogs' convertita in Capped.");
-                    } catch (e) { }
+                        await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 250 * 1024 * 1024, cappedMax: 500000 });
+                        console.log("📦 Collezione 'humanlogs' ridimensionata con successo a 250MB (max 500.000 mosse).");
+                    } catch (e) {
+                        try {
+                            await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 250 * 1024 * 1024 });
+                            console.log("📦 Collezione 'humanlogs' ridimensionata con successo a 250MB (solo size).");
+                        } catch (e2) {
+                            console.log("Nota su humanlogs:", e2.message);
+                        }
+                    }
                 }
             } catch (e) { console.log("Nota: Inizializzazione collezioni già completata."); }
 
@@ -453,7 +463,7 @@ app.get('/api/admin/all-users', authAdmin, async (req, res) => {
 app.get('/api/replays/:uniqueCode', async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
     try {
-        const { search } = req.query;
+        const { search, limit: reqLimit } = req.query;
         const filter = { uniqueCode: req.params.uniqueCode };
 
         // Se c'è una ricerca, cerchiamo tra i nickname presenti nel match
@@ -469,6 +479,9 @@ app.get('/api/replays/:uniqueCode', async (req, res) => {
             filter.trickWinnerId = { $exists: true };
         }
 
+        const limitParsed = parseInt(reqLimit) || 50;
+        const limit = Math.min(Math.max(limitParsed, 1), 200);
+
         const replays = await HumanMatchLog.aggregate([
             { $match: filter },
             { $sort: { timestamp: -1 } },
@@ -484,7 +497,7 @@ app.get('/api/replays/:uniqueCode', async (req, res) => {
                 }
             },
             { $sort: { timestamp: -1 } },
-            { $limit: 20 }
+            { $limit: limit }
         ]);
         res.json({ success: true, replays });
     } catch (e) {
@@ -496,11 +509,14 @@ app.get('/api/replays/:uniqueCode', async (req, res) => {
 app.get('/api/admin/replays', authAdmin, async (req, res) => {
     if (!dbConnected) return res.json({ success: false, error: "DB non connesso" });
     try {
-        const { search } = req.query;
+        const { search, limit: reqLimit } = req.query;
         const filter = {};
         if (search) {
             filter.nickname = new RegExp(search, 'i');
         }
+
+        const limitParsed = parseInt(reqLimit) || 200;
+        const limit = Math.min(Math.max(limitParsed, 1), 500);
 
         const replays = await HumanMatchLog.aggregate([
             { $match: filter },
@@ -517,7 +533,7 @@ app.get('/api/admin/replays', authAdmin, async (req, res) => {
                 }
             },
             { $sort: { timestamp: -1 } },
-            { $limit: 100 } // Limite più alto per admin
+            { $limit: limit }
         ]);
         res.json({ success: true, replays });
     } catch (e) {
@@ -665,8 +681,8 @@ app.post('/reset-turbo-logs-777', authAdmin, express.json(), async (req, res) =>
         await mongoose.connection.db.collection('matchlogs').drop();
         await mongoose.connection.db.createCollection('matchlogs', {
             capped: true,
-            size: 100 * 1024 * 1024,
-            max: 400000
+            size: 50 * 1024 * 1024,
+            max: 200000
         });
 
         res.json({ ok: true });
@@ -758,6 +774,28 @@ app.get('/clean-old-replays-777', authAdmin, async (req, res) => {
     }
 });
 
+// --- NUOVA ROTTA SEGRETA: ESPANSIONE MEMORIA REPLAY ---
+app.post('/api/admin/expand-replays', authAdmin, async (req, res) => {
+    if (!dbConnected) return res.status(500).json({ success: false, error: "DB non connesso" });
+    try {
+        let msg = "";
+        try {
+            await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 250 * 1024 * 1024, cappedMax: 500000 });
+            msg = "Memoria humanlogs espansa a 250MB (max 500.000 mosse).";
+        } catch (err1) {
+            await mongoose.connection.db.command({ collMod: 'humanlogs', cappedSize: 250 * 1024 * 1024 });
+            msg = "Memoria humanlogs espansa a 250MB (solo size).";
+        }
+        let humanStats = null;
+        try {
+            humanStats = await mongoose.connection.db.command({ collStats: 'humanlogs' });
+        } catch (e) { }
+        res.json({ success: true, message: msg, stats: humanStats });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // ROTTA SEGRETA: DASHBOARD MONITORAGGIO AI
 app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
     try {
@@ -770,6 +808,15 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
         const partiteHuman = (await HumanMatchLog.distinct("matchId")).length;
         const ultimoLog = await MatchLog.findOne().sort({ timestamp: -1 });
         const ultimoHuman = await HumanMatchLog.findOne().sort({ timestamp: -1 });
+
+        let humanStats = null;
+        let turboStats = null;
+        try {
+            humanStats = await mongoose.connection.db.command({ collStats: 'humanlogs' });
+        } catch (e) { }
+        try {
+            turboStats = await mongoose.connection.db.command({ collStats: 'matchlogs' });
+        } catch (e) { }
 
         const html = `
         <!DOCTYPE html>
@@ -903,13 +950,16 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
                         <h3>💾 DATASET TURBO (AI)</h3>
                         <div class="metric">Mosse registrate: ${totaleTurbo.toLocaleString()}</div>
                         <div class="metric">Partite: ${partiteTurbo}</div>
+                        <div class="metric">Memoria: ${turboStats ? (turboStats.size / (1024 * 1024)).toFixed(1) + ' MB' : 'N/D'} / ${turboStats && turboStats.maxSize ? (turboStats.maxSize / (1024 * 1024)).toFixed(0) + ' MB' : '50 MB'}</div>
                         <a href="/scarica-dataset-lucas-777?type=turbo" class="btn">SCARICA TURBO CSV</a>
                     </div>
                     <div style="border-left: 1px solid #00ff00; padding-left: 20px;">
-                        <h3>💎 DATASET UMANO</h3>
+                        <h3>💎 DATASET UMANO (REPLAY)</h3>
                         <div class="metric">Mosse registrate: ${totaleHuman.toLocaleString()}</div>
-                        <div class="metric">Partite: ${partiteHuman}</div>
+                        <div class="metric">Partite archiviate: ${partiteHuman}</div>
+                        <div class="metric">Memoria: ${humanStats ? (humanStats.size / (1024 * 1024)).toFixed(1) + ' MB' : 'N/D'} / ${humanStats && humanStats.maxSize ? (humanStats.maxSize / (1024 * 1024)).toFixed(0) + ' MB' : '250 MB'}</div>
                         <a href="/scarica-dataset-lucas-777?type=human" class="btn">SCARICA HUMAN CSV</a>
+                        <button class="btn" style="border-color:#3498db; color:#3498db; margin-top:10px; display:block;" onclick="espandiReplay()">🚀 Espandi Memoria Replay a 250MB</button>
                     </div>
                 </div>
                 
@@ -923,6 +973,23 @@ app.get('/stato-allenamento-777', authAdmin, async (req, res) => {
 
             <script>
                 const socket = io({ query: { role: 'admin' } });
+
+                async function espandiReplay() {
+                    if (confirm("Vuoi assicurarti che la memoria dei replay umani sia espansa a 250MB su MongoDB?")) {
+                        try {
+                            const res = await fetch('/api/admin/expand-replays', { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) {
+                                alert("Successo: " + data.message);
+                                location.reload();
+                            } else {
+                                alert("Errore: " + data.error);
+                            }
+                        } catch (e) {
+                            alert("Errore di rete");
+                        }
+                    }
+                }
 
                 async function toggleTurbo() {
                     try {
