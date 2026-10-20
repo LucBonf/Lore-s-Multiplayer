@@ -8,6 +8,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 import filter from 'leo-profanity';
 import cookieParser from 'cookie-parser';
+import { ScopaGame } from './games/scopa.js';
+import { RubamazzettoGame } from './games/rubamazzetto.js';
+import { BriscolaGame } from './games/briscola.js';
+import { TressetteGame, TressettePlayer } from './games/tressette.js';
 
 const ADMIN_KEY = process.env.ADMIN_KEY || "Lucas2024!"; // Cambiala nel file .env
 
@@ -46,6 +50,10 @@ const userSchema = new mongoose.Schema({
     punteggioTotale: { type: Number, default: 0 },
     elo: { type: Number, default: 1000 },
     eloCiapano: { type: Number, default: 1000 },
+    eloScopa: { type: Number, default: 1000 },
+    eloRubamazzetto: { type: Number, default: 1000 },
+    eloBriscola: { type: Number, default: 1000 },
+    eloTressette: { type: Number, default: 1000 },
     lastLogin: { type: Date, default: Date.now },
     stemmi: { type: [String], default: [] }
 });
@@ -54,6 +62,10 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ punteggioTotale: -1 });
 userSchema.index({ elo: -1 });
 userSchema.index({ eloCiapano: -1 });
+userSchema.index({ eloScopa: -1 });
+userSchema.index({ eloRubamazzetto: -1 });
+userSchema.index({ eloBriscola: -1 });
+userSchema.index({ eloTressette: -1 });
 userSchema.index({ lastLogin: -1 });
 userSchema.index({ nickname: 'text' }); // Per ricerca veloce per nome
 
@@ -1980,6 +1992,10 @@ io.on('connection', (socket) => {
             socket.userNickname = user.nickname;
             socket.userElo = user.elo || 1000;
             socket.userEloCiapano = user.eloCiapano || 1000;
+            socket.userEloScopa = user.eloScopa || 1000;
+            socket.userEloRubamazzetto = user.eloRubamazzetto || 1000;
+            socket.userEloBriscola = user.eloBriscola || 1000;
+            socket.userEloTressette = user.eloTressette || 1000;
             const userPayload = user.toObject ? user.toObject() : { ...user };
             userPayload.stemma = ottieniStemma(user.uniqueCode, user.nickname);
             socket.emit('login_ok', userPayload);
@@ -2085,6 +2101,134 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('richiedi_classifica_scopa', async () => {
+        if (!dbConnected) return socket.emit('classifica_dati_scopa', { top10: [], userRank: null });
+        try {
+            let top10 = await User.find().sort({ eloScopa: -1 }).limit(10);
+            const top10ConStemma = top10.map(u => {
+                const uObj = u.toObject ? u.toObject() : { ...u };
+                uObj.stemma = ottieniStemma(u.uniqueCode, u.nickname);
+                return uObj;
+            });
+
+            let userRank = null;
+            if (socket.userUniqueCode) {
+                const user = await User.findOne({ uniqueCode: socket.userUniqueCode });
+                if (user) {
+                    const isInTop10 = top10.some(u => u.uniqueCode === socket.userUniqueCode);
+                    if (!isInTop10) {
+                        const count = await User.countDocuments({ eloScopa: { $gt: user.eloScopa || 1000 } });
+                        userRank = {
+                            nickname: user.nickname,
+                            eloScopa: user.eloScopa || 1000,
+                            posizione: count + 1,
+                            stemma: ottieniStemma(user.uniqueCode, user.nickname)
+                        };
+                    }
+                }
+            }
+            socket.emit('classifica_dati_scopa', { top10: top10ConStemma, userRank });
+        } catch (e) {
+            console.error("Errore richiedi_classifica_scopa:", e);
+        }
+    });
+
+    socket.on('richiedi_classifica_rubamazzetto', async () => {
+        if (!dbConnected) return socket.emit('classifica_dati_rubamazzetto', { top10: [], userRank: null });
+        try {
+            let top10 = await User.find().sort({ eloRubamazzetto: -1 }).limit(10);
+            const top10ConStemma = top10.map(u => {
+                const uObj = u.toObject ? u.toObject() : { ...u };
+                uObj.stemma = ottieniStemma(u.uniqueCode, u.nickname);
+                return uObj;
+            });
+
+            let userRank = null;
+            if (socket.userUniqueCode) {
+                const user = await User.findOne({ uniqueCode: socket.userUniqueCode });
+                if (user) {
+                    const isInTop10 = top10.some(u => u.uniqueCode === socket.userUniqueCode);
+                    if (!isInTop10) {
+                        const count = await User.countDocuments({ eloRubamazzetto: { $gt: user.eloRubamazzetto || 1000 } });
+                        userRank = {
+                            nickname: user.nickname,
+                            eloRubamazzetto: user.eloRubamazzetto || 1000,
+                            posizione: count + 1,
+                            stemma: ottieniStemma(user.uniqueCode, user.nickname)
+                        };
+                    }
+                }
+            }
+            socket.emit('classifica_dati_rubamazzetto', { top10: top10ConStemma, userRank });
+        } catch (e) {
+            console.error("Errore richiedi_classifica_rubamazzetto:", e);
+        }
+    });
+
+    socket.on('richiedi_classifica_briscola', async () => {
+        if (!dbConnected) return socket.emit('classifica_dati_briscola', { top10: [], userRank: null });
+        try {
+            let top10 = await User.find().sort({ eloBriscola: -1 }).limit(10);
+            const top10ConStemma = top10.map(u => {
+                const uObj = u.toObject ? u.toObject() : { ...u };
+                uObj.stemma = ottieniStemma(u.uniqueCode, u.nickname);
+                return uObj;
+            });
+
+            let userRank = null;
+            if (socket.userUniqueCode) {
+                const user = await User.findOne({ uniqueCode: socket.userUniqueCode });
+                if (user) {
+                    const isInTop10 = top10.some(u => u.uniqueCode === socket.userUniqueCode);
+                    if (!isInTop10) {
+                        const count = await User.countDocuments({ eloBriscola: { $gt: user.eloBriscola || 1000 } });
+                        userRank = {
+                            nickname: user.nickname,
+                            eloBriscola: user.eloBriscola || 1000,
+                            posizione: count + 1,
+                            stemma: ottieniStemma(user.uniqueCode, user.nickname)
+                        };
+                    }
+                }
+            }
+            socket.emit('classifica_dati_briscola', { top10: top10ConStemma, userRank });
+        } catch (e) {
+            console.error("Errore richiedi_classifica_briscola:", e);
+        }
+    });
+
+    socket.on('richiedi_classifica_tressette', async () => {
+        if (!dbConnected) return socket.emit('classifica_dati_tressette', { top10: [], userRank: null });
+        try {
+            let top10 = await User.find().sort({ eloTressette: -1 }).limit(10);
+            const top10ConStemma = top10.map(u => {
+                const uObj = u.toObject ? u.toObject() : { ...u };
+                uObj.stemma = ottieniStemma(u.uniqueCode, u.nickname);
+                return uObj;
+            });
+
+            let userRank = null;
+            if (socket.userUniqueCode) {
+                const user = await User.findOne({ uniqueCode: socket.userUniqueCode });
+                if (user) {
+                    const isInTop10 = top10.some(u => u.uniqueCode === socket.userUniqueCode);
+                    if (!isInTop10) {
+                        const count = await User.countDocuments({ eloTressette: { $gt: user.eloTressette || 1000 } });
+                        userRank = {
+                            nickname: user.nickname,
+                            eloTressette: user.eloTressette || 1000,
+                            posizione: count + 1,
+                            stemma: ottieniStemma(user.uniqueCode, user.nickname)
+                        };
+                    }
+                }
+            }
+            socket.emit('classifica_dati_tressette', { top10: top10ConStemma, userRank });
+        } catch (e) {
+            console.error("Errore richiedi_classifica_tressette:", e);
+        }
+    });
+
     socket.on('crea_lobby', (dati) => {
         try {
             if (!dati || !dati.nome) return socket.emit('errore', "Dati lobby non validi.");
@@ -2094,7 +2238,12 @@ io.on('connection', (socket) => {
             } while (lobbies[code]);
 
             const gameType = dati.gameType || 'lucas';
-            const eloValue = (gameType === 'ciapano' ? socket.userEloCiapano : socket.userElo) || 1000;
+            let eloValue = socket.userElo || 1000;
+            if (gameType === 'ciapano') eloValue = socket.userEloCiapano || 1000;
+            else if (gameType === 'scopa') eloValue = socket.userEloScopa || 1000;
+            else if (gameType === 'rubamazzetto') eloValue = socket.userEloRubamazzetto || 1000;
+            else if (gameType === 'briscola') eloValue = socket.userEloBriscola || 1000;
+            else if (gameType === 'tressette') eloValue = socket.userEloTressette || 1000;
 
             lobbies[code] = {
                 host: socket.id,
@@ -2106,6 +2255,10 @@ io.on('connection', (socket) => {
                     uniqueCode: dati.uniqueCode,
                     elo: eloValue,
                     eloCiapano: socket.userEloCiapano || 1000,
+                    eloScopa: socket.userEloScopa || 1000,
+                    eloRubamazzetto: socket.userEloRubamazzetto || 1000,
+                    eloBriscola: socket.userEloBriscola || 1000,
+                    eloTressette: socket.userEloTressette || 1000,
                     isHuman: true
                 }]
             };
@@ -2237,13 +2390,25 @@ io.on('connection', (socket) => {
                     return socket.emit('errore', "La lobby è piena!");
                 }
                 if (lobby.giocatori.find(p => p.id === socket.id)) return;
+                const gType = lobby.parametri?.gameType || 'lucas';
+                let eloValue = socket.userElo || 1000;
+                if (gType === 'ciapano') eloValue = socket.userEloCiapano || 1000;
+                else if (gType === 'scopa') eloValue = socket.userEloScopa || 1000;
+                else if (gType === 'rubamazzetto') eloValue = socket.userEloRubamazzetto || 1000;
+                else if (gType === 'briscola') eloValue = socket.userEloBriscola || 1000;
+                else if (gType === 'tressette') eloValue = socket.userEloTressette || 1000;
+
                 lobby.giocatori.push({
                     id: socket.id,
                     nome: dati.nome,
                     token: dati.token,
                     uniqueCode: dati.uniqueCode,
-                    elo: (lobby.parametri?.gameType === 'ciapano' ? socket.userEloCiapano : socket.userElo) || 1000,
+                    elo: eloValue,
                     eloCiapano: socket.userEloCiapano || 1000,
+                    eloScopa: socket.userEloScopa || 1000,
+                    eloRubamazzetto: socket.userEloRubamazzetto || 1000,
+                    eloBriscola: socket.userEloBriscola || 1000,
+                    eloTressette: socket.userEloTressette || 1000,
                     isHuman: true
                 });
                 socket.userNickname = dati.nome;
@@ -2320,6 +2485,22 @@ io.on('connection', (socket) => {
                             inviaStatoCiapano(code);
                             gestisciIA_Ciapano(code);
                             avviaTimerTurnoCiapano(code);
+                        } else if (game instanceof ScopaGame) {
+                            inviaStatoScopa(code);
+                            gestisciIA_Scopa(code);
+                            avviaTimerTurnoScopa(code);
+                        } else if (game instanceof RubamazzettoGame) {
+                            inviaStatoRubamazzetto(code);
+                            gestisciIA_Rubamazzetto(code);
+                            avviaTimerTurnoRubamazzetto(code);
+                        } else if (game instanceof BriscolaGame) {
+                            inviaStatoBriscola(code);
+                            gestisciIA_Briscola(code);
+                            avviaTimerTurnoBriscola(code);
+                        } else if (game instanceof TressetteGame) {
+                            inviaStatoTressette(code);
+                            gestisciIA_Tressette(code);
+                            avviaTimerTurnoTressette(code);
                         } else {
                             inviaStato(code);
                             gestisciIA(code);
@@ -2367,6 +2548,14 @@ io.on('connection', (socket) => {
                             // Notifichiamo gli altri che il giocatore è in attesa di riconnessione
                             if (game instanceof CiapanoGame) {
                                 inviaStatoCiapano(code);
+                            } else if (game instanceof ScopaGame) {
+                                inviaStatoScopa(code);
+                            } else if (game instanceof RubamazzettoGame) {
+                                inviaStatoRubamazzetto(code);
+                            } else if (game instanceof BriscolaGame) {
+                                inviaStatoBriscola(code);
+                            } else if (game instanceof TressetteGame) {
+                                inviaStatoTressette(code);
                             } else {
                                 inviaStato(code);
                             }
@@ -2389,6 +2578,34 @@ io.on('connection', (socket) => {
                                             gestisciIA_Ciapano(code);
                                         }
                                         avviaTimerTurnoCiapano(code);
+                                    } else if (currentLobby.gameInstance instanceof ScopaGame) {
+                                        inviaStatoScopa(code);
+                                        salvaStatoMatch(code);
+                                        if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p)) {
+                                            gestisciIA_Scopa(code);
+                                        }
+                                        avviaTimerTurnoScopa(code);
+                                    } else if (currentLobby.gameInstance instanceof RubamazzettoGame) {
+                                        inviaStatoRubamazzetto(code);
+                                        salvaStatoMatch(code);
+                                        if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p)) {
+                                            gestisciIA_Rubamazzetto(code);
+                                        }
+                                        avviaTimerTurnoRubamazzetto(code);
+                                    } else if (currentLobby.gameInstance instanceof BriscolaGame) {
+                                        inviaStatoBriscola(code);
+                                        salvaStatoMatch(code);
+                                        if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p)) {
+                                            gestisciIA_Briscola(code);
+                                        }
+                                        avviaTimerTurnoBriscola(code);
+                                    } else if (currentLobby.gameInstance instanceof TressetteGame) {
+                                        inviaStatoTressette(code);
+                                        salvaStatoMatch(code);
+                                        if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p)) {
+                                            gestisciIA_Tressette(code);
+                                        }
+                                        avviaTimerTurnoTressette(code);
                                     } else {
                                         inviaStato(code);
                                         salvaStatoMatch(code);
@@ -2462,6 +2679,133 @@ io.on('connection', (socket) => {
             inviaStatoCiapano(code);
             gestisciIA_Ciapano(code);
             avviaTimerTurnoCiapano(code);
+            return;
+        }
+
+        if (lobby.parametri?.gameType === 'scopa') {
+            const limite = parseInt(lobby.parametri.limitePunti || 11);
+            const numG = parseInt(lobby.parametri.numGiocatori || 2);
+            lobby.gameInstance = new ScopaGame(numG, limite);
+            inviaLobbyPubblicheTutti();
+
+            lobby.gameInstance.players.forEach((p, i) => {
+                if (lobby.giocatori[i]) {
+                    p.nome = lobby.giocatori[i].nome;
+                    p.id = lobby.giocatori[i].id;
+                    p.isHuman = true;
+                    p.token = lobby.giocatori[i].token;
+                    p.uniqueCode = lobby.giocatori[i].uniqueCode;
+                    p.eloMomentaneo = lobby.giocatori[i].eloScopa || 1000;
+                } else {
+                    p.nome = `Bot Scopa ${i + 1}`;
+                    p.isHuman = false;
+                }
+            });
+
+            lobby.gameInstance.distribuisciIniziale();
+            lobby.gameInstance.matchId = "S-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+            const hostPlayer = lobby.giocatori.find(p => p.id === lobby.host);
+            lobby.gameInstance.hostNickname = hostPlayer ? hostPlayer.nome : "Sconosciuto";
+
+            salvaStatoMatch(code);
+            inviaStatoScopa(code);
+            gestisciIA_Scopa(code);
+            avviaTimerTurnoScopa(code);
+            return;
+        }
+
+        if (lobby.parametri?.gameType === 'rubamazzetto') {
+            const numG = parseInt(lobby.parametri.numGiocatori || 2);
+            lobby.gameInstance = new RubamazzettoGame(numG, 40);
+            inviaLobbyPubblicheTutti();
+
+            lobby.gameInstance.players.forEach((p, i) => {
+                if (lobby.giocatori[i]) {
+                    p.nome = lobby.giocatori[i].nome;
+                    p.id = lobby.giocatori[i].id;
+                    p.isHuman = true;
+                    p.token = lobby.giocatori[i].token;
+                    p.uniqueCode = lobby.giocatori[i].uniqueCode;
+                    p.eloMomentaneo = lobby.giocatori[i].eloRubamazzetto || 1000;
+                } else {
+                    p.nome = `Bot Ruba ${i + 1}`;
+                    p.isHuman = false;
+                }
+            });
+
+            lobby.gameInstance.distribuisciIniziale();
+            lobby.gameInstance.matchId = "R-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+            const hostPlayer = lobby.giocatori.find(p => p.id === lobby.host);
+            lobby.gameInstance.hostNickname = hostPlayer ? hostPlayer.nome : "Sconosciuto";
+
+            salvaStatoMatch(code);
+            inviaStatoRubamazzetto(code);
+            gestisciIA_Rubamazzetto(code);
+            avviaTimerTurnoRubamazzetto(code);
+            return;
+        }
+
+        if (lobby.parametri?.gameType === 'briscola') {
+            const numG = parseInt(lobby.parametri.numGiocatori || 2);
+            const variante = (numG === 5) ? 'chiamata' : 'classica';
+            lobby.gameInstance = new BriscolaGame(numG, variante);
+            inviaLobbyPubblicheTutti();
+
+            lobby.gameInstance.players.forEach((p, i) => {
+                if (lobby.giocatori[i]) {
+                    p.nome = lobby.giocatori[i].nome;
+                    p.id = lobby.giocatori[i].id;
+                    p.isHuman = true;
+                    p.token = lobby.giocatori[i].token;
+                    p.uniqueCode = lobby.giocatori[i].uniqueCode;
+                    p.eloMomentaneo = lobby.giocatori[i].eloBriscola || 1000;
+                } else {
+                    p.nome = `Bot Briscola ${i + 1}`;
+                    p.isHuman = false;
+                }
+            });
+
+            lobby.gameInstance.distribuisciIniziale();
+            lobby.gameInstance.matchId = "B-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+            const hostPlayer = lobby.giocatori.find(p => p.id === lobby.host);
+            lobby.gameInstance.hostNickname = hostPlayer ? hostPlayer.nome : "Sconosciuto";
+
+            salvaStatoMatch(code);
+            inviaStatoBriscola(code);
+            gestisciIA_Briscola(code);
+            avviaTimerTurnoBriscola(code);
+            return;
+        }
+
+        if (lobby.parametri?.gameType === 'tressette') {
+            const numG = parseInt(lobby.parametri.numGiocatori || 4);
+            const limitePunti = parseInt(lobby.parametri.tressetteLimite || 21);
+
+            const tressettePlayers = [];
+            for (let i = 0; i < numG; i++) {
+                if (lobby.giocatori[i]) {
+                    const g = lobby.giocatori[i];
+                    const p = new TressettePlayer(g.id, g.nome, true, g.uniqueCode);
+                    p.token = g.token;
+                    p.eloMomentaneo = g.eloTressette || 1000;
+                    tressettePlayers.push(p);
+                } else {
+                    const bot = new TressettePlayer(`bot_tressette_${i + 1}`, `Bot Tressette ${i + 1}`, false, null);
+                    tressettePlayers.push(bot);
+                }
+            }
+
+            lobby.gameInstance = new TressetteGame(tressettePlayers, { limitePunti });
+            inviaLobbyPubblicheTutti();
+
+            lobby.gameInstance.matchId = "T-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+            const hostPlayer = lobby.giocatori.find(p => p.id === lobby.host);
+            lobby.gameInstance.hostNickname = hostPlayer ? hostPlayer.nome : "Sconosciuto";
+
+            salvaStatoMatch(code);
+            inviaStatoTressette(code);
+            gestisciIA_Tressette(code);
+            avviaTimerTurnoTressette(code);
             return;
         }
 
@@ -4000,6 +4344,992 @@ io.on('connection', (socket) => {
             }
             salvaStatoMatch(code);
         }
+    }
+
+    // =============================================
+    // HANDLERS SERVER: SCOPA
+    // =============================================
+
+    socket.on('gioca_carta_scopa', (dati) => {
+        try {
+            const code = socket.roomCode;
+            const lobby = lobbies[code];
+            const game = lobby?.gameInstance;
+            if (!game || !(game instanceof ScopaGame)) return;
+
+            const playerIdx = game.turnoAttuale;
+            const player = game.players[playerIdx];
+            if (!player || player.id !== socket.id) return socket.emit('errore', "Non è il tuo turno!");
+
+            const cartaIdx = dati?.cartaIdx;
+            if (cartaIdx === undefined || cartaIdx < 0 || cartaIdx >= player.mano.length) {
+                return socket.emit('errore', "Mossa non valida.");
+            }
+
+            if (turnTimers[code]) {
+                clearTimeout(turnTimers[code]);
+                delete turnTimers[code];
+            }
+
+            const res = game.giocaCarta(playerIdx, cartaIdx);
+            io.to(code).emit('mossa_scopa', {
+                playerIdx,
+                nome: player.nome,
+                ...res
+            });
+
+            const avanz = game.verificaAvanzamentoMano();
+            if (avanz.smazzataFinita) {
+                inviaStatoScopa(code);
+                concludiSmazzataScopa(code);
+            } else {
+                inviaStatoScopa(code);
+                gestisciIA_Scopa(code);
+                avviaTimerTurnoScopa(code);
+            }
+            salvaStatoMatch(code);
+        } catch (e) {
+            console.error("Errore gioca_carta_scopa:", e);
+        }
+    });
+
+    function inviaStatoScopa(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof ScopaGame)) return;
+
+        const umani = game.players.filter(p => p.isHuman);
+        umani.forEach(giocatoreUmano => {
+            const payload = {
+                roomCode: code,
+                turnoAttuale: game.turnoAttuale,
+                fase: game.fase,
+                tavolo: game.tavolo,
+                smazzataNum: game.smazzataNum,
+                distribuzioneNum: game.distribuzioneNum,
+                limitePunti: game.limitePunti,
+                mazzoRimanente: game.mazzo.length,
+                mano: giocatoreUmano.mano,
+                tuttiGiocatori: game.players.map((p, i) => {
+                    const isMe = (p.id === giocatoreUmano.id);
+                    return {
+                        id: p.id,
+                        nome: p.nome,
+                        isHuman: p.isHuman,
+                        numCarte: p.mano.length,
+                        preseCount: p.prese.length,
+                        scopeCount: p.scope,
+                        puntiTotali: p.puntiTotali,
+                        isMazziere: (i === game.indiceMazziere),
+                        isMe: isMe,
+                        socketId: p.id,
+                        stemma: ottieniStemma(p.uniqueCode, p.nome)
+                    };
+                })
+            };
+            if (giocatoreUmano.id) {
+                io.to(giocatoreUmano.id).emit('conferma_inizio_scopa', payload);
+            }
+        });
+    }
+
+    async function concludiSmazzataScopa(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof ScopaGame)) return;
+
+        const ris = game.calcolaPunteggiSmazzata();
+
+        io.to(code).emit('fine_smazzata_scopa', {
+            punteggi: game.players.map(p => ({
+                id: p.id,
+                nome: p.nome,
+                scope: p.scope,
+                preseCount: p.prese.length,
+                puntiSmazzata: p.puntiSmazzata,
+                puntiTotali: p.puntiTotali,
+                dettaglio: p.dettaglioPuntiSmazzata
+            })),
+            gameOver: ris.gameOver,
+            vincitoreId: ris.vincitoreId
+        });
+
+        if (ris.gameOver) {
+            game.fase = "fine_partita";
+            const classificaFinale = [...game.players].sort((a, b) => b.puntiTotali - a.puntiTotali);
+
+            if (dbConnected) {
+                const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
+                for (let p of humanPlayers) {
+                    const isWinner = (p.id === ris.vincitoreId) ? 1 : 0;
+                    const eloChange = isWinner ? 25 : -25;
+                    try {
+                        await User.updateOne(
+                            { uniqueCode: p.uniqueCode },
+                            {
+                                $inc: {
+                                    partiteGiocate: 1,
+                                    partiteVinte: isWinner,
+                                    eloScopa: eloChange
+                                }
+                            }
+                        );
+                        p.eloChange = eloChange;
+                    } catch (errElo) {
+                        console.error("Errore aggiornamento ELO Scopa:", errElo);
+                    }
+                }
+            }
+
+            io.to(code).emit('fine_partita_scopa', {
+                classifica: classificaFinale.map((p, idx) => ({
+                    posizione: idx + 1,
+                    nome: p.nome,
+                    puntiTotali: p.puntiTotali,
+                    eloChange: p.eloChange || 0,
+                    stemma: ottieniStemma(p.uniqueCode, p.nome)
+                }))
+            });
+            salvaStatoMatch(code);
+        } else {
+            setTimeout(() => {
+                const curLobby = lobbies[code];
+                if (!curLobby || !curLobby.gameInstance) return;
+                const curGame = curLobby.gameInstance;
+                curGame.smazzataNum++;
+                curGame.indiceMazziere = (curGame.indiceMazziere + 1) % curGame.numPlayers;
+                curGame.distribuisciIniziale();
+                inviaStatoScopa(code);
+                gestisciIA_Scopa(code);
+                avviaTimerTurnoScopa(code);
+                salvaStatoMatch(code);
+            }, 3500);
+        }
+    }
+
+    function gestisciIA_Scopa(code) {
+        const game = lobbies[code]?.gameInstance;
+        if (!game || !(game instanceof ScopaGame)) return;
+        const attivo = game.players[game.turnoAttuale];
+        if (!attivo || attivo.isHuman || game.botThinking) return;
+
+        game.botThinking = true;
+
+        setTimeout(() => {
+            const currentGame = lobbies[code]?.gameInstance;
+            if (!currentGame || !(currentGame instanceof ScopaGame)) return;
+            const p = currentGame.players[currentGame.turnoAttuale];
+            if (!p || p.isHuman || p.mano.length === 0) {
+                currentGame.botThinking = false;
+                return;
+            }
+
+            const cartaIdx = currentGame.scegliMossaIA(currentGame.turnoAttuale);
+            currentGame.botThinking = false;
+
+            const res = currentGame.giocaCarta(currentGame.turnoAttuale, cartaIdx);
+            io.to(code).emit('mossa_scopa', {
+                playerIdx: currentGame.turnoAttuale,
+                nome: p.nome,
+                ...res
+            });
+
+            const avanz = currentGame.verificaAvanzamentoMano();
+            if (avanz.smazzataFinita) {
+                inviaStatoScopa(code);
+                concludiSmazzataScopa(code);
+            } else {
+                inviaStatoScopa(code);
+                gestisciIA_Scopa(code);
+                avviaTimerTurnoScopa(code);
+            }
+            salvaStatoMatch(code);
+        }, 800 + Math.floor(Math.random() * 400));
+    }
+
+    function avviaTimerTurnoScopa(code) {
+        if (turnTimers[code]) {
+            clearTimeout(turnTimers[code]);
+            delete turnTimers[code];
+        }
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof ScopaGame)) return;
+
+        const activePlayer = game.players[game.turnoAttuale];
+        if (activePlayer && activePlayer.isHuman) {
+            turnTimers[code] = setTimeout(() => {
+                autogiocaTurnoScopa(code, game.turnoAttuale);
+            }, 30000);
+        }
+    }
+
+    function autogiocaTurnoScopa(code, playerIdx) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof ScopaGame) || game.turnoAttuale !== playerIdx) return;
+        const p = game.players[playerIdx];
+        if (!p || p.mano.length === 0) return;
+
+        const cartaIdx = game.scegliMossaIA(playerIdx);
+        const res = game.giocaCarta(playerIdx, cartaIdx);
+        io.to(code).emit('mossa_scopa', {
+            playerIdx,
+            nome: p.nome,
+            ...res
+        });
+
+        const avanz = game.verificaAvanzamentoMano();
+        if (avanz.smazzataFinita) {
+            inviaStatoScopa(code);
+            concludiSmazzataScopa(code);
+        } else {
+            inviaStatoScopa(code);
+            gestisciIA_Scopa(code);
+            avviaTimerTurnoScopa(code);
+        }
+        salvaStatoMatch(code);
+    }
+
+    // =============================================
+    // HANDLERS SERVER: RUBAMAZZETTO
+    // =============================================
+
+    socket.on('gioca_carta_rubamazzetto', (dati) => {
+        try {
+            const code = socket.roomCode;
+            const lobby = lobbies[code];
+            const game = lobby?.gameInstance;
+            if (!game || !(game instanceof RubamazzettoGame)) return;
+
+            const playerIdx = game.turnoAttuale;
+            const player = game.players[playerIdx];
+            if (!player || player.id !== socket.id) return socket.emit('errore', "Non è il tuo turno!");
+
+            const cartaIdx = dati?.cartaIdx;
+            if (cartaIdx === undefined || cartaIdx < 0 || cartaIdx >= player.mano.length) {
+                return socket.emit('errore', "Mossa non valida.");
+            }
+
+            if (turnTimers[code]) {
+                clearTimeout(turnTimers[code]);
+                delete turnTimers[code];
+            }
+
+            const res = game.giocaCarta(playerIdx, cartaIdx);
+            io.to(code).emit('mossa_rubamazzetto', {
+                playerIdx,
+                nome: player.nome,
+                ...res
+            });
+
+            const avanz = game.verificaAvanzamentoMano();
+            if (avanz.smazzataFinita) {
+                inviaStatoRubamazzetto(code);
+                concludiPartitaRubamazzetto(code);
+            } else {
+                inviaStatoRubamazzetto(code);
+                gestisciIA_Rubamazzetto(code);
+                avviaTimerTurnoRubamazzetto(code);
+            }
+            salvaStatoMatch(code);
+        } catch (e) {
+            console.error("Errore gioca_carta_rubamazzetto:", e);
+        }
+    });
+
+    function inviaStatoRubamazzetto(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof RubamazzettoGame)) return;
+
+        const umani = game.players.filter(p => p.isHuman);
+        umani.forEach(giocatoreUmano => {
+            const payload = {
+                roomCode: code,
+                turnoAttuale: game.turnoAttuale,
+                fase: game.fase,
+                tavolo: game.tavolo,
+                smazzataNum: game.smazzataNum,
+                distribuzioneNum: game.distribuzioneNum,
+                mazzoRimanente: game.mazzo.length,
+                mano: giocatoreUmano.mano,
+                tuttiGiocatori: game.players.map((p, i) => {
+                    const isMe = (p.id === giocatoreUmano.id);
+                    return {
+                        id: p.id,
+                        nome: p.nome,
+                        isHuman: p.isHuman,
+                        numCarte: p.mano.length,
+                        mazzettoCount: p.mazzetto.length,
+                        cimaMazzetto: p.cimaMazzetto,
+                        puntiTotali: p.puntiTotali,
+                        isMazziere: (i === game.indiceMazziere),
+                        isMe: isMe,
+                        socketId: p.id,
+                        stemma: ottieniStemma(p.uniqueCode, p.nome)
+                    };
+                })
+            };
+            if (giocatoreUmano.id) {
+                io.to(giocatoreUmano.id).emit('conferma_inizio_rubamazzetto', payload);
+            }
+        });
+    }
+
+    async function concludiPartitaRubamazzetto(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof RubamazzettoGame)) return;
+
+        game.fase = "fine_partita";
+        const { classifica, vincitoreId } = game.calcolaClassificaFinale();
+
+        if (dbConnected) {
+            const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
+            for (let p of humanPlayers) {
+                const isWinner = (p.id === vincitoreId) ? 1 : 0;
+                const eloChange = isWinner ? 30 : -15;
+                try {
+                    await User.updateOne(
+                        { uniqueCode: p.uniqueCode },
+                        {
+                            $inc: {
+                                partiteGiocate: 1,
+                                partiteVinte: isWinner,
+                                eloRubamazzetto: eloChange
+                            }
+                        }
+                    );
+                    p.eloChange = eloChange;
+                } catch (errElo) {
+                    console.error("Errore aggiornamento ELO Rubamazzetto:", errElo);
+                }
+            }
+        }
+
+        io.to(code).emit('fine_partita_rubamazzetto', {
+            classifica: classifica.map((p, idx) => ({
+                posizione: idx + 1,
+                nome: p.nome,
+                carteMazzetto: p.mazzetto.length,
+                puntiTotali: p.puntiTotali,
+                eloChange: p.eloChange || 0,
+                stemma: ottieniStemma(p.uniqueCode, p.nome)
+            }))
+        });
+        salvaStatoMatch(code);
+    }
+
+    function gestisciIA_Rubamazzetto(code) {
+        const game = lobbies[code]?.gameInstance;
+        if (!game || !(game instanceof RubamazzettoGame)) return;
+        const attivo = game.players[game.turnoAttuale];
+        if (!attivo || attivo.isHuman || game.botThinking) return;
+
+        game.botThinking = true;
+
+        setTimeout(() => {
+            const currentGame = lobbies[code]?.gameInstance;
+            if (!currentGame || !(currentGame instanceof RubamazzettoGame)) return;
+            const p = currentGame.players[currentGame.turnoAttuale];
+            if (!p || p.isHuman || p.mano.length === 0) {
+                currentGame.botThinking = false;
+                return;
+            }
+
+            const cartaIdx = currentGame.scegliMossaIA(currentGame.turnoAttuale);
+            currentGame.botThinking = false;
+
+            const res = currentGame.giocaCarta(currentGame.turnoAttuale, cartaIdx);
+            io.to(code).emit('mossa_rubamazzetto', {
+                playerIdx: currentGame.turnoAttuale,
+                nome: p.nome,
+                ...res
+            });
+
+            const avanz = currentGame.verificaAvanzamentoMano();
+            if (avanz.smazzataFinita) {
+                inviaStatoRubamazzetto(code);
+                concludiPartitaRubamazzetto(code);
+            } else {
+                inviaStatoRubamazzetto(code);
+                gestisciIA_Rubamazzetto(code);
+                avviaTimerTurnoRubamazzetto(code);
+            }
+            salvaStatoMatch(code);
+        }, 800 + Math.floor(Math.random() * 400));
+    }
+
+    function avviaTimerTurnoRubamazzetto(code) {
+        if (turnTimers[code]) {
+            clearTimeout(turnTimers[code]);
+            delete turnTimers[code];
+        }
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof RubamazzettoGame)) return;
+
+        const activePlayer = game.players[game.turnoAttuale];
+        if (activePlayer && activePlayer.isHuman) {
+            turnTimers[code] = setTimeout(() => {
+                autogiocaTurnoRubamazzetto(code, game.turnoAttuale);
+            }, 30000);
+        }
+    }
+
+    function autogiocaTurnoRubamazzetto(code, playerIdx) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof RubamazzettoGame) || game.turnoAttuale !== playerIdx) return;
+        const p = game.players[playerIdx];
+        if (!p || p.mano.length === 0) return;
+
+        const cartaIdx = game.scegliMossaIA(playerIdx);
+        const res = game.giocaCarta(playerIdx, cartaIdx);
+        io.to(code).emit('mossa_rubamazzetto', {
+            playerIdx,
+            nome: p.nome,
+            ...res
+        });
+
+        const avanz = game.verificaAvanzamentoMano();
+        if (avanz.smazzataFinita) {
+            inviaStatoRubamazzetto(code);
+            concludiPartitaRubamazzetto(code);
+        } else {
+            inviaStatoRubamazzetto(code);
+            gestisciIA_Rubamazzetto(code);
+            avviaTimerTurnoRubamazzetto(code);
+        }
+        salvaStatoMatch(code);
+    }
+
+    // =============================================
+    // GESTIONE BRISCOLA (CLASSICA & CHIAMATA)
+    // =============================================
+    socket.on('gioca_carta_briscola', (dati) => {
+        try {
+            const code = socket.roomCode;
+            const lobby = lobbies[code];
+            const game = lobby?.gameInstance;
+            if (!game || !(game instanceof BriscolaGame)) return;
+
+            const playerIdx = game.turnoAttuale;
+            const player = game.players[playerIdx];
+            if (!player || player.id !== socket.id) return socket.emit('errore', "Non è il tuo turno!");
+
+            const cartaIdx = dati?.cartaIdx;
+            if (cartaIdx === undefined || cartaIdx < 0 || cartaIdx >= player.mano.length) {
+                return socket.emit('errore', "Mossa non valida.");
+            }
+
+            if (turnTimers[code]) {
+                clearTimeout(turnTimers[code]);
+                delete turnTimers[code];
+            }
+
+            const res = game.giocaCarta(playerIdx, cartaIdx);
+            io.to(code).emit('mossa_briscola', {
+                playerIdx,
+                nome: player.nome,
+                ...res
+            });
+
+            if (res.manoCompleta) {
+                inviaStatoBriscola(code);
+                setTimeout(() => risolviPresaBriscola(code), 1200);
+            } else {
+                inviaStatoBriscola(code);
+                gestisciIA_Briscola(code);
+                avviaTimerTurnoBriscola(code);
+            }
+            salvaStatoMatch(code);
+        } catch (e) {
+            console.error("Errore gioca_carta_briscola:", e);
+        }
+    });
+
+    function risolviPresaBriscola(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof BriscolaGame)) return;
+
+        const esito = game.risolviPresa();
+        if (!esito) return;
+
+        io.to(code).emit('vincitore_presa_briscola', {
+            vincitoreId: esito.vincitoreId,
+            nomeVincitore: esito.nomeVincitore,
+            cartaVincente: esito.cartaVincente
+        });
+
+        if (esito.partitaFinita) {
+            inviaStatoBriscola(code);
+            concludiPartitaBriscola(code);
+        } else {
+            inviaStatoBriscola(code);
+            gestisciIA_Briscola(code);
+            avviaTimerTurnoBriscola(code);
+        }
+        salvaStatoMatch(code);
+    }
+
+    function inviaStatoBriscola(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof BriscolaGame)) return;
+
+        const umani = game.players.filter(p => p.isHuman);
+        umani.forEach(giocatoreUmano => {
+            const payload = {
+                roomCode: code,
+                turnoAttuale: game.turnoAttuale,
+                fase: game.fase,
+                tavolo: game.tavolo,
+                smazzataNum: game.smazzataNum,
+                semeBriscola: game.semeBriscola,
+                cartaBriscola: game.cartaBriscola,
+                mazzoRimanente: game.mazzo.length,
+                variante: game.variante,
+                cartaChiamata: game.cartaChiamata,
+                socioRivelato: game.socioRivelato,
+                mano: giocatoreUmano.mano,
+                tuttiGiocatori: game.players.map((p, i) => {
+                    const isMe = (p.id === giocatoreUmano.id);
+                    let ruoloVisibile = null;
+                    if (game.variante === 'chiamata') {
+                        if (i === game.chiamanteIdx) {
+                            ruoloVisibile = 'chiamante';
+                        } else if (game.socioRivelato) {
+                            ruoloVisibile = (i === game.socioIdx) ? 'socio' : 'buono';
+                        } else if (isMe && i === game.socioIdx) {
+                            ruoloVisibile = 'socio';
+                        }
+                    }
+                    return {
+                        id: p.id,
+                        nome: p.nome,
+                        isHuman: p.isHuman,
+                        numCarte: p.mano.length,
+                        cartePreseCount: p.prese.length,
+                        puntiTotali: p.puntiTotali,
+                        ruolo: ruoloVisibile,
+                        isMazziere: (i === game.indiceMazziere),
+                        isMe: isMe,
+                        socketId: p.id,
+                        stemma: ottieniStemma(p.uniqueCode, p.nome)
+                    };
+                })
+            };
+            if (giocatoreUmano.id) {
+                io.to(giocatoreUmano.id).emit('conferma_inizio_briscola', payload);
+            }
+        });
+    }
+
+    async function concludiPartitaBriscola(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof BriscolaGame)) return;
+
+        game.fase = "fine_partita";
+        const esito = game.calcolaClassificaFinale();
+
+        if (dbConnected) {
+            const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
+            for (let p of humanPlayers) {
+                const pIdx = game.players.indexOf(p);
+                let isWinner = 0;
+                if (game.variante === 'chiamata') {
+                    const isInChiamanteTeam = (pIdx === game.chiamanteIdx || pIdx === game.socioIdx);
+                    isWinner = (esito.vittoriaChiamante && isInChiamanteTeam) || (!esito.vittoriaChiamante && !isInChiamanteTeam) ? 1 : 0;
+                } else {
+                    isWinner = (p.id === esito.vincitoreId) ? 1 : 0;
+                }
+                const eloChange = isWinner ? 30 : -15;
+                try {
+                    await User.updateOne(
+                        { uniqueCode: p.uniqueCode },
+                        {
+                            $inc: {
+                                partiteGiocate: 1,
+                                partiteVinte: isWinner,
+                                eloBriscola: eloChange
+                            }
+                        }
+                    );
+                    p.eloChange = eloChange;
+                } catch (errElo) {
+                    console.error("Errore aggiornamento ELO Briscola:", errElo);
+                }
+            }
+        }
+
+        io.to(code).emit('fine_partita_briscola', {
+            variante: game.variante,
+            vittoriaChiamante: esito.vittoriaChiamante,
+            puntiSquadraChiamante: esito.puntiSquadraChiamante,
+            puntiDifesa: esito.puntiDifesa,
+            chiamanteNome: esito.chiamanteNome,
+            socioNome: esito.socioNome,
+            isPareggio: esito.isPareggio,
+            vincitoreId: esito.vincitoreId,
+            classifica: esito.classifica.map((p, idx) => ({
+                posizione: idx + 1,
+                nome: p.nome,
+                puntiTotali: p.puntiTotali,
+                eloChange: p.eloChange || 0,
+                ruolo: p.ruolo,
+                stemma: ottieniStemma(p.uniqueCode, p.nome)
+            }))
+        });
+        salvaStatoMatch(code);
+    }
+
+    function gestisciIA_Briscola(code) {
+        const game = lobbies[code]?.gameInstance;
+        if (!game || !(game instanceof BriscolaGame)) return;
+        const attivo = game.players[game.turnoAttuale];
+        if (!attivo || attivo.isHuman || game.botThinking) return;
+
+        game.botThinking = true;
+
+        setTimeout(() => {
+            const currentGame = lobbies[code]?.gameInstance;
+            if (!currentGame || !(currentGame instanceof BriscolaGame)) return;
+            const p = currentGame.players[currentGame.turnoAttuale];
+            if (!p || p.isHuman || p.mano.length === 0) {
+                currentGame.botThinking = false;
+                return;
+            }
+
+            const cartaIdx = currentGame.scegliMossaIA(currentGame.turnoAttuale);
+            currentGame.botThinking = false;
+
+            const res = currentGame.giocaCarta(currentGame.turnoAttuale, cartaIdx);
+            io.to(code).emit('mossa_briscola', {
+                playerIdx: currentGame.turnoAttuale,
+                nome: p.nome,
+                ...res
+            });
+
+            if (res.manoCompleta) {
+                inviaStatoBriscola(code);
+                setTimeout(() => risolviPresaBriscola(code), 1200);
+            } else {
+                inviaStatoBriscola(code);
+                gestisciIA_Briscola(code);
+                avviaTimerTurnoBriscola(code);
+            }
+            salvaStatoMatch(code);
+        }, 800 + Math.floor(Math.random() * 400));
+    }
+
+    function avviaTimerTurnoBriscola(code) {
+        if (turnTimers[code]) {
+            clearTimeout(turnTimers[code]);
+            delete turnTimers[code];
+        }
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof BriscolaGame)) return;
+
+        const activePlayer = game.players[game.turnoAttuale];
+        if (activePlayer && activePlayer.isHuman) {
+            turnTimers[code] = setTimeout(() => {
+                autogiocaTurnoBriscola(code, game.turnoAttuale);
+            }, 30000);
+        }
+    }
+
+    function autogiocaTurnoBriscola(code, playerIdx) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof BriscolaGame) || game.turnoAttuale !== playerIdx) return;
+        const p = game.players[playerIdx];
+        if (!p || p.mano.length === 0) return;
+
+        const cartaIdx = game.scegliMossaIA(playerIdx);
+        const res = game.giocaCarta(playerIdx, cartaIdx);
+        io.to(code).emit('mossa_briscola', {
+            playerIdx,
+            nome: p.nome,
+            ...res
+        });
+
+        if (res.manoCompleta) {
+            inviaStatoBriscola(code);
+            setTimeout(() => risolviPresaBriscola(code), 1200);
+        } else {
+            inviaStatoBriscola(code);
+            gestisciIA_Briscola(code);
+            avviaTimerTurnoBriscola(code);
+        }
+        salvaStatoMatch(code);
+    }
+
+    // ==========================================
+    //   GESTIONE TRESSETTE (A 2 O A 4 GIOCATORI)
+    // ==========================================
+
+    socket.on('gioca_carta_tressette', (dati) => {
+        try {
+            const code = socket.roomCode;
+            if (!code || !lobbies[code]) return;
+            const game = lobbies[code].gameInstance;
+            if (!game || !(game instanceof TressetteGame)) return;
+
+            const playerIdx = game.players.findIndex(p => p.id === socket.id);
+            if (playerIdx === -1 || playerIdx !== game.turnoAttuale) return;
+
+            const res = game.giocaCarta(playerIdx, dati.cartaIdx);
+            if (!res.ok) {
+                return socket.emit('errore', res.motivo);
+            }
+
+            if (turnTimers[code]) {
+                clearTimeout(turnTimers[code]);
+                delete turnTimers[code];
+            }
+
+            io.to(code).emit('mossa_tressette', {
+                playerIdx,
+                nome: game.players[playerIdx].nome,
+                ...res
+            });
+
+            if (res.manoCompleta) {
+                inviaStatoTressette(code);
+                setTimeout(() => risolviPresaTressette(code), 1200);
+            } else {
+                inviaStatoTressette(code);
+                gestisciIA_Tressette(code);
+                avviaTimerTurnoTressette(code);
+            }
+            salvaStatoMatch(code);
+        } catch (e) {
+            console.error("Errore gioca_carta_tressette:", e);
+        }
+    });
+
+    function risolviPresaTressette(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof TressetteGame)) return;
+
+        const resPresa = game.risolviPresa();
+        if (!resPresa) return;
+
+        io.to(code).emit('vincitore_presa_tressette', {
+            vincitoreId: resPresa.vincitoreId,
+            vincitoreIdx: resPresa.vincitoreIdx,
+            vincitoreNome: resPresa.vincitoreNome,
+            cartaVincente: resPresa.cartaVincente
+        });
+
+        if (resPresa.smazzataFinita) {
+            io.to(code).emit('fine_smazzata_tressette', {
+                smazzataNum: resPresa.esitoSmazzata.smazzataNum,
+                punteggi: resPresa.esitoSmazzata.punteggi
+            });
+
+            if (resPresa.esitoSmazzata.partitaFinita) {
+                inviaStatoTressette(code);
+                concludiPartitaTressette(code);
+            } else {
+                setTimeout(() => {
+                    const curGame = lobbies[code]?.gameInstance;
+                    if (curGame && curGame instanceof TressetteGame) {
+                        curGame.nuovaSmazzata();
+                        inviaStatoTressette(code);
+                        gestisciIA_Tressette(code);
+                        avviaTimerTurnoTressette(code);
+                        salvaStatoMatch(code);
+                    }
+                }, 2500);
+            }
+        } else {
+            inviaStatoTressette(code);
+            gestisciIA_Tressette(code);
+            avviaTimerTurnoTressette(code);
+        }
+        salvaStatoMatch(code);
+    }
+
+    function inviaStatoTressette(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof TressetteGame)) return;
+
+        const umani = game.players.filter(p => p.isHuman);
+        umani.forEach(giocatoreUmano => {
+            const payload = {
+                roomCode: code,
+                turnoAttuale: game.turnoAttuale,
+                fase: game.fase,
+                tavolo: game.tavolo,
+                smazzataNum: game.smazzataNum,
+                limitePunti: game.limitePunti,
+                mazzoRimanente: game.mazzo.length,
+                numPlayers: game.numPlayers,
+                mano: giocatoreUmano.mano,
+                tuttiGiocatori: game.players.map((p, i) => {
+                    const isMe = (p.id === giocatoreUmano.id);
+                    return {
+                        id: p.id,
+                        nome: p.nome,
+                        isHuman: p.isHuman,
+                        numCarte: p.mano.length,
+                        cartePreseCount: p.prese.length,
+                        puntiTotali: p.puntiTotali,
+                        puntiSmazzata: p.puntiSmazzata,
+                        isMazziere: (i === game.indiceMazziere),
+                        isMe: isMe,
+                        socketId: p.id,
+                        stemma: ottieniStemma(p.uniqueCode, p.nome)
+                    };
+                })
+            };
+            if (giocatoreUmano.id) {
+                io.to(giocatoreUmano.id).emit('conferma_inizio_tressette', payload);
+            }
+        });
+    }
+
+    async function concludiPartitaTressette(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof TressetteGame)) return;
+
+        game.fase = "fine_partita";
+        const esito = game.calcolaClassificaFinale();
+
+        if (dbConnected) {
+            const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
+            for (let p of humanPlayers) {
+                const pIdx = game.players.indexOf(p);
+                let isWinner = 0;
+                if (game.numPlayers === 4) {
+                    const winnerIdx = game.players.indexOf(esito.vincitore);
+                    const isWinnerTeam = (winnerIdx % 2 === pIdx % 2);
+                    isWinner = isWinnerTeam ? 1 : 0;
+                } else {
+                    isWinner = (p.id === esito.vincitore.id) ? 1 : 0;
+                }
+                const eloChange = isWinner ? 30 : -15;
+                try {
+                    await User.updateOne(
+                        { uniqueCode: p.uniqueCode },
+                        {
+                            $inc: {
+                                partiteGiocate: 1,
+                                partiteVinte: isWinner,
+                                eloTressette: eloChange
+                            }
+                        }
+                    );
+                    p.eloChange = eloChange;
+                } catch (errElo) {
+                    console.error("Errore aggiornamento ELO Tressette:", errElo);
+                }
+            }
+        }
+
+        io.to(code).emit('fine_partita_tressette', {
+            isPareggio: esito.isPareggio,
+            vincitoreNome: esito.vincitore.nome,
+            classifica: esito.classifica.map((p, idx) => ({
+                posizione: idx + 1,
+                nome: p.nome,
+                puntiTotali: p.puntiTotali,
+                eloChange: p.eloChange || 0,
+                stemma: ottieniStemma(p.uniqueCode, p.nome)
+            }))
+        });
+        salvaStatoMatch(code);
+    }
+
+    function gestisciIA_Tressette(code) {
+        const game = lobbies[code]?.gameInstance;
+        if (!game || !(game instanceof TressetteGame)) return;
+        const attivo = game.players[game.turnoAttuale];
+        if (!attivo || attivo.isHuman || game.botThinking) return;
+
+        game.botThinking = true;
+
+        setTimeout(() => {
+            const currentGame = lobbies[code]?.gameInstance;
+            if (!currentGame || !(currentGame instanceof TressetteGame)) return;
+            const p = currentGame.players[currentGame.turnoAttuale];
+            if (!p || p.isHuman || p.mano.length === 0) {
+                currentGame.botThinking = false;
+                return;
+            }
+
+            const cartaIdx = currentGame.scegliMossaIA(currentGame.turnoAttuale);
+            currentGame.botThinking = false;
+
+            const res = currentGame.giocaCarta(currentGame.turnoAttuale, cartaIdx);
+            io.to(code).emit('mossa_tressette', {
+                playerIdx: currentGame.turnoAttuale,
+                nome: p.nome,
+                ...res
+            });
+
+            if (res.manoCompleta) {
+                inviaStatoTressette(code);
+                setTimeout(() => risolviPresaTressette(code), 1200);
+            } else {
+                inviaStatoTressette(code);
+                gestisciIA_Tressette(code);
+                avviaTimerTurnoTressette(code);
+            }
+            salvaStatoMatch(code);
+        }, 800 + Math.floor(Math.random() * 400));
+    }
+
+    function avviaTimerTurnoTressette(code) {
+        if (turnTimers[code]) {
+            clearTimeout(turnTimers[code]);
+            delete turnTimers[code];
+        }
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof TressetteGame)) return;
+
+        const activePlayer = game.players[game.turnoAttuale];
+        if (activePlayer && activePlayer.isHuman) {
+            turnTimers[code] = setTimeout(() => {
+                autogiocaTurnoTressette(code, game.turnoAttuale);
+            }, 30000);
+        }
+    }
+
+    function autogiocaTurnoTressette(code, playerIdx) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof TressetteGame) || game.turnoAttuale !== playerIdx) return;
+        const p = game.players[playerIdx];
+        if (!p || p.mano.length === 0) return;
+
+        const cartaIdx = game.scegliMossaIA(playerIdx);
+        const res = game.giocaCarta(playerIdx, cartaIdx);
+        io.to(code).emit('mossa_tressette', {
+            playerIdx,
+            nome: p.nome,
+            ...res
+        });
+
+        if (res.manoCompleta) {
+            inviaStatoTressette(code);
+            setTimeout(() => risolviPresaTressette(code), 1200);
+        } else {
+            inviaStatoTressette(code);
+            gestisciIA_Tressette(code);
+            avviaTimerTurnoTressette(code);
+        }
+        salvaStatoMatch(code);
     }
 });
 

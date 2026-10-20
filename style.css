@@ -1726,3 +1726,132 @@ button {
     font-size: 0.85rem;
 }
 
+/* Stili specifici per Scopa */
+.scopa-badge {
+    background: #27ae60;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-left: 5px;
+}
+
+.scopa-punti-badge {
+    color: #2ecc71;
+    font-weight: bold;
+    font-size: 1.05rem;
+}
+
+/* Stili specifici per Rubamazzetto */
+.rubamazzetto-badge {
+    background: #9b59b6;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.cima-mazzetto-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(155, 89, 182, 0.2);
+    border: 1px solid #9b59b6;
+    border-radius: 6px;
+    padding: 3px 6px;
+    margin-top: 4px;
+}
+
+.cima-mazzetto-label {
+    font-size: 0.75rem;
+    color: #e056fd;
+    font-weight: bold;
+}
+
+.cima-mazzetto-valore {
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #fff;
+}
+
+/* Stili specifici per Briscola */
+.briscola-badge {
+    background: #d35400;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.briscola-punti-badge {
+    color: #e67e22;
+    font-weight: bold;
+    font-size: 1.05rem;
+}
+
+.briscola-ruolo-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-top: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.briscola-ruolo-chiamante {
+    background: rgba(231, 76, 60, 0.3);
+    border: 1px solid #e74c3c;
+    color: #e74c3c;
+}
+
+.briscola-ruolo-socio {
+    background: rgba(46, 204, 113, 0.3);
+    border: 1px solid #2ecc71;
+    color: #2ecc71;
+}
+
+.briscola-ruolo-buono {
+    background: rgba(52, 152, 219, 0.3);
+    border: 1px solid #3498db;
+    color: #3498db;
+}
+
+#briscola-deck-container {
+    transition: all 0.3s ease;
+}
+
+@media (max-width: 768px) {
+    #briscola-deck-container {
+        left: 8px !important;
+        transform: translateY(-50%) scale(0.65) !important;
+        transform-origin: left center !important;
+    }
+}
+
+/* Stili specifici per Tressette */
+.tressette-badge {
+    background: #2980b9;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.tressette-punti-badge {
+    color: #3498db;
+    font-weight: bold;
+    font-size: 1.05rem;
+}
+
+
+

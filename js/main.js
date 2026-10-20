@@ -359,7 +359,9 @@ function aggiornaWelcomeMessage() {
         if (welcome) {
             welcome.innerHTML = `
                 ${d.welcome} ${nomeConStemma}! 
-                <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">${d.wins}: ${userProfile.partiteVinte} | ELO Lucas: ${userProfile.elo || 1000} | ELO Ciapanò: ${userProfile.eloCiapano || 1000}</div>
+                <div style="font-size:0.85rem; margin-top:5px; color:#ddd; line-height: 1.4;">
+                    ${d.wins}: ${userProfile.partiteVinte} | Lucas: <strong>${userProfile.elo || 1000}</strong> | Ciapanò: <strong>${userProfile.eloCiapano || 1000}</strong> | Scopa: <strong>${userProfile.eloScopa || 1000}</strong> | Ruba: <strong>${userProfile.eloRubamazzetto || 1000}</strong> | Briscola: <strong>${userProfile.eloBriscola || 1000}</strong> | Tressette: <strong>${userProfile.eloTressette || 1000}</strong>
+                </div>
             `;
         }
         if (selectWelcome) {
@@ -422,6 +424,14 @@ socket.on('login_err', (msg) => {
 window.apriClassifica = () => {
     if (currentGameType === 'ciapano') {
         window.apriClassificaCiapano();
+    } else if (currentGameType === 'scopa') {
+        window.apriClassificaScopa();
+    } else if (currentGameType === 'rubamazzetto') {
+        window.apriClassificaRubamazzetto();
+    } else if (currentGameType === 'briscola') {
+        window.apriClassificaBriscola();
+    } else if (currentGameType === 'tressette') {
+        window.apriClassificaTressette();
     } else {
         document.getElementById('modal-classifica').style.display = 'block';
         socket.emit('richiedi_classifica');
@@ -1137,14 +1147,22 @@ window.creaNuovaStanza = () => {
     sessionStorage.removeItem('lucas_room');
     const nome = userProfile ? userProfile.nickname : "Host";
     const num = document.getElementById('select-players').value;
-    const limitePunti = document.getElementById('select-ciapano-limite') ? parseInt(document.getElementById('select-ciapano-limite').value || 31) : 31;
+    let limitePunti = 31;
+    if (currentGameType === 'scopa') {
+        limitePunti = document.getElementById('select-scopa-limite') ? parseInt(document.getElementById('select-scopa-limite').value || 11) : 11;
+    } else if (currentGameType === 'ciapano') {
+        limitePunti = document.getElementById('select-ciapano-limite') ? parseInt(document.getElementById('select-ciapano-limite').value || 31) : 31;
+    } else if (currentGameType === 'tressette') {
+        limitePunti = document.getElementById('select-tressette-limite') ? parseInt(document.getElementById('select-tressette-limite').value || 21) : 21;
+    }
     socket.emit('crea_lobby', {
         nome: nome,
         numGiocatori: num,
         token: sessionToken,
         uniqueCode: userProfile ? userProfile.uniqueCode : null,
         gameType: currentGameType,
-        limitePunti: limitePunti
+        limitePunti: limitePunti,
+        tressetteLimite: limitePunti
     });
 };
 
@@ -1219,7 +1237,14 @@ socket.on('lobby_creata', (d) => {
     if (d.gameType) {
         currentGameType = d.gameType;
         const titleEl = document.getElementById('game-title');
-        if (titleEl) titleEl.innerText = (currentGameType === 'ciapano') ? 'Ciapanò' : 'Lucas';
+        if (titleEl) {
+            if (currentGameType === 'ciapano') titleEl.innerText = 'Ciapanò';
+            else if (currentGameType === 'scopa') titleEl.innerText = 'Scopa';
+            else if (currentGameType === 'rubamazzetto') titleEl.innerText = 'Rubamazzetto';
+            else if (currentGameType === 'briscola') titleEl.innerText = 'Briscola';
+            else if (currentGameType === 'tressette') titleEl.innerText = 'Tressette';
+            else titleEl.innerText = 'Lucas';
+        }
     }
     
     // Mostriamo il tasto avvia partita solo se siamo il creatore/host
@@ -1246,7 +1271,14 @@ socket.on('aggiorna_lobby', (dati) => {
     if (dati.gameType) {
         currentGameType = dati.gameType;
         const titleEl = document.getElementById('game-title');
-        if (titleEl) titleEl.innerText = (currentGameType === 'ciapano') ? 'Ciapanò' : 'Lucas';
+        if (titleEl) {
+            if (currentGameType === 'ciapano') titleEl.innerText = 'Ciapanò';
+            else if (currentGameType === 'scopa') titleEl.innerText = 'Scopa';
+            else if (currentGameType === 'rubamazzetto') titleEl.innerText = 'Rubamazzetto';
+            else if (currentGameType === 'briscola') titleEl.innerText = 'Briscola';
+            else if (currentGameType === 'tressette') titleEl.innerText = 'Tressette';
+            else titleEl.innerText = 'Lucas';
+        }
     }
 
     // Mostriamo il codice stanza all'amico e la lista aggiornata
@@ -1313,16 +1345,21 @@ socket.on('lista_lobby_pubbliche', (list) => {
     }
 
     container.style.display = 'block';
-    listEl.innerHTML = list.map(l => `
+    listEl.innerHTML = list.map(l => {
+        const badgeColor = l.gameType === 'ciapano' ? '#e74c3c' : (l.gameType === 'scopa' ? '#27ae60' : (l.gameType === 'rubamazzetto' ? '#9b59b6' : (l.gameType === 'briscola' ? '#e67e22' : (l.gameType === 'tressette' ? '#3498db' : '#f1c40f'))));
+        const badgeText = l.gameType === 'ciapano' ? 'Ciapanò' : (l.gameType === 'scopa' ? 'Scopa' : (l.gameType === 'rubamazzetto' ? 'Rubamazzetto' : (l.gameType === 'briscola' ? 'Briscola' : (l.gameType === 'tressette' ? 'Tressette' : 'Lucas'))));
+        const badgeTextColor = (l.gameType === 'ciapano' || l.gameType === 'scopa' || l.gameType === 'rubamazzetto' || l.gameType === 'briscola' || l.gameType === 'tressette') ? 'white' : '#111';
+        return `
         <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; margin-bottom: 4px;">
             <div style="display: flex; align-items: center;">
-                <span style="display: inline-block; padding: 2px 6px; font-size: 0.75rem; font-weight: bold; border-radius: 4px; margin-right: 8px; background: ${l.gameType === 'ciapano' ? '#e74c3c' : '#f1c40f'}; color: ${l.gameType === 'ciapano' ? 'white' : '#111'};">${l.gameType === 'ciapano' ? 'Ciapanò' : 'Lucas'}</span>
+                <span style="display: inline-block; padding: 2px 6px; font-size: 0.75rem; font-weight: bold; border-radius: 4px; margin-right: 8px; background: ${badgeColor}; color: ${badgeTextColor};">${badgeText}</span>
                 <span style="font-weight: bold; color: #f1c40f;">${renderNomeConStemma(l.hostName, l.stemma)}</span>
                 <span style="color: #bbb; font-size: 0.9rem; margin-left: 8px;">(${l.playersCount}/${l.maxPlayers})</span>
             </div>
             <button onclick="window.uniscitiAPartitaPubblica('${l.code}')" style="background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 0.85rem; font-weight: bold; width: auto; height: auto;">Entra</button>
         </div>
-    `).join('');
+    `;
+    }).join('');
 });
 
 socket.on('conferma_inizio_partita', (dati) => {
@@ -1485,6 +1522,14 @@ socket.on('fine_partita', (cl) => {
 window.apriRegole = () => {
     if (currentGameType === 'ciapano') {
         window.apriRegoleCiapano();
+    } else if (currentGameType === 'scopa') {
+        window.apriRegoleScopa();
+    } else if (currentGameType === 'rubamazzetto') {
+        window.apriRegoleRubamazzetto();
+    } else if (currentGameType === 'briscola') {
+        window.apriRegoleBriscola();
+    } else if (currentGameType === 'tressette') {
+        window.apriRegoleTressette();
     } else {
         document.getElementById('modal-regole').style.display = 'block';
     }
@@ -1500,6 +1545,14 @@ window.onclick = (event) => {
     const modalClassifica = document.getElementById('modal-classifica');
     const modalRegoleCiapano = document.getElementById('modal-regole-ciapano');
     const modalClassificaCiapano = document.getElementById('modal-classifica-ciapano');
+    const modalRegoleScopa = document.getElementById('modal-regole-scopa');
+    const modalClassificaScopa = document.getElementById('modal-classifica-scopa');
+    const modalRegoleRubamazzetto = document.getElementById('modal-regole-rubamazzetto');
+    const modalClassificaRubamazzetto = document.getElementById('modal-classifica-rubamazzetto');
+    const modalRegoleBriscola = document.getElementById('modal-regole-briscola');
+    const modalClassificaBriscola = document.getElementById('modal-classifica-briscola');
+    const modalRegoleTressette = document.getElementById('modal-regole-tressette');
+    const modalClassificaTressette = document.getElementById('modal-classifica-tressette');
     const modalLingua = document.getElementById('modal-lingua');
     const modalReport = document.getElementById('modal-report');
     const modalReplays = document.getElementById('modal-replays');
@@ -1508,6 +1561,14 @@ window.onclick = (event) => {
     if (event.target === modalClassifica) modalClassifica.style.display = 'none';
     if (event.target === modalRegoleCiapano) modalRegoleCiapano.style.display = 'none';
     if (event.target === modalClassificaCiapano) modalClassificaCiapano.style.display = 'none';
+    if (event.target === modalRegoleScopa) modalRegoleScopa.style.display = 'none';
+    if (event.target === modalClassificaScopa) modalClassificaScopa.style.display = 'none';
+    if (event.target === modalRegoleRubamazzetto) modalRegoleRubamazzetto.style.display = 'none';
+    if (event.target === modalClassificaRubamazzetto) modalClassificaRubamazzetto.style.display = 'none';
+    if (event.target === modalRegoleBriscola) modalRegoleBriscola.style.display = 'none';
+    if (event.target === modalClassificaBriscola) modalClassificaBriscola.style.display = 'none';
+    if (event.target === modalRegoleTressette) modalRegoleTressette.style.display = 'none';
+    if (event.target === modalClassificaTressette) modalClassificaTressette.style.display = 'none';
     if (event.target === modalLingua) chiudiLingua();
     if (event.target === modalReport) chiudiReport();
     if (event.target === modalReplays) chiudiReplays();
@@ -1834,8 +1895,21 @@ window.selezionaGioco = (tipo) => {
     currentGameType = tipo;
     const titleEl = document.getElementById('game-title');
     const badgeEl = document.getElementById('current-game-badge');
-    const opt2 = document.getElementById('opt-players-2');
     const ciapanoOpts = document.getElementById('ciapano-options-container');
+    const scopaOpts = document.getElementById('scopa-options-container');
+    const tressetteOpts = document.getElementById('tressette-options-container');
+    const selectP = document.getElementById('select-players');
+
+    const impostaOpzioniGiocatori = (consentiti, defaultVal) => {
+        if (!selectP) return;
+        for (let opt of selectP.options) {
+            const val = parseInt(opt.value);
+            opt.style.display = consentiti.includes(val) ? 'block' : 'none';
+        }
+        if (!consentiti.includes(parseInt(selectP.value))) {
+            selectP.value = defaultVal.toString();
+        }
+    };
 
     if (tipo === 'ciapano') {
         if (titleEl) titleEl.innerText = 'Ciapanò';
@@ -1845,8 +1919,58 @@ window.selezionaGioco = (tipo) => {
             badgeEl.style.color = '#e74c3c';
             badgeEl.style.background = 'rgba(231,76,60,0.2)';
         }
-        if (opt2) opt2.style.display = 'block';
         if (ciapanoOpts) ciapanoOpts.style.display = 'block';
+        if (scopaOpts) scopaOpts.style.display = 'none';
+        if (tressetteOpts) tressetteOpts.style.display = 'none';
+        impostaOpzioniGiocatori([2, 3, 4, 5, 6, 7, 8], 4);
+    } else if (tipo === 'scopa') {
+        if (titleEl) titleEl.innerText = 'Scopa';
+        if (badgeEl) {
+            badgeEl.innerText = 'Gioco: Scopa';
+            badgeEl.style.borderColor = '#27ae60';
+            badgeEl.style.color = '#2ecc71';
+            badgeEl.style.background = 'rgba(39,174,96,0.2)';
+        }
+        if (ciapanoOpts) ciapanoOpts.style.display = 'none';
+        if (scopaOpts) scopaOpts.style.display = 'block';
+        if (tressetteOpts) tressetteOpts.style.display = 'none';
+        impostaOpzioniGiocatori([2, 4], 2);
+    } else if (tipo === 'rubamazzetto') {
+        if (titleEl) titleEl.innerText = 'Rubamazzetto';
+        if (badgeEl) {
+            badgeEl.innerText = 'Gioco: Rubamazzetto';
+            badgeEl.style.borderColor = '#9b59b6';
+            badgeEl.style.color = '#e056fd';
+            badgeEl.style.background = 'rgba(155,89,182,0.2)';
+        }
+        if (ciapanoOpts) ciapanoOpts.style.display = 'none';
+        if (scopaOpts) scopaOpts.style.display = 'none';
+        if (tressetteOpts) tressetteOpts.style.display = 'none';
+        impostaOpzioniGiocatori([2, 3, 4], 2);
+    } else if (tipo === 'briscola') {
+        if (titleEl) titleEl.innerText = 'Briscola';
+        if (badgeEl) {
+            badgeEl.innerText = 'Gioco: Briscola';
+            badgeEl.style.borderColor = '#d35400';
+            badgeEl.style.color = '#e67e22';
+            badgeEl.style.background = 'rgba(230,126,34,0.2)';
+        }
+        if (ciapanoOpts) ciapanoOpts.style.display = 'none';
+        if (scopaOpts) scopaOpts.style.display = 'none';
+        if (tressetteOpts) tressetteOpts.style.display = 'none';
+        impostaOpzioniGiocatori([2, 4, 5], 2);
+    } else if (tipo === 'tressette') {
+        if (titleEl) titleEl.innerText = 'Tressette';
+        if (badgeEl) {
+            badgeEl.innerText = 'Gioco: Tressette';
+            badgeEl.style.borderColor = '#2980b9';
+            badgeEl.style.color = '#3498db';
+            badgeEl.style.background = 'rgba(52,152,219,0.2)';
+        }
+        if (ciapanoOpts) ciapanoOpts.style.display = 'none';
+        if (scopaOpts) scopaOpts.style.display = 'none';
+        if (tressetteOpts) tressetteOpts.style.display = 'block';
+        impostaOpzioniGiocatori([2, 4], 4);
     } else {
         if (titleEl) titleEl.innerText = 'Lucas';
         if (badgeEl) {
@@ -1855,10 +1979,10 @@ window.selezionaGioco = (tipo) => {
             badgeEl.style.color = '#f1c40f';
             badgeEl.style.background = 'rgba(241,196,15,0.2)';
         }
-        if (opt2) opt2.style.display = 'none';
         if (ciapanoOpts) ciapanoOpts.style.display = 'none';
-        const selectP = document.getElementById('select-players');
-        if (selectP && selectP.value === '2') selectP.value = '4';
+        if (scopaOpts) scopaOpts.style.display = 'none';
+        if (tressetteOpts) tressetteOpts.style.display = 'none';
+        impostaOpzioniGiocatori([3, 4, 5, 6, 7, 8], 4);
     }
 
     switchSection('setup-menu');
@@ -1883,6 +2007,40 @@ window.apriClassificaCiapano = () => {
 
 window.chiudiClassificaCiapano = () => {
     document.getElementById('modal-classifica-ciapano').style.display = 'none';
+};
+
+window.apriRegoleScopa = () => {
+    document.getElementById('modal-regole-scopa').style.display = 'block';
+};
+
+window.chiudiRegoleScopa = () => {
+    document.getElementById('modal-regole-scopa').style.display = 'none';
+};
+
+window.apriClassificaScopa = () => {
+    document.getElementById('modal-classifica-scopa').style.display = 'block';
+    socket.emit('richiedi_classifica_scopa');
+};
+
+window.chiudiClassificaScopa = () => {
+    document.getElementById('modal-classifica-scopa').style.display = 'none';
+};
+
+window.apriRegoleRubamazzetto = () => {
+    document.getElementById('modal-regole-rubamazzetto').style.display = 'block';
+};
+
+window.chiudiRegoleRubamazzetto = () => {
+    document.getElementById('modal-regole-rubamazzetto').style.display = 'none';
+};
+
+window.apriClassificaRubamazzetto = () => {
+    document.getElementById('modal-classifica-rubamazzetto').style.display = 'block';
+    socket.emit('richiedi_classifica_rubamazzetto');
+};
+
+window.chiudiClassificaRubamazzetto = () => {
+    document.getElementById('modal-classifica-rubamazzetto').style.display = 'none';
 };
 
 // --- RICEZIONE DATI CLASSIFICA ELO CIAPANÒ ---
@@ -1912,6 +2070,180 @@ socket.on('classifica_dati_ciapano', ({ top10, userRank }) => {
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(231,76,60,0.2); border: 1px solid #e74c3c; border-radius: 8px;">
                     <span style="font-weight: bold;">#${userRank.posizione} ${uNome}</span>
                     <span style="color: #e74c3c; font-weight: bold;">ELO: ${userRank.eloCiapano || 1000}</span>
+                </div>
+            </div>
+        `;
+    }
+    html += '</div>';
+    listEl.innerHTML = html;
+});
+
+// --- RICEZIONE DATI CLASSIFICA ELO SCOPA ---
+socket.on('classifica_dati_scopa', ({ top10, userRank }) => {
+    const listEl = document.getElementById('leaderboard-scopa-list');
+    if (!listEl) return;
+    if (!top10 || top10.length === 0) {
+        listEl.innerHTML = '<p style="text-align: center; color: #aaa;">Nessuna partita a Scopa registrata.</p>';
+        return;
+    }
+    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    top10.forEach((u, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+        const nomeConStemma = renderNomeConStemma(u.nickname, u.stemma);
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <span style="font-weight: bold;">${medal} ${nomeConStemma}</span>
+                <span style="color: #2ecc71; font-weight: bold;">ELO: ${u.eloScopa || 1000}</span>
+            </div>
+        `;
+    });
+    if (userRank) {
+        const uNome = renderNomeConStemma(userRank.nickname, userRank.stemma);
+        html += `
+            <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+                <div style="color: #f1c40f; font-size: 0.95rem; margin-bottom: 5px;">La tua posizione:</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(46,204,113,0.2); border: 1px solid #2ecc71; border-radius: 8px;">
+                    <span style="font-weight: bold;">#${userRank.posizione} ${uNome}</span>
+                    <span style="color: #2ecc71; font-weight: bold;">ELO: ${userRank.eloScopa || 1000}</span>
+                </div>
+            </div>
+        `;
+    }
+    html += '</div>';
+    listEl.innerHTML = html;
+});
+
+// --- RICEZIONE DATI CLASSIFICA ELO RUBAMAZZETTO ---
+socket.on('classifica_dati_rubamazzetto', ({ top10, userRank }) => {
+    const listEl = document.getElementById('leaderboard-rubamazzetto-list');
+    if (!listEl) return;
+    if (!top10 || top10.length === 0) {
+        listEl.innerHTML = '<p style="text-align: center; color: #aaa;">Nessuna partita a Rubamazzetto registrata.</p>';
+        return;
+    }
+    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    top10.forEach((u, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+        const nomeConStemma = renderNomeConStemma(u.nickname, u.stemma);
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <span style="font-weight: bold;">${medal} ${nomeConStemma}</span>
+                <span style="color: #9b59b6; font-weight: bold;">ELO: ${u.eloRubamazzetto || 1000}</span>
+            </div>
+        `;
+    });
+    if (userRank) {
+        const uNome = renderNomeConStemma(userRank.nickname, userRank.stemma);
+        html += `
+            <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+                <div style="color: #f1c40f; font-size: 0.95rem; margin-bottom: 5px;">La tua posizione:</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(155,89,182,0.2); border: 1px solid #9b59b6; border-radius: 8px;">
+                    <span style="font-weight: bold;">#${userRank.posizione} ${uNome}</span>
+                    <span style="color: #9b59b6; font-weight: bold;">ELO: ${userRank.eloRubamazzetto || 1000}</span>
+                </div>
+            </div>
+        `;
+    }
+    html += '</div>';
+    listEl.innerHTML = html;
+});
+
+window.apriRegoleBriscola = () => {
+    document.getElementById('modal-regole-briscola').style.display = 'block';
+};
+
+window.chiudiRegoleBriscola = () => {
+    document.getElementById('modal-regole-briscola').style.display = 'none';
+};
+
+window.apriClassificaBriscola = () => {
+    document.getElementById('modal-classifica-briscola').style.display = 'block';
+    socket.emit('richiedi_classifica_briscola');
+};
+
+window.chiudiClassificaBriscola = () => {
+    document.getElementById('modal-classifica-briscola').style.display = 'none';
+};
+
+// --- RICEZIONE DATI CLASSIFICA ELO BRISCOLA ---
+socket.on('classifica_dati_briscola', ({ top10, userRank }) => {
+    const listEl = document.getElementById('leaderboard-briscola-list');
+    if (!listEl) return;
+    if (!top10 || top10.length === 0) {
+        listEl.innerHTML = '<p style="text-align: center; color: #aaa;">Nessuna partita a Briscola registrata.</p>';
+        return;
+    }
+    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    top10.forEach((u, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+        const nomeConStemma = renderNomeConStemma(u.nickname, u.stemma);
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <span style="font-weight: bold;">${medal} ${nomeConStemma}</span>
+                <span style="color: #e67e22; font-weight: bold;">ELO: ${u.eloBriscola || 1000}</span>
+            </div>
+        `;
+    });
+    if (userRank) {
+        const uNome = renderNomeConStemma(userRank.nickname, userRank.stemma);
+        html += `
+            <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+                <div style="color: #f1c40f; font-size: 0.95rem; margin-bottom: 5px;">La tua posizione:</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(230,126,34,0.2); border: 1px solid #e67e22; border-radius: 8px;">
+                    <span style="font-weight: bold;">#${userRank.posizione} ${uNome}</span>
+                    <span style="color: #e67e22; font-weight: bold;">ELO: ${userRank.eloBriscola || 1000}</span>
+                </div>
+            </div>
+        `;
+    }
+    html += '</div>';
+    listEl.innerHTML = html;
+});
+
+window.apriRegoleTressette = () => {
+    document.getElementById('modal-regole-tressette').style.display = 'block';
+};
+
+window.chiudiRegoleTressette = () => {
+    document.getElementById('modal-regole-tressette').style.display = 'none';
+};
+
+window.apriClassificaTressette = () => {
+    document.getElementById('modal-classifica-tressette').style.display = 'block';
+    socket.emit('richiedi_classifica_tressette');
+};
+
+window.chiudiClassificaTressette = () => {
+    document.getElementById('modal-classifica-tressette').style.display = 'none';
+};
+
+// --- RICEZIONE DATI CLASSIFICA ELO TRESSETTE ---
+socket.on('classifica_dati_tressette', ({ top10, userRank }) => {
+    const listEl = document.getElementById('leaderboard-tressette-list');
+    if (!listEl) return;
+    if (!top10 || top10.length === 0) {
+        listEl.innerHTML = '<p style="text-align: center; color: #aaa;">Nessuna partita a Tressette registrata.</p>';
+        return;
+    }
+    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    top10.forEach((u, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+        const nomeConStemma = renderNomeConStemma(u.nickname, u.stemma);
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <span style="font-weight: bold;">${medal} ${nomeConStemma}</span>
+                <span style="color: #3498db; font-weight: bold;">ELO: ${u.eloTressette || 1000}</span>
+            </div>
+        `;
+    });
+    if (userRank) {
+        const uNome = renderNomeConStemma(userRank.nickname, userRank.stemma);
+        html += `
+            <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+                <div style="color: #f1c40f; font-size: 0.95rem; margin-bottom: 5px;">La tua posizione:</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(52,152,219,0.2); border: 1px solid #3498db; border-radius: 8px;">
+                    <span style="font-weight: bold;">#${userRank.posizione} ${uNome}</span>
+                    <span style="color: #3498db; font-weight: bold;">ELO: ${userRank.eloTressette || 1000}</span>
                 </div>
             </div>
         `;
@@ -2256,6 +2588,1282 @@ function renderTuaManoCiapano(handCont, mano, isMyTurn, tavolo) {
                 canPlay = false;
                 sound.playCardPlay(c);
                 socket.emit('gioca_carta_ciapano', { cartaIdx: mano.indexOf(c) });
+            }
+        };
+        handCont.appendChild(div);
+    });
+}
+
+// =============================================
+// FUNZIONE COMUNE RENDER BANCO CARTE SCOPERTE
+// (SCOPA & RUBAMAZZETTO)
+// =============================================
+function renderTavoloBanco(cardsOnTable, carteTavolo) {
+    if (!cardsOnTable) return;
+    cardsOnTable.innerHTML = '';
+    if (!carteTavolo || carteTavolo.length === 0) return;
+
+    const count = carteTavolo.length;
+    const isMobile = window.innerWidth <= 768;
+    const scala = isMobile ? 0.45 : 0.72;
+    const maxCols = isMobile ? 4 : 5;
+    const stepX = isMobile ? 36 : 64;
+    const stepY = isMobile ? 48 : 88;
+
+    carteTavolo.forEach((c, idx) => {
+        const divCarta = document.createElement('div');
+        divCarta.className = `card seme-${c.seme} val-${c.valore} table-card`;
+
+        const row = Math.floor(idx / maxCols);
+        const col = idx % maxCols;
+        const totalInThisRow = Math.min(maxCols, count - row * maxCols);
+
+        const offsetX = (col - (totalInThisRow - 1) / 2) * stepX;
+        const totalRows = Math.ceil(count / maxCols);
+        const offsetY = (row - (totalRows - 1) / 2) * stepY;
+
+        divCarta.style.left = `calc(50% + ${offsetX}px)`;
+        divCarta.style.top = `calc(44% + ${offsetY}px)`;
+        divCarta.style.transform = `translate(-50%, -50%) scale(${scala})`;
+        divCarta.style.zIndex = 50 + idx;
+
+        cardsOnTable.appendChild(divCarta);
+    });
+}
+
+// =============================================
+// MOTORE CLIENT SCOPA
+// =============================================
+socket.on('conferma_inizio_scopa', (dati) => {
+    currentGameType = 'scopa';
+    window.ultimoStatoGioco = dati;
+    nascondiErrore();
+
+    const titleEl = document.getElementById('game-title');
+    if (titleEl) titleEl.innerText = 'Scopa';
+
+    switchSection('game-area');
+
+    const areaScommessa = document.getElementById('dichiarazione-area');
+    if (areaScommessa) areaScommessa.style.display = 'none';
+
+    const scartiBar = document.getElementById('ciapano-scarti-bar');
+    if (scartiBar) scartiBar.style.display = 'none';
+
+    renderGiocatoriScopa(dati);
+    updateChatVisibility(dati.tuttiGiocatori);
+
+    const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
+    const eMioTurno = pAttuale && (pAttuale.isMe || pAttuale.socketId === socket.id);
+    if (eMioTurno) {
+        sound.playYourTurn();
+    }
+
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    const timerDisplay = document.getElementById('turn-timer-display');
+    if (timerDisplay) {
+        let timeLeft = 30;
+        window.clientTurnInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 10) {
+                timerDisplay.style.display = 'block';
+                timerDisplay.innerText = `${timeLeft}s`;
+            }
+            if (timeLeft <= 0) {
+                clearInterval(window.clientTurnInterval);
+                timerDisplay.innerText = "Timeout!";
+            }
+        }, 1000);
+    }
+
+    canPlay = false;
+    setTimeout(() => { canPlay = true; }, 400);
+});
+
+socket.on('mossa_scopa', (dati) => {
+    if (dati.carta) sound.playCardPlay(dati.carta);
+    if (dati.scopa) {
+        const mioIndice = window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.isMe || p.socketId === socket.id);
+        const isMe = (dati.playerIdx === mioIndice);
+        sound.playTrickWon(isMe);
+        mostraErrore(`🧹 SCOPA di ${dati.nome}!`);
+    }
+});
+
+socket.on('fine_smazzata_scopa', (data) => {
+    let msg = `Fine Smazzata ${data.smazzataNum}!\n`;
+    if (data.punteggi && data.punteggi.length > 0) {
+        data.punteggi.forEach(p => {
+            const dettagli = [];
+            if (p.scope > 0) dettagli.push(`Scope: ${p.scope}`);
+            if (p.carte > 0) dettagli.push(`Carte: +1`);
+            if (p.denari > 0) dettagli.push(`Denari: +1`);
+            if (p.settebello > 0) dettagli.push(`Settebello: +1`);
+            if (p.primiera > 0) dettagli.push(`Primiera: +1`);
+            const strDet = dettagli.length > 0 ? ` (${dettagli.join(', ')})` : '';
+            msg += `${p.nome}: +${p.puntiSmazzata} pt${strDet} -> Totale: ${p.puntiTotali} pt\n`;
+        });
+    }
+    mostraErrore(msg);
+});
+
+socket.on('fine_partita_scopa', (data) => {
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    sessionStorage.removeItem('lucas_room');
+
+    const modal = document.getElementById('modal-endgame');
+    if (modal) {
+        modal.style.display = 'block';
+        const h2El = modal.querySelector('h2');
+        if (h2El) h2El.innerText = "Classifica Finale Scopa";
+        const listEl = document.getElementById('endgame-list');
+        if (listEl && data.classifica) {
+            listEl.innerHTML = data.classifica.map(p => {
+                const medal = p.posizione === 1 ? '🥇' : p.posizione === 2 ? '🥈' : p.posizione === 3 ? '🥉' : `#${p.posizione}`;
+                const eloStr = p.eloChange ? ` (ELO ${p.eloChange > 0 ? '+' : ''}${p.eloChange})` : '';
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <span>${medal} ${renderNomeConStemma(p.nome, p.stemma)}</span>
+                        <span style="color: #2ecc71; font-weight: bold;">${p.puntiTotali} pt${eloStr}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+});
+
+function renderGiocatoriScopa(data) {
+    const playersCircle = document.getElementById('players-circle');
+    const cardsOnTable = document.getElementById('cards-on-table');
+    const infoGiro = document.getElementById('info-giro');
+
+    playersCircle.innerHTML = '';
+    renderTavoloBanco(cardsOnTable, data.tavolo);
+
+    const numPlayers = data.tuttiGiocatori.length;
+    let mioIndice = data.tuttiGiocatori.findIndex(p => p.isMe || p.socketId === socket.id);
+    if (mioIndice === -1) mioIndice = 0;
+
+    infoGiro.innerText = `Smazzata ${data.smazzataNum} | Obiettivo: ${data.limitePunti || 11} pt`;
+
+    const isMobile = window.innerWidth <= 768;
+    const scalaPlayerBlock = isMobile ? 1 : 1;
+
+    for (let i = 0; i < numPlayers; i++) {
+        const serverPlayerIndex = (mioIndice + i) % numPlayers;
+        const p = data.tuttiGiocatori[serverPlayerIndex];
+        const isMe = p.isMe || (p.socketId === socket.id);
+
+        let posX, posY;
+        if (isMe) {
+            posX = 50;
+            posY = 85;
+        } else {
+            const indexOpp = i - 1;
+            const numOpp = numPlayers - 1;
+            let angoloGradi = 270;
+            if (numOpp > 1) {
+                const startA = 160;
+                const endA = 380;
+                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
+            }
+            const rad = angoloGradi * (Math.PI / 180);
+            posX = 50 + 44 * Math.cos(rad);
+            posY = 40 + 30 * Math.sin(rad);
+        }
+
+        const pBlock = document.createElement('div');
+        pBlock.className = 'player-block';
+        pBlock.setAttribute('data-player-id', serverPlayerIndex);
+        pBlock.setAttribute('data-socket-id', isMe ? 'me' : (p.socketId || ''));
+        if (isMe) pBlock.classList.add('me');
+        if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
+
+        pBlock.style.left = `${posX}%`;
+        pBlock.style.top = `${posY}%`;
+        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+
+        const ruolo = p.isMazziere ? " (Mazziere)" : "";
+        const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
+        let timerHtml = "";
+        if (data.turnoAttuale === serverPlayerIndex && p.isHuman !== false) {
+            timerHtml = `<div class="turn-timer" id="turn-timer-display" style="display: none;">30s</div>`;
+        }
+
+        pBlock.innerHTML = `
+            <div class="name">${nomeConStemma}${ruolo}</div>
+            <div class="stats"><span class="scopa-punti-badge">Punti: ${p.puntiTotali}</span> | Scope: <span class="scopa-badge">${p.scopeCount || 0}</span> | Prese: ${p.cartePreseCount || 0}</div>
+            ${timerHtml}
+        `;
+
+        if (isMe) {
+            const myHandCont = document.createElement('div');
+            myHandCont.id = 'tu-mano';
+            pBlock.appendChild(myHandCont);
+            renderTuaManoScopa(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale);
+        } else {
+            const oppHandCont = document.createElement('div');
+            oppHandCont.className = 'opponent-hand';
+            const carteInManoCount = p.numCarte !== undefined ? p.numCarte : (p.mano ? p.mano.length : 0);
+
+            let margineNegativo = 0;
+            if (carteInManoCount > 1) {
+                const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
+                margineNegativo = Math.min(0, spazioPerCarta - 35);
+            }
+
+            for (let c = 0; c < carteInManoCount; c++) {
+                const cardBack = document.createElement('div');
+                cardBack.className = 'card-back';
+                if (c > 0) cardBack.style.marginLeft = `${margineNegativo}px`;
+                oppHandCont.appendChild(cardBack);
+            }
+            pBlock.appendChild(oppHandCont);
+        }
+
+        playersCircle.appendChild(pBlock);
+    }
+}
+
+function renderTuaManoScopa(handCont, mano, isMyTurn) {
+    if (!handCont) return;
+    handCont.innerHTML = '';
+    const carteDaDisegnare = (mano || []).filter(c => !c.giocata);
+    const numCarte = carteDaDisegnare.length;
+    const isMobile = window.innerWidth <= 768;
+    const baseScale = isMobile ? 0.65 : 1.0;
+    let dynamicScale = baseScale;
+    if (numCarte > 7) {
+        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08);
+    }
+
+    let marginLeft = 0;
+    if (isMobile) {
+        if (numCarte > 1) {
+            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
+            marginLeft = overlapFactor;
+        }
+    } else {
+        if (numCarte > 10) marginLeft = -35;
+        else if (numCarte > 7) marginLeft = -20;
+    }
+
+    carteDaDisegnare.forEach((c, idx) => {
+        const div = document.createElement('div');
+        div.style.transform = `scale(${dynamicScale})`;
+        div.style.transformOrigin = "center";
+        if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
+        div.className = `card seme-${c.seme} val-${c.valore}`;
+        div.style.zIndex = 10 + idx;
+
+        if (isMyTurn) {
+            div.style.cursor = 'pointer';
+        }
+
+        div.onclick = () => {
+            if (isMyTurn && canPlay && !isReplayMode) {
+                nascondiErrore();
+                canPlay = false;
+                sound.playCardPlay(c);
+                socket.emit('gioca_carta_scopa', { cartaIdx: mano.indexOf(c) });
+            }
+        };
+        handCont.appendChild(div);
+    });
+}
+
+// =============================================
+// MOTORE CLIENT RUBAMAZZETTO
+// =============================================
+socket.on('conferma_inizio_rubamazzetto', (dati) => {
+    currentGameType = 'rubamazzetto';
+    window.ultimoStatoGioco = dati;
+    nascondiErrore();
+
+    const titleEl = document.getElementById('game-title');
+    if (titleEl) titleEl.innerText = 'Rubamazzetto';
+
+    switchSection('game-area');
+
+    const areaScommessa = document.getElementById('dichiarazione-area');
+    if (areaScommessa) areaScommessa.style.display = 'none';
+
+    const scartiBar = document.getElementById('ciapano-scarti-bar');
+    if (scartiBar) scartiBar.style.display = 'none';
+
+    renderGiocatoriRubamazzetto(dati);
+    updateChatVisibility(dati.tuttiGiocatori);
+
+    const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
+    const eMioTurno = pAttuale && (pAttuale.isMe || pAttuale.socketId === socket.id);
+    if (eMioTurno) {
+        sound.playYourTurn();
+    }
+
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    const timerDisplay = document.getElementById('turn-timer-display');
+    if (timerDisplay) {
+        let timeLeft = 30;
+        window.clientTurnInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 10) {
+                timerDisplay.style.display = 'block';
+                timerDisplay.innerText = `${timeLeft}s`;
+            }
+            if (timeLeft <= 0) {
+                clearInterval(window.clientTurnInterval);
+                timerDisplay.innerText = "Timeout!";
+            }
+        }, 1000);
+    }
+
+    canPlay = false;
+    setTimeout(() => { canPlay = true; }, 400);
+});
+
+socket.on('mossa_rubamazzetto', (dati) => {
+    if (dati.carta) sound.playCardPlay(dati.carta);
+    if (dati.tipo === 'furto') {
+        const mioIndice = window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.isMe || p.socketId === socket.id);
+        const isMe = (dati.playerIdx === mioIndice);
+        sound.playTrickWon(isMe);
+        const rubatoANome = dati.rubatoA?.nome || 'avversario';
+        mostraErrore(`🥷 FURTO! ${dati.nome} ha rubato il mazzetto di ${rubatoANome}!`);
+    }
+});
+
+socket.on('fine_partita_rubamazzetto', (data) => {
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    sessionStorage.removeItem('lucas_room');
+
+    const modal = document.getElementById('modal-endgame');
+    if (modal) {
+        modal.style.display = 'block';
+        const h2El = modal.querySelector('h2');
+        if (h2El) h2El.innerText = "Classifica Finale Rubamazzetto";
+        const listEl = document.getElementById('endgame-list');
+        if (listEl && data.classifica) {
+            listEl.innerHTML = data.classifica.map(p => {
+                const medal = p.posizione === 1 ? '🥇' : p.posizione === 2 ? '🥈' : p.posizione === 3 ? '🥉' : `#${p.posizione}`;
+                const eloStr = p.eloChange ? ` (ELO ${p.eloChange > 0 ? '+' : ''}${p.eloChange})` : '';
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <span>${medal} ${renderNomeConStemma(p.nome, p.stemma)}</span>
+                        <span style="color: #9b59b6; font-weight: bold;">${p.carteMazzetto} carte${eloStr}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+});
+
+function renderGiocatoriRubamazzetto(data) {
+    const playersCircle = document.getElementById('players-circle');
+    const cardsOnTable = document.getElementById('cards-on-table');
+    const infoGiro = document.getElementById('info-giro');
+
+    playersCircle.innerHTML = '';
+    renderTavoloBanco(cardsOnTable, data.tavolo);
+
+    const numPlayers = data.tuttiGiocatori.length;
+    let mioIndice = data.tuttiGiocatori.findIndex(p => p.isMe || p.socketId === socket.id);
+    if (mioIndice === -1) mioIndice = 0;
+
+    infoGiro.innerText = `Smazzata ${data.smazzataNum} | Mazzo rimanente: ${data.mazzoRimanente}`;
+
+    const isMobile = window.innerWidth <= 768;
+    const scalaPlayerBlock = isMobile ? 1 : 1;
+
+    for (let i = 0; i < numPlayers; i++) {
+        const serverPlayerIndex = (mioIndice + i) % numPlayers;
+        const p = data.tuttiGiocatori[serverPlayerIndex];
+        const isMe = p.isMe || (p.socketId === socket.id);
+
+        let posX, posY;
+        if (isMe) {
+            posX = 50;
+            posY = 85;
+        } else {
+            const indexOpp = i - 1;
+            const numOpp = numPlayers - 1;
+            let angoloGradi = 270;
+            if (numOpp > 1) {
+                const startA = 160;
+                const endA = 380;
+                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
+            }
+            const rad = angoloGradi * (Math.PI / 180);
+            posX = 50 + 44 * Math.cos(rad);
+            posY = 40 + 30 * Math.sin(rad);
+        }
+
+        const pBlock = document.createElement('div');
+        pBlock.className = 'player-block';
+        pBlock.setAttribute('data-player-id', serverPlayerIndex);
+        pBlock.setAttribute('data-socket-id', isMe ? 'me' : (p.socketId || ''));
+        if (isMe) pBlock.classList.add('me');
+        if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
+
+        pBlock.style.left = `${posX}%`;
+        pBlock.style.top = `${posY}%`;
+        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+
+        const ruolo = p.isMazziere ? " (Mazziere)" : "";
+        const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
+        let timerHtml = "";
+        if (data.turnoAttuale === serverPlayerIndex && p.isHuman !== false) {
+            timerHtml = `<div class="turn-timer" id="turn-timer-display" style="display: none;">30s</div>`;
+        }
+
+        let cimaHtml = '';
+        if (p.cimaMazzetto) {
+            const iconSeme = getSemeSimbolo(p.cimaMazzetto.seme);
+            cimaHtml = `
+                <div class="cima-mazzetto-box" title="Cima del mazzetto: rubabile con carta uguale!">
+                    <span class="cima-mazzetto-label">Cima:</span>
+                    <span class="cima-mazzetto-valore">${p.cimaMazzetto.valore} ${iconSeme}</span>
+                </div>
+            `;
+        } else {
+            cimaHtml = `<div style="font-size:0.75rem; color:#888; margin-top:2px;">(Mazzetto vuoto)</div>`;
+        }
+
+        pBlock.innerHTML = `
+            <div class="name">${nomeConStemma}${ruolo}</div>
+            <div class="stats"><span class="rubamazzetto-badge">Mazzetto: ${p.mazzettoCount || 0}</span></div>
+            ${cimaHtml}
+            ${timerHtml}
+        `;
+
+        if (isMe) {
+            const myHandCont = document.createElement('div');
+            myHandCont.id = 'tu-mano';
+            pBlock.appendChild(myHandCont);
+            renderTuaManoRubamazzetto(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale);
+        } else {
+            const oppHandCont = document.createElement('div');
+            oppHandCont.className = 'opponent-hand';
+            const carteInManoCount = p.numCarte !== undefined ? p.numCarte : (p.mano ? p.mano.length : 0);
+
+            let margineNegativo = 0;
+            if (carteInManoCount > 1) {
+                const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
+                margineNegativo = Math.min(0, spazioPerCarta - 35);
+            }
+
+            for (let c = 0; c < carteInManoCount; c++) {
+                const cardBack = document.createElement('div');
+                cardBack.className = 'card-back';
+                if (c > 0) cardBack.style.marginLeft = `${margineNegativo}px`;
+                oppHandCont.appendChild(cardBack);
+            }
+            pBlock.appendChild(oppHandCont);
+        }
+
+        playersCircle.appendChild(pBlock);
+    }
+}
+
+function renderTuaManoRubamazzetto(handCont, mano, isMyTurn) {
+    if (!handCont) return;
+    handCont.innerHTML = '';
+    const carteDaDisegnare = (mano || []).filter(c => !c.giocata);
+    const numCarte = carteDaDisegnare.length;
+    const isMobile = window.innerWidth <= 768;
+    const baseScale = isMobile ? 0.65 : 1.0;
+    let dynamicScale = baseScale;
+    if (numCarte > 7) {
+        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08);
+    }
+
+    let marginLeft = 0;
+    if (isMobile) {
+        if (numCarte > 1) {
+            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
+            marginLeft = overlapFactor;
+        }
+    } else {
+        if (numCarte > 10) marginLeft = -35;
+        else if (numCarte > 7) marginLeft = -20;
+    }
+
+    carteDaDisegnare.forEach((c, idx) => {
+        const div = document.createElement('div');
+        div.style.transform = `scale(${dynamicScale})`;
+        div.style.transformOrigin = "center";
+        if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
+        div.className = `card seme-${c.seme} val-${c.valore}`;
+        div.style.zIndex = 10 + idx;
+
+        if (isMyTurn) {
+            div.style.cursor = 'pointer';
+        }
+
+        div.onclick = () => {
+            if (isMyTurn && canPlay && !isReplayMode) {
+                nascondiErrore();
+                canPlay = false;
+                sound.playCardPlay(c);
+                socket.emit('gioca_carta_rubamazzetto', { cartaIdx: mano.indexOf(c) });
+            }
+        };
+        handCont.appendChild(div);
+    });
+}
+
+// =============================================
+// MOTORE CLIENT BRISCOLA
+// =============================================
+const PUNTI_BRISCOLA_CLIENT = { "Asso": 11, "3": 10, "Re": 4, "Cavallo": 3, "Fante": 2, "7": 0, "6": 0, "5": 0, "4": 0, "2": 0 };
+const PESO_PRESA_BRISCOLA_CLIENT = { "Asso": 10, "3": 9, "Re": 8, "Cavallo": 7, "Fante": 6, "7": 5, "6": 4, "5": 3, "4": 2, "2": 1 };
+
+socket.on('conferma_inizio_briscola', (dati) => {
+    currentGameType = 'briscola';
+    window.ultimoStatoGioco = dati;
+    nascondiErrore();
+
+    const titleEl = document.getElementById('game-title');
+    if (titleEl) {
+        titleEl.innerText = (dati.variante === 'chiamata' || (dati.tuttiGiocatori && dati.tuttiGiocatori.length === 5))
+            ? 'Briscola Chiamata (a 5)'
+            : 'Briscola';
+    }
+
+    switchSection('game-area');
+
+    const areaScommessa = document.getElementById('dichiarazione-area');
+    if (areaScommessa) areaScommessa.style.display = 'none';
+
+    const scartiBar = document.getElementById('ciapano-scarti-bar');
+    if (scartiBar) scartiBar.style.display = 'none';
+
+    renderGiocatoriBriscola(dati);
+    updateChatVisibility(dati.tuttiGiocatori);
+
+    const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
+    const eMioTurno = pAttuale && (pAttuale.isMe || pAttuale.socketId === socket.id);
+    if (eMioTurno) {
+        sound.playYourTurn();
+    }
+
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    const timerDisplay = document.getElementById('turn-timer-display');
+    if (timerDisplay) {
+        let timeLeft = 30;
+        window.clientTurnInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 10) {
+                timerDisplay.style.display = 'block';
+                timerDisplay.innerText = `${timeLeft}s`;
+            }
+            if (timeLeft <= 0) {
+                clearInterval(window.clientTurnInterval);
+                timerDisplay.innerText = "Timeout!";
+            }
+        }, 1000);
+    }
+
+    canPlay = false;
+    setTimeout(() => { canPlay = true; }, 400);
+});
+
+socket.on('mossa_briscola', (dati) => {
+    if (dati.card) sound.playCardPlay(dati.card);
+});
+
+socket.on('vincitore_presa_briscola', ({ vincitoreId, vincitoreIdx, cartaVincente, puntiPresa }) => {
+    const mioIndice = window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.isMe || p.socketId === socket.id);
+    const isMe = (vincitoreIdx !== undefined) ? (vincitoreIdx === mioIndice) : (window.ultimoStatoGioco?.tuttiGiocatori?.[mioIndice]?.id === vincitoreId);
+    sound.playTrickWon(isMe);
+
+    const targetIdx = (vincitoreIdx !== undefined) ? vincitoreIdx : window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.id === vincitoreId);
+    if (targetIdx !== -1 && targetIdx !== undefined) {
+        const pBlock = document.querySelector(`.player-block[data-player-id="${targetIdx}"]`);
+        if (pBlock) {
+            pBlock.classList.add('winner-pulse');
+            setTimeout(() => pBlock.classList.remove('winner-pulse'), 1200);
+        }
+    }
+});
+
+socket.on('fine_partita_briscola', (data) => {
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    sessionStorage.removeItem('lucas_room');
+
+    const modal = document.getElementById('modal-endgame');
+    if (modal) {
+        modal.style.display = 'block';
+        const h2El = modal.querySelector('h2');
+        if (h2El) {
+            h2El.innerText = data.variante === 'chiamata' ? "Fine Briscola Chiamata" : "Classifica Finale Briscola";
+        }
+        const listEl = document.getElementById('endgame-list');
+        if (listEl && data.classifica) {
+            let bannerHtml = '';
+            if (data.variante === 'chiamata') {
+                const esitoStr = data.vittoriaChiamante
+                    ? `🏆 Vince la Coppia Chiamante (${data.chiamanteNome} & ${data.socioNome}) con ${data.puntiSquadraChiamante} pt!`
+                    : `🛡️ Vincono i Buoni (Difesa) con ${data.puntiDifesa} pt!`;
+                bannerHtml = `<div style="text-align:center; padding:10px; margin-bottom:12px; font-weight:bold; color:#f1c40f; background:rgba(230,126,34,0.25); border-radius:8px; border:1px solid #e67e22;">${esitoStr}</div>`;
+            }
+            listEl.innerHTML = bannerHtml + data.classifica.map(p => {
+                const medal = p.posizione === 1 ? '🥇' : p.posizione === 2 ? '🥈' : p.posizione === 3 ? '🥉' : `#${p.posizione}`;
+                const eloStr = p.eloChange ? ` (ELO ${p.eloChange > 0 ? '+' : ''}${p.eloChange})` : '';
+                let ruoloTag = '';
+                if (p.ruolo === 'chiamante') ruoloTag = ' <span class="briscola-ruolo-badge briscola-ruolo-chiamante">Chiamante</span>';
+                else if (p.ruolo === 'socio') ruoloTag = ' <span class="briscola-ruolo-badge briscola-ruolo-socio">Socio</span>';
+                else if (p.ruolo === 'buono') ruoloTag = ' <span class="briscola-ruolo-badge briscola-ruolo-buono">Buono</span>';
+
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <span>${medal} ${renderNomeConStemma(p.nome, p.stemma)}${ruoloTag}</span>
+                        <span style="color: #e67e22; font-weight: bold;">${p.puntiTotali} pt${eloStr}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+});
+
+function renderGiocatoriBriscola(data) {
+    const playersCircle = document.getElementById('players-circle');
+    const cardsOnTable = document.getElementById('cards-on-table');
+    const infoGiro = document.getElementById('info-giro');
+
+    // Chiamata Banner
+    const chiamataBanner = document.getElementById('briscola-chiamata-banner');
+    const chiamataTesto = document.getElementById('briscola-chiamata-testo');
+    if (chiamataBanner && chiamataTesto) {
+        if (data.variante === 'chiamata' && data.cartaChiamata) {
+            chiamataBanner.style.display = 'block';
+            const socioInfo = data.socioRivelato ? ' | Socio svelato!' : ' (Socio Segreto 🤫)';
+            chiamataTesto.innerHTML = `Chiamata: <span style="color:#fff;">${data.cartaChiamata.valore} di ${data.cartaChiamata.seme}</span> | Briscola: <span style="color:#e67e22;">${data.semeBriscola}</span>${socioInfo}`;
+        } else {
+            chiamataBanner.style.display = 'none';
+        }
+    }
+
+    // Tallone e Briscola visibile sotto al mazzo
+    const deckCont = document.getElementById('briscola-deck-container');
+    const cartaScopertaEl = document.getElementById('briscola-carta-scoperta');
+    const deckCountEl = document.getElementById('briscola-deck-count');
+    if (deckCont && cartaScopertaEl && deckCountEl) {
+        if (data.variante !== 'chiamata' && data.cartaBriscola && data.mazzoRimanente > 0) {
+            deckCont.style.display = 'block';
+            cartaScopertaEl.className = `card seme-${data.cartaBriscola.seme} val-${data.cartaBriscola.valore}`;
+            deckCountEl.innerText = `${data.mazzoRimanente} carte`;
+        } else {
+            deckCont.style.display = 'none';
+        }
+    }
+
+    const prevTableCount = window.ultimoTavoloCount || 0;
+    const currentTableCount = data.tavolo ? data.tavolo.length : 0;
+    if (currentTableCount > prevTableCount) {
+        const ultimaGiocata = data.tavolo[currentTableCount - 1];
+        sound.playCardPlay(ultimaGiocata ? ultimaGiocata.card : null);
+    }
+    window.ultimoTavoloCount = currentTableCount;
+
+    playersCircle.innerHTML = '';
+    cardsOnTable.innerHTML = '';
+
+    const numPlayers = data.tuttiGiocatori.length;
+    let mioIndice = data.tuttiGiocatori.findIndex(p => p.isMe || p.socketId === socket.id);
+    if (mioIndice === -1) mioIndice = 0;
+
+    const briscolaSemeTxt = data.semeBriscola ? `Briscola: ${data.semeBriscola}` : '';
+    infoGiro.innerText = data.variante === 'chiamata'
+        ? `Briscola Chiamata | ${briscolaSemeTxt}`
+        : `${briscolaSemeTxt} | Tallone: ${data.mazzoRimanente} carte`;
+
+    const isMobile = window.innerWidth <= 768;
+    let scalaPlayerBlock = isMobile ? 1 : 1;
+    let scalaTableCard = isMobile ? 0.45 : 0.8;
+
+    if (numPlayers >= 5) {
+        scalaPlayerBlock = isMobile ? 0.75 : 0.82;
+        scalaTableCard = isMobile ? 0.38 : 0.7;
+    }
+
+    const posizioniCarteTavoloPerGiocatore = new Map();
+    const raggioCarteX = 26;
+    const raggioCarteY = 18;
+
+    for (let i = 0; i < numPlayers; i++) {
+        const serverPlayerIndex = (mioIndice + i) % numPlayers;
+        const p = data.tuttiGiocatori[serverPlayerIndex];
+        const isMe = p.isMe || (p.socketId === socket.id);
+
+        let posX, posY;
+        let angoloGradi;
+
+        if (isMe) {
+            posX = 50;
+            posY = 85;
+            angoloGradi = 90;
+        } else {
+            const indexOpp = i - 1;
+            const numOpp = numPlayers - 1;
+            if (numOpp === 1) {
+                angoloGradi = 270;
+            } else {
+                const startA = 160;
+                const endA = 380;
+                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
+            }
+
+            const rad = angoloGradi * (Math.PI / 180);
+            posX = 50 + 44 * Math.cos(rad);
+            posY = 40 + 30 * Math.sin(rad);
+        }
+
+        const pBlock = document.createElement('div');
+        pBlock.className = 'player-block';
+        pBlock.setAttribute('data-player-id', serverPlayerIndex);
+        pBlock.setAttribute('data-socket-id', isMe ? 'me' : (p.socketId || ''));
+        if (isMe) pBlock.classList.add('me');
+        if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
+
+        pBlock.style.left = `${posX}%`;
+        pBlock.style.top = `${posY}%`;
+        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+
+        const ruoloMazziere = p.isMazziere ? " (Mazziere)" : "";
+        const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
+        let timerHtml = "";
+        if (data.turnoAttuale === serverPlayerIndex && p.isHuman !== false) {
+            timerHtml = `<div class="turn-timer" id="turn-timer-display" style="display: none;">30s</div>`;
+        }
+
+        let ruoloHtml = '';
+        if (p.ruolo === 'chiamante') ruoloHtml = '<span class="briscola-ruolo-badge briscola-ruolo-chiamante">Chiamante</span>';
+        else if (p.ruolo === 'socio') ruoloHtml = '<span class="briscola-ruolo-badge briscola-ruolo-socio">Socio</span>';
+        else if (p.ruolo === 'buono') ruoloHtml = '<span class="briscola-ruolo-badge briscola-ruolo-buono">Buono</span>';
+
+        pBlock.innerHTML = `
+            <div class="name">${nomeConStemma}${ruoloMazziere} ${ruoloHtml}</div>
+            <div class="stats"><span class="briscola-punti-badge">Prese: ${p.cartePreseCount || 0}</span></div>
+            ${timerHtml}
+        `;
+
+        if (isMe) {
+            const myHandCont = document.createElement('div');
+            myHandCont.id = 'tu-mano';
+            pBlock.appendChild(myHandCont);
+            renderTuaManoBriscola(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale, data.semeBriscola);
+        } else {
+            const oppHandCont = document.createElement('div');
+            oppHandCont.className = 'opponent-hand';
+            const carteInManoCount = p.numCarte !== undefined ? p.numCarte : (p.mano ? p.mano.length : 0);
+
+            let margineNegativo = 0;
+            if (carteInManoCount > 1) {
+                const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
+                margineNegativo = Math.min(0, spazioPerCarta - 35);
+            }
+
+            for (let c = 0; c < carteInManoCount; c++) {
+                const cardBack = document.createElement('div');
+                cardBack.className = 'card-back';
+                if (c > 0) cardBack.style.marginLeft = `${margineNegativo}px`;
+                oppHandCont.appendChild(cardBack);
+            }
+            pBlock.appendChild(oppHandCont);
+        }
+
+        playersCircle.appendChild(pBlock);
+
+        let cartaX, cartaY;
+        if (isMe) {
+            cartaX = 50;
+            cartaY = 68;
+        } else {
+            cartaX = 50 + raggioCarteX * Math.cos(angoloGradi * (Math.PI / 180));
+            cartaY = 44 + raggioCarteY * Math.sin(angoloGradi * (Math.PI / 180));
+        }
+        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
+    }
+
+    // Calcolo carta temporaneamente vincente sul tavolo
+    let winnerCardDiv = null;
+    if (data.tavolo && data.tavolo.length > 0) {
+        const semeBriscola = data.semeBriscola;
+        const semeBase = data.tavolo[0].card.seme;
+        let bestGiocata = data.tavolo[0];
+        let bestDiv = null;
+
+        data.tavolo.forEach((giocata, index) => {
+            const c = giocata.card;
+            const pId = giocata.playerId;
+            const posData = posizioniCarteTavoloPerGiocatore.get(pId);
+
+            if (posData) {
+                const divCartaTavolo = document.createElement('div');
+                divCartaTavolo.className = `card seme-${c.seme} val-${c.valore} table-card`;
+                divCartaTavolo.style.left = `${posData.x}%`;
+                divCartaTavolo.style.top = `${posData.y}%`;
+                divCartaTavolo.style.zIndex = 100 + index;
+
+                const randRot = (Math.random() * 14) - 7;
+                divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${randRot}deg)`;
+
+                if (index === 0) {
+                    bestDiv = divCartaTavolo;
+                } else {
+                    const cSeme = c.seme;
+                    const bSeme = bestGiocata.card.seme;
+                    const cPeso = PESO_PRESA_BRISCOLA_CLIENT[c.valore] || 0;
+                    const bPeso = PESO_PRESA_BRISCOLA_CLIENT[bestGiocata.card.valore] || 0;
+
+                    if (cSeme === semeBriscola && bSeme !== semeBriscola) {
+                        bestGiocata = giocata;
+                        bestDiv = divCartaTavolo;
+                    } else if (cSeme === bSeme && cPeso > bPeso) {
+                        bestGiocata = giocata;
+                        bestDiv = divCartaTavolo;
+                    }
+                }
+
+                cardsOnTable.appendChild(divCartaTavolo);
+            }
+        });
+
+        if (bestDiv) {
+            bestDiv.classList.add('card-winning');
+        }
+    }
+}
+
+function renderTuaManoBriscola(handCont, mano, isMyTurn, semeBriscola) {
+    if (!handCont) return;
+    handCont.innerHTML = '';
+
+    const carteDaDisegnare = (mano || []).filter(c => !c.giocata);
+
+    // Ordina: prima le non-briscole per seme, poi le briscole alla fine
+    carteDaDisegnare.sort((a, b) => {
+        const aIsBriscola = a.seme === semeBriscola ? 1 : 0;
+        const bIsBriscola = b.seme === semeBriscola ? 1 : 0;
+        if (aIsBriscola !== bIsBriscola) return aIsBriscola - bIsBriscola;
+        if (a.seme !== b.seme) return a.seme.localeCompare(b.seme);
+        return (PESO_PRESA_BRISCOLA_CLIENT[b.valore] || 0) - (PESO_PRESA_BRISCOLA_CLIENT[a.valore] || 0);
+    });
+
+    const numCarte = carteDaDisegnare.length;
+    const isMobile = window.innerWidth <= 768;
+    const baseScale = isMobile ? 0.65 : 1.0;
+    let dynamicScale = baseScale;
+    if (numCarte > 7) {
+        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08);
+    }
+
+    let marginLeft = 0;
+    if (isMobile) {
+        if (numCarte > 1) {
+            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
+            marginLeft = overlapFactor;
+        }
+    } else {
+        if (numCarte > 6) marginLeft = -25;
+    }
+
+    carteDaDisegnare.forEach((c, idx) => {
+        const div = document.createElement('div');
+        div.style.transform = `scale(${dynamicScale})`;
+        div.style.transformOrigin = "center";
+        if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
+        div.className = `card seme-${c.seme} val-${c.valore}`;
+        div.style.zIndex = 10 + idx;
+
+        if (isMyTurn) {
+            div.style.cursor = 'pointer';
+        }
+
+        div.onclick = () => {
+            if (isMyTurn && canPlay && !isReplayMode) {
+                nascondiErrore();
+                canPlay = false;
+                sound.playCardPlay(c);
+                socket.emit('gioca_carta_briscola', { cartaIdx: mano.indexOf(c) });
+            }
+        };
+        handCont.appendChild(div);
+    });
+}
+
+// =============================================
+// MOTORE CLIENT TRESSETTE
+// =============================================
+const PESO_PRESA_TRESSETTE_CLIENT = {
+    "3": 10,
+    "2": 9,
+    "Asso": 8,
+    "Re": 7,
+    "Cavallo": 6,
+    "Fante": 5,
+    "7": 4,
+    "6": 3,
+    "5": 2,
+    "4": 1
+};
+
+socket.on('conferma_inizio_tressette', (dati) => {
+    currentGameType = 'tressette';
+    window.ultimoStatoGioco = dati;
+    nascondiErrore();
+
+    const titleEl = document.getElementById('game-title');
+    if (titleEl) {
+        titleEl.innerText = (dati.numPlayers === 4) ? 'Tressette (a 4)' : 'Tressette (a 2)';
+    }
+
+    switchSection('game-area');
+
+    const areaScommessa = document.getElementById('dichiarazione-area');
+    if (areaScommessa) areaScommessa.style.display = 'none';
+
+    const scartiBar = document.getElementById('ciapano-scarti-bar');
+    if (scartiBar) scartiBar.style.display = 'none';
+
+    const chiamataBanner = document.getElementById('briscola-chiamata-banner');
+    if (chiamataBanner) chiamataBanner.style.display = 'none';
+
+    const deckCont = document.getElementById('briscola-deck-container');
+    if (deckCont) deckCont.style.display = 'none';
+
+    renderGiocatoriTressette(dati);
+    updateChatVisibility(dati.tuttiGiocatori);
+
+    const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
+    const eMioTurno = pAttuale && (pAttuale.isMe || pAttuale.socketId === socket.id);
+    if (eMioTurno) {
+        sound.playYourTurn();
+    }
+
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    const timerDisplay = document.getElementById('turn-timer-display');
+    if (timerDisplay) {
+        let timeLeft = 30;
+        window.clientTurnInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 10) {
+                timerDisplay.style.display = 'block';
+                timerDisplay.innerText = `${timeLeft}s`;
+            }
+            if (timeLeft <= 0) {
+                clearInterval(window.clientTurnInterval);
+                timerDisplay.innerText = "Timeout!";
+            }
+        }, 1000);
+    }
+
+    canPlay = false;
+    setTimeout(() => { canPlay = true; }, 400);
+});
+
+socket.on('mossa_tressette', (dati) => {
+    if (dati.card) sound.playCardPlay(dati.card);
+});
+
+socket.on('vincitore_presa_tressette', ({ vincitoreId, vincitoreIdx, vincitoreNome, cartaVincente }) => {
+    const mioIndice = window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.isMe || p.socketId === socket.id);
+    const isMe = (vincitoreIdx !== undefined) ? (vincitoreIdx === mioIndice) : (window.ultimoStatoGioco?.tuttiGiocatori?.[mioIndice]?.id === vincitoreId);
+    sound.playTrickWon(isMe);
+
+    const targetIdx = (vincitoreIdx !== undefined) ? vincitoreIdx : window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.id === vincitoreId);
+    if (targetIdx !== -1 && targetIdx !== undefined) {
+        const pBlock = document.querySelector(`.player-block[data-player-id="${targetIdx}"]`);
+        if (pBlock) {
+            pBlock.classList.add('winner-pulse');
+            setTimeout(() => pBlock.classList.remove('winner-pulse'), 1200);
+        }
+    }
+});
+
+socket.on('fine_smazzata_tressette', (data) => {
+    let msg = `Fine Smazzata ${data.smazzataNum}!\n`;
+    if (data.punteggi && data.punteggi.length > 0) {
+        data.punteggi.forEach(p => {
+            msg += `${p.nome}: +${p.puntiSmazzata} pt -> Totale: ${p.puntiTotali} pt\n`;
+        });
+    }
+    mostraErrore(msg);
+});
+
+socket.on('fine_partita_tressette', (data) => {
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    sessionStorage.removeItem('lucas_room');
+
+    const modal = document.getElementById('modal-endgame');
+    if (modal) {
+        modal.style.display = 'block';
+        const h2El = modal.querySelector('h2');
+        if (h2El) h2El.innerText = "Classifica Finale Tressette";
+        const listEl = document.getElementById('endgame-list');
+        if (listEl && data.classifica) {
+            listEl.innerHTML = data.classifica.map(p => {
+                const medal = p.posizione === 1 ? '🥇' : p.posizione === 2 ? '🥈' : p.posizione === 3 ? '🥉' : `#${p.posizione}`;
+                const eloStr = p.eloChange ? ` (ELO ${p.eloChange > 0 ? '+' : ''}${p.eloChange})` : '';
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <span>${medal} ${renderNomeConStemma(p.nome, p.stemma)}</span>
+                        <span style="color: #3498db; font-weight: bold;">${p.puntiTotali} pt${eloStr}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+});
+
+function renderGiocatoriTressette(data) {
+    const playersCircle = document.getElementById('players-circle');
+    const cardsOnTable = document.getElementById('cards-on-table');
+    const infoGiro = document.getElementById('info-giro');
+
+    const prevTableCount = window.ultimoTavoloCount || 0;
+    const currentTableCount = data.tavolo ? data.tavolo.length : 0;
+    if (currentTableCount > prevTableCount) {
+        const ultimaGiocata = data.tavolo[currentTableCount - 1];
+        sound.playCardPlay(ultimaGiocata ? ultimaGiocata.card : null);
+    }
+    window.ultimoTavoloCount = currentTableCount;
+
+    playersCircle.innerHTML = '';
+    cardsOnTable.innerHTML = '';
+
+    const numPlayers = data.tuttiGiocatori.length;
+    let mioIndice = data.tuttiGiocatori.findIndex(p => p.isMe || p.socketId === socket.id);
+    if (mioIndice === -1) mioIndice = 0;
+
+    const talloneTxt = (numPlayers === 2 && data.mazzoRimanente > 0) ? ` | Tallone: ${data.mazzoRimanente} carte` : '';
+    infoGiro.innerText = `Smazzata ${data.smazzataNum} | Limite: ${data.limitePunti || 21} pt${talloneTxt}`;
+
+    const isMobile = window.innerWidth <= 768;
+    let scalaPlayerBlock = isMobile ? 1 : 1;
+    let scalaTableCard = isMobile ? 0.45 : 0.8;
+
+    if (numPlayers >= 4) {
+        scalaPlayerBlock = isMobile ? 0.78 : 0.88;
+        scalaTableCard = isMobile ? 0.4 : 0.75;
+    }
+
+    const posizioniCarteTavoloPerGiocatore = new Map();
+    const raggioCarteX = 26;
+    const raggioCarteY = 18;
+
+    for (let i = 0; i < numPlayers; i++) {
+        const serverPlayerIndex = (mioIndice + i) % numPlayers;
+        const p = data.tuttiGiocatori[serverPlayerIndex];
+        const isMe = p.isMe || (p.socketId === socket.id);
+
+        let posX, posY;
+        let angoloGradi;
+
+        if (isMe) {
+            posX = 50;
+            posY = 85;
+            angoloGradi = 90;
+        } else {
+            const indexOpp = i - 1;
+            const numOpp = numPlayers - 1;
+            if (numOpp === 1) {
+                angoloGradi = 270;
+            } else {
+                const startA = 160;
+                const endA = 380;
+                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
+            }
+
+            const rad = angoloGradi * (Math.PI / 180);
+            posX = 50 + 44 * Math.cos(rad);
+            posY = 40 + 30 * Math.sin(rad);
+        }
+
+        const pBlock = document.createElement('div');
+        pBlock.className = 'player-block';
+        pBlock.setAttribute('data-player-id', serverPlayerIndex);
+        pBlock.setAttribute('data-socket-id', isMe ? 'me' : (p.socketId || ''));
+        if (isMe) pBlock.classList.add('me');
+        if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
+
+        pBlock.style.left = `${posX}%`;
+        pBlock.style.top = `${posY}%`;
+        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+
+        const ruoloMazziere = p.isMazziere ? " (Mazziere)" : "";
+        const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
+        let timerHtml = "";
+        if (data.turnoAttuale === serverPlayerIndex && p.isHuman !== false) {
+            timerHtml = `<div class="turn-timer" id="turn-timer-display" style="display: none;">30s</div>`;
+        }
+
+        pBlock.innerHTML = `
+            <div class="name">${nomeConStemma}${ruoloMazziere}</div>
+            <div class="stats"><span class="tressette-punti-badge">Punti: ${p.puntiTotali}</span> | Prese: ${p.cartePreseCount || 0}</div>
+            ${timerHtml}
+        `;
+
+        if (isMe) {
+            const myHandCont = document.createElement('div');
+            myHandCont.id = 'tu-mano';
+            pBlock.appendChild(myHandCont);
+            renderTuaManoTressette(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale, data.tavolo);
+        } else {
+            const oppHandCont = document.createElement('div');
+            oppHandCont.className = 'opponent-hand';
+            const carteInManoCount = p.numCarte !== undefined ? p.numCarte : (p.mano ? p.mano.length : 0);
+
+            let margineNegativo = 0;
+            if (carteInManoCount > 1) {
+                const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
+                margineNegativo = Math.min(0, spazioPerCarta - 35);
+            }
+
+            for (let c = 0; c < carteInManoCount; c++) {
+                const cardBack = document.createElement('div');
+                cardBack.className = 'card-back';
+                if (c > 0) cardBack.style.marginLeft = `${margineNegativo}px`;
+                oppHandCont.appendChild(cardBack);
+            }
+            pBlock.appendChild(oppHandCont);
+        }
+
+        playersCircle.appendChild(pBlock);
+
+        let cartaX, cartaY;
+        if (isMe) {
+            cartaX = 50;
+            cartaY = 68;
+        } else {
+            cartaX = 50 + raggioCarteX * Math.cos(angoloGradi * (Math.PI / 180));
+            cartaY = 44 + raggioCarteY * Math.sin(angoloGradi * (Math.PI / 180));
+        }
+        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
+    }
+
+    // Carta vincente sul tavolo
+    let winnerCardDiv = null;
+    let maxPeso = -1;
+    let semeUscita = data.tavolo && data.tavolo.length > 0 ? data.tavolo[0].card.seme : null;
+
+    data.tavolo.forEach((giocata, index) => {
+        const c = giocata.card;
+        const pId = giocata.playerId;
+        const posData = posizioniCarteTavoloPerGiocatore.get(pId);
+
+        if (posData) {
+            const divCartaTavolo = document.createElement('div');
+            divCartaTavolo.className = `card seme-${c.seme} val-${c.valore} table-card`;
+            divCartaTavolo.style.left = `${posData.x}%`;
+            divCartaTavolo.style.top = `${posData.y}%`;
+            divCartaTavolo.style.zIndex = 100 + index;
+
+            const randRot = (Math.random() * 14) - 7;
+            divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${randRot}deg)`;
+
+            if (c.seme === semeUscita) {
+                const peso = PESO_PRESA_TRESSETTE_CLIENT[c.valore] || 0;
+                if (peso > maxPeso) {
+                    maxPeso = peso;
+                    winnerCardDiv = divCartaTavolo;
+                }
+            }
+
+            cardsOnTable.appendChild(divCartaTavolo);
+        }
+    });
+
+    if (winnerCardDiv) {
+        winnerCardDiv.classList.add('card-winning');
+    }
+}
+
+function renderTuaManoTressette(handCont, mano, isMyTurn, tavolo) {
+    if (!handCont) return;
+    handCont.innerHTML = '';
+
+    const carteDaDisegnare = (mano || []).filter(c => !c.giocata);
+
+    const ORDINE_SEMI = { "Denari": 1, "Spade": 2, "Coppe": 3, "Bastoni": 4 };
+    carteDaDisegnare.sort((a, b) => {
+        const diffSeme = (ORDINE_SEMI[a.seme] || 0) - (ORDINE_SEMI[b.seme] || 0);
+        if (diffSeme !== 0) return diffSeme;
+        return (PESO_PRESA_TRESSETTE_CLIENT[b.valore] || 0) - (PESO_PRESA_TRESSETTE_CLIENT[a.valore] || 0);
+    });
+
+    const numCarte = carteDaDisegnare.length;
+    const isMobile = window.innerWidth <= 768;
+    const baseScale = isMobile ? 0.65 : 1.0;
+    let dynamicScale = baseScale;
+    if (numCarte > 7) {
+        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08);
+    }
+
+    let marginLeft = 0;
+    if (isMobile) {
+        if (numCarte > 1) {
+            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
+            marginLeft = overlapFactor;
+        }
+    } else {
+        if (numCarte > 10) marginLeft = -35;
+        else if (numCarte > 7) marginLeft = -20;
+    }
+
+    const semeUscita = tavolo && tavolo.length > 0 ? tavolo[0].card.seme : null;
+    const haSemeUscita = semeUscita ? carteDaDisegnare.some(c => c.seme === semeUscita) : false;
+
+    carteDaDisegnare.forEach((c, idx) => {
+        const div = document.createElement('div');
+        div.style.transform = `scale(${dynamicScale})`;
+        div.style.transformOrigin = "center";
+        if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
+        div.className = `card seme-${c.seme} val-${c.valore}`;
+        div.style.zIndex = 10 + idx;
+
+        if (isMyTurn && haSemeUscita && c.seme !== semeUscita) {
+            div.style.opacity = '0.45';
+            div.style.filter = 'grayscale(50%)';
+            div.style.cursor = 'not-allowed';
+        } else if (isMyTurn) {
+            div.style.cursor = 'pointer';
+        }
+
+        div.onclick = () => {
+            if (isMyTurn && canPlay && !isReplayMode) {
+                if (haSemeUscita && c.seme !== semeUscita) {
+                    mostraErrore(`Devi rispondere al seme di uscita (${semeUscita})!`);
+                    return;
+                }
+                nascondiErrore();
+                canPlay = false;
+                sound.playCardPlay(c);
+                socket.emit('gioca_carta_tressette', { cartaIdx: mano.indexOf(c) });
             }
         };
         handCont.appendChild(div);

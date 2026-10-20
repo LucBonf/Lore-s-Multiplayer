@@ -108,7 +108,15 @@ const dictionary = {
         'lucasDesc': 'Previsioni, prese e scommesse a mani decrescenti. Precisione e strategia pura!',
         'ciapanoDesc': 'Vince chi fa meno punti! Evita le figure (⅓ pt) e gli assi (1 pt), o fai la Sola!',
         'playLucasBtn': 'GIOCA A LUCAS',
-        'playCiapanoBtn': 'GIOCA A CIAPANÒ'
+        'playCiapanoBtn': 'GIOCA A CIAPANÒ',
+        'scopaDesc': 'Fai scopa svuotando il banco! Prendi il Settebello, fai primiera, denari e più carte per vincere!',
+        'playScopaBtn': 'GIOCA A SCOPA',
+        'rubamazzettoDesc': 'Ruba il mazzetto avversario se cali una carta uguale alla sua cima, o prendi dal banco!',
+        'playRubamazzettoBtn': 'GIOCA A RUBAMAZZETTO',
+        'briscolaDesc': 'Fai più di 60 punti a suon di carichi (Asso, 3) e briscole, o gioca a 5 con il socio segreto!',
+        'playBriscolaBtn': 'GIOCA A BRISCOLA',
+        'tressetteDesc': 'Il re dei giochi tradizionali italiani! 3, 2, carichi e il punto dell\'ultima presa per raggiungere 21 o 31 punti.',
+        'playTressetteBtn': 'GIOCA A TRESSETTE'
     },
     'en': {
         'chooseLanguage': 'Choose Language',
@@ -211,7 +219,15 @@ const dictionary = {
         'lucasDesc': 'Predictions, tricks, and decreasing hand sizes. Pure precision and strategy!',
         'ciapanoDesc': 'Fewest points wins! Avoid face cards (⅓ pt) and aces (1 pt), or aim for a Clean Sweep (Sola)!',
         'playLucasBtn': 'PLAY LUCAS',
-        'playCiapanoBtn': 'PLAY CIAPANÒ'
+        'playCiapanoBtn': 'PLAY CIAPANÒ',
+        'scopaDesc': 'Sweep the table! Capture Settebello, primiera, coins, and the most cards to score points!',
+        'playScopaBtn': 'PLAY SCOPA',
+        'rubamazzettoDesc': 'Steal your opponent\'s deck if you match their top card, or capture from the table!',
+        'playRubamazzettoBtn': 'PLAY RUBAMAZZETTO',
+        'briscolaDesc': 'Score over 60 points with high cards (Ace, 3) and trumps, or play with 5 and a secret partner!',
+        'playBriscolaBtn': 'PLAY BRISCOLA',
+        'tressetteDesc': 'The king of Italian trick-taking card games! 3s, 2s, high cards, and the last trick bonus to reach 21 or 31 points.',
+        'playTressetteBtn': 'PLAY TRESSETTE'
     },
     'fr': {
         'chooseLanguage': 'Choisissez la Langue',
@@ -314,7 +330,15 @@ const dictionary = {
         'lucasDesc': 'Prédictions, plis et enchères en mains décroissantes. Pure précision et stratégie !',
         'ciapanoDesc': 'Le moins de points gagne ! Évitez les figures (⅓ pt) et les as (1 pt), ou tentez la Sola !',
         'playLucasBtn': 'JOUER À LUCAS',
-        'playCiapanoBtn': 'JOUER À CIAPANÒ'
+        'playCiapanoBtn': 'JOUER À CIAPANÒ',
+        'scopaDesc': 'Faites scopa en balayant la table ! Prenez le Settebello, la primiera, les deniers et le plus de cartes !',
+        'playScopaBtn': 'JOUER À LA SCOPA',
+        'rubamazzettoDesc': 'Volez le tas de l\'adversaire si vous posez la même carte que son sommet, ou prenez sur la table !',
+        'playRubamazzettoBtn': 'JOUER AU RUBAMAZZETTO',
+        'briscolaDesc': 'Marquez plus de 60 points avec les atouts et cartes fortes, ou jouez à 5 avec le partenaire secret !',
+        'playBriscolaBtn': 'JOUER À LA BRISCOLA',
+        'tressetteDesc': 'Le roi des jeux de plis italiens ! 3, 2, cartes fortes et le point du dernier pli pour atteindre 21 ou 31 points.',
+        'playTressetteBtn': 'JOUER AU TRESSETTE'
     },
     'es': {
         'chooseLanguage': 'Elige el Idioma',
@@ -417,7 +441,15 @@ const dictionary = {
         'lucasDesc': 'Predicciones, bazas y apuestas con manos decrecientes. ¡Pura precisión y estrategia!',
         'ciapanoDesc': '¡Gana quien consiga menos puntos! Evita las figuras (⅓ pt) y los ases (1 pt), o haz la Sola.',
         'playLucasBtn': 'JUGAR A LUCAS',
-        'playCiapanoBtn': 'JUGAR A CIAPANÒ'
+        'playCiapanoBtn': 'JUGAR A CIAPANÒ',
+        'scopaDesc': '¡Haz escoba barriendo la mesa! ¡Consigue el Settebello, la primera, oros y la mayoría de cartas!',
+        'playScopaBtn': 'JUGAR A LA ESCOBA',
+        'rubamazzettoDesc': '¡Roba el mazo del rival si juegas una carta igual a la de arriba, o captura cartas de la mesa!',
+        'playRubamazzettoBtn': 'JUGAR A RUBAMAZZETTO',
+        'briscolaDesc': '¡Consigue más de 60 puntos con ases, treses y triunfos, o juega a 5 con el compañero secreto!',
+        'playBriscolaBtn': 'JUGAR A LA BRISCOLA',
+        'tressetteDesc': '¡El rey de los juegos de bazas italianos! 3, 2, cartas de valor y el punto de la última baza para alcanzar 21 o 31 puntos.',
+        'playTressetteBtn': 'JUGAR AL TRESSETTE'
     },
     'de': {
         'chooseLanguage': 'Sprache Wählen',
@@ -520,7 +552,15 @@ const dictionary = {
         'lucasDesc': 'Vorhersagen, Stiche und Wetten mit abnehmenden Händen. Reine Präzision und Strategie!',
         'ciapanoDesc': 'Die wenigsten Punkte gewinnen! Vermeide Bildkarten (⅓ Pkt.) und Asse (1 Pkt.) oder wage die Sola!',
         'playLucasBtn': 'LUCAS SPIELEN',
-        'playCiapanoBtn': 'CIAPANÒ SPIELEN'
+        'playCiapanoBtn': 'CIAPANÒ SPIELEN',
+        'scopaDesc': 'Fegen Sie den Tisch leer! Holen Sie sich Settebello, Primiera, Münzen und die meisten Karten!',
+        'playScopaBtn': 'SCOPA SPIELEN',
+        'rubamazzettoDesc': 'Stiehl den gegnerischen Stapel mit passender Oberkarte oder nimm Karten vom Tisch!',
+        'playRubamazzettoBtn': 'RUBAMAZZETTO SPIELEN',
+        'briscolaDesc': 'Erziele über 60 Punkte mit Assen, Dreiern und Trümpfen, oder spiele zu fünft mit geheimem Partner!',
+        'playBriscolaBtn': 'BRISCOLA SPIELEN',
+        'tressetteDesc': 'Der König der traditionellen italienischen Stichspiele! 3er, 2er, Punkte und der Bonus für den letzten Stich auf 21 oder 31 Punkte.',
+        'playTressetteBtn': 'TRESSETTE SPIELEN'
     }
 };
 

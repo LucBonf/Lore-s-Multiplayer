@@ -223,6 +223,157 @@
         </div>
     </div>
 
+    <!-- Modal Regole Scopa -->
+    <div id="modal-regole-scopa" class="modal">
+        <div class="modal-content" style="max-width: 650px;">
+            <span class="close-btn" onclick="chiudiRegoleScopa()">&times;</span>
+            <h2 style="color: #27ae60; margin-top: 0; text-align: center;">📖 Regolamento: Scopa</h2>
+            <div id="rules-scopa-body" style="line-height: 1.6; font-size: 1.05rem; color: #ddd; text-align: left; max-height: 70vh; overflow-y: auto; padding-right: 8px;">
+                <p><strong>🎯 Scopo del gioco:</strong> Raggiungere per primi il limite stabilito (11 o 21 punti) catturando le carte sul banco e realizzando le Scope.</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>🃏 Valori Nominali per la Presa:</strong><br>
+                Asso (1), 2, 3, 4, 5, 6, 7, Fante (8), Cavallo (9), Re (10).</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>⚖️ Regole di Presa:</strong><br>
+                • <strong>Presa Singola Obbligatoria:</strong> Se sul tavolo c'è una carta dello stesso valore nominale di quella giocata, c'è l'obbligo di prendere la carta singola (non è permesso prendere la somma).<br>
+                • <strong>Presa per Somma:</strong> Se non c'è una carta singola di pari valore, si può prendere una combinazione di due o più carte la cui somma è uguale al valore giocato.<br>
+                • <strong>Scarto:</strong> Se non si può effettuare alcuna presa, la carta resta scoperta sul banco.</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>🧹 La Scopa (+1 punto):</strong> Se una presa lascia il banco completamente vuoto, il giocatore realizza una Scopa! (Tranne che sull'ultima presa dell'ultima mano).</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>💰 Punti di Smazzata:</strong><br>
+                • <strong>Scope:</strong> 1 punto per ogni scopa.<br>
+                • <strong>Carte:</strong> 1 punto a chi ha preso più di 20 carte.<br>
+                • <strong>Denari:</strong> 1 punto a chi ha preso più di 5 carte di Denari.<br>
+                • <strong>Settebello:</strong> 1 punto a chi prende il 7 di Denari.<br>
+                • <strong>Primiera:</strong> 1 punto a chi totalizza il punteggio più alto con le quattro carte migliori dei 4 semi (7=21, 6=18, Asso=16, 5=15, 4=14, 3=13, 2=12, Figure=10).</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Classifica Scopa ELO -->
+    <div id="modal-classifica-scopa" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-btn" onclick="chiudiClassificaScopa()">&times;</span>
+            <h2 style="color: #27ae60; margin-top: 0; text-align: center;">🏆 Classifica ELO Scopa</h2>
+            <div id="leaderboard-scopa-list" style="margin-top: 20px; font-size: 1.2rem; color: #ddd; text-align: left; line-height: 1.8;">
+                <p style="text-align: center;">Caricamento classifica in corso...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Regole Rubamazzetto -->
+    <div id="modal-regole-rubamazzetto" class="modal">
+        <div class="modal-content" style="max-width: 650px;">
+            <span class="close-btn" onclick="chiudiRegoleRubamazzetto()">&times;</span>
+            <h2 style="color: #9b59b6; margin-top: 0; text-align: center;">📖 Regolamento: Rubamazzetto</h2>
+            <div id="rules-rubamazzetto-body" style="line-height: 1.6; font-size: 1.05rem; color: #ddd; text-align: left; max-height: 70vh; overflow-y: auto; padding-right: 8px;">
+                <p><strong>🎯 Scopo del gioco:</strong> Conquistare il maggior numero di carte nel proprio mazzetto alla fine delle 40 carte.</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>🥷 Il Mazzetto e la Cima:</strong><br>
+                Ciascun giocatore impila le carte catturate davanti a sé scoperte. L'ultima carta catturata costituisce la <strong>Cima del Mazzetto</strong>, visibile a tutti!</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>👑 Meccaniche di Gioco:</strong><br>
+                1. <strong>Ruba il Mazzetto:</strong> Se cali una carta dello stesso valore della Cima del mazzetto di un avversario, <em>rubi l'intero mazzetto</em> avversario e lo metti nel tuo, posando la tua carta in cima!<br>
+                2. <strong>Presa dal Banco:</strong> Se una carta calata ha lo stesso valore (o fa la somma) di carte sul banco, le prendi e le metti nel tuo mazzetto con la carta giocata in cima.<br>
+                3. <strong>Scarto:</strong> Se non puoi rubare né prendere, la carta resta sul banco.<br>
+                4. <strong>Ultima mano:</strong> L'ultimo giocatore che ha effettuato una presa o un furto raccoglie tutte le carte rimaste sul banco!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Classifica Rubamazzetto ELO -->
+    <div id="modal-classifica-rubamazzetto" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-btn" onclick="chiudiClassificaRubamazzetto()">&times;</span>
+            <h2 style="color: #9b59b6; margin-top: 0; text-align: center;">🏆 Classifica ELO Rubamazzetto</h2>
+            <div id="leaderboard-rubamazzetto-list" style="margin-top: 20px; font-size: 1.2rem; color: #ddd; text-align: left; line-height: 1.8;">
+                <p style="text-align: center;">Caricamento classifica in corso...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Regole Briscola -->
+    <div id="modal-regole-briscola" class="modal">
+        <div class="modal-content" style="max-width: 650px;">
+            <span class="close-btn" onclick="chiudiRegoleBriscola()">&times;</span>
+            <h2 style="color: #e67e22; margin-top: 0; text-align: center;">📖 Regolamento: Briscola (Classica & Chiamata a 5)</h2>
+            <div id="rules-briscola-body" style="line-height: 1.6; font-size: 1.05rem; color: #ddd; text-align: left; max-height: 70vh; overflow-y: auto; padding-right: 8px;">
+                <p><strong>🎯 Scopo del gioco:</strong> Conquistare più di 60 punti su 120 totali catturando le carte più preziose (carichi e figure).</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>💰 Valore dei Punti:</strong><br>
+                • <strong>Asso:</strong> 11 punti<br>
+                • <strong>3:</strong> 10 punti<br>
+                • <strong>Re:</strong> 4 punti<br>
+                • <strong>Cavallo:</strong> 3 punti<br>
+                • <strong>Fante:</strong> 2 punti<br>
+                • <strong>7, 6, 5, 4, 2 (Lisce):</strong> 0 punti</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>⚔️ Regole di Presa:</strong><br>
+                • <strong>Nessun obbligo di palo:</strong> Puoi giocare liberamente qualsiasi carta dalla tua mano.<br>
+                • Se è stata giocata almeno una carta del seme di <strong>Briscola</strong>, vince la Briscola più alta.<br>
+                • Altrimenti vince la carta più alta del <strong>seme di uscita</strong> (il seme giocato dal primo di mano).<br>
+                • Gerarchia di presa: Asso &gt; 3 &gt; Re &gt; Cavallo &gt; Fante &gt; 7 &gt; 6 &gt; 5 &gt; 4 &gt; 2.</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>🃏 Briscola Classica (2 o 4 giocatori):</strong> Si parte con 3 carte a testa. La carta scoperta sotto il tallone fissa il seme di Briscola. Dopo ogni mano il vincitore pesca per primo, seguito dagli altri. L'ultima carta pescata è la Briscola scoperta!</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>👑 Briscola Chiamata (a 5 giocatori):</strong> Vengono distribuite tutte le 40 carte (8 a testa). Il Chiamante dichiara una carta (es. Asso o Tre di un seme, che diventa Briscola). Il possessore segreto della carta chiamata è il <strong>Socio</strong> e gioca in coppia con il Chiamante (2 contro 3), ma la sua identità rimane segreta finché la carta non viene giocata!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Classifica Briscola ELO -->
+    <div id="modal-classifica-briscola" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-btn" onclick="chiudiClassificaBriscola()">&times;</span>
+            <h2 style="color: #e67e22; margin-top: 0; text-align: center;">🏆 Classifica ELO Briscola</h2>
+            <div id="leaderboard-briscola-list" style="margin-top: 20px; font-size: 1.2rem; color: #ddd; text-align: left; line-height: 1.8;">
+                <p style="text-align: center;">Caricamento classifica in corso...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Regole Tressette -->
+    <div id="modal-regole-tressette" class="modal">
+        <div class="modal-content" style="max-width: 650px;">
+            <span class="close-btn" onclick="chiudiRegoleTressette()">&times;</span>
+            <h2 style="color: #3498db; margin-top: 0; text-align: center;">📖 Regolamento: Tressette</h2>
+            <div id="rules-tressette-body" style="line-height: 1.6; font-size: 1.05rem; color: #ddd; text-align: left; max-height: 70vh; overflow-y: auto; padding-right: 8px;">
+                <p><strong>🎯 Scopo del gioco:</strong> Raggiungere per primi il limite di punti (21 o 31 punti) catturando le carte di valore e l'ultima presa.</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>👑 Gerarchia di Presa:</strong><br>
+                <strong>3 &gt; 2 &gt; Asso &gt; Re &gt; Cavallo &gt; Fante &gt; 7 &gt; 6 &gt; 5 &gt; 4</strong>.<br>
+                Il Tre è la carta più forte in assoluto del palo!</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>⚠️ Obbligo di Palo (Rispondere a Seme):</strong><br>
+                Chi è di turno <strong>ha l'obbligo assoluto</strong> di giocare una carta dello stesso seme giocato dal primo di mano, se ne possiede. Se non ha carte di quel seme ("piombare"), può scartare qualsiasi altra carta.<br>
+                Non esistono briscole: vince sempre la carta più alta del seme di uscita!</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>💰 Valore dei Punti (11 punti per smazzata):</strong><br>
+                • <strong>Asso:</strong> 1 punto intero (4 assi = 4 punti)<br>
+                • <strong>3, 2, Re, Cavallo, Fante (Figure e Carichini):</strong> 1/3 di punto ciascuno (3 carte = 1 punto)<br>
+                • <strong>7, 6, 5, 4 (Lisce/Scartine):</strong> 0 punti<br>
+                • <strong>Ultima Presa:</strong> +1 punto a chi vince la decima mano!<br>
+                • I terzi di punto vengono sommati e arrotondati per difetto all'intero.</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>👥 Modalità di Gioco:</strong><br>
+                • <strong>A 4 giocatori:</strong> Si gioca a coppie incrociate (Giocatore 1 e 3 contro 2 e 4). Vengono distribuite 10 carte a ciascuno.<br>
+                • <strong>A 2 giocatori ("Spizzichino"):</strong> 10 carte a testa e tallone di 20 carte da cui si pesca una carta a testa dopo ogni mano.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Classifica Tressette ELO -->
+    <div id="modal-classifica-tressette" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-btn" onclick="chiudiClassificaTressette()">&times;</span>
+            <h2 style="color: #3498db; margin-top: 0; text-align: center;">🏆 Classifica ELO Tressette</h2>
+            <div id="leaderboard-tressette-list" style="margin-top: 20px; font-size: 1.2rem; color: #ddd; text-align: left; line-height: 1.8;">
+                <p style="text-align: center;">Caricamento classifica in corso...</p>
+            </div>
+        </div>
+    </div>
+
     <div id="game-container">
 
         <div id="game-table" style="position: relative; display: flex; justify-content: center; align-items: center;">
@@ -287,6 +438,66 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Card Scopa -->
+                    <div class="game-select-card" style="background: rgba(22, 50, 35, 0.9); border: 2px solid #27ae60; border-radius: 14px; padding: 22px; box-shadow: 0 8px 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center;">
+                        <div style="font-size: 3.2rem; margin-bottom: 8px;">🧹</div>
+                        <h2 style="color: #2ecc71; margin: 0 0 4px 0; font-size: 1.6rem;">Scopa</h2>
+                        <div style="font-size: 0.8rem; color: #27ae60; margin-bottom: 8px; font-weight: bold;">(Classica Italiana)</div>
+                        <p data-i18n="scopaDesc" style="color: #ecf0f1; font-size: 0.95rem; line-height: 1.4; margin: 0 0 15px 0; flex: 1;">Fai scopa svuotando il banco! Prendi il Settebello, fai primiera, denari e più carte per vincere!</p>
+                        <div style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
+                            <button data-i18n="playScopaBtn" onclick="selezionaGioco('scopa')" style="background: #27ae60; color: white; border: none; padding: 11px; border-radius: 6px; font-size: 1.05rem; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">GIOCA A SCOPA</button>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="apriRegoleScopa()" style="flex: 1; background: rgba(255,255,255,0.1); color: #2ecc71; border: 1px solid #2ecc71; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 0.85rem;">📜 Regole</button>
+                                <button onclick="apriClassificaScopa()" style="flex: 1; background: rgba(255,255,255,0.1); color: #27ae60; border: 1px solid #27ae60; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 0.85rem;">🏆 ELO Scopa</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card Rubamazzetto -->
+                    <div class="game-select-card" style="background: rgba(45, 25, 60, 0.9); border: 2px solid #9b59b6; border-radius: 14px; padding: 22px; box-shadow: 0 8px 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center;">
+                        <div style="font-size: 3.2rem; margin-bottom: 8px;">🥷</div>
+                        <h2 style="color: #9b59b6; margin: 0 0 4px 0; font-size: 1.6rem;">Rubamazzetto</h2>
+                        <div style="font-size: 0.8rem; color: #e056fd; margin-bottom: 8px; font-weight: bold;">(Prendi o Ruba il mazzo!)</div>
+                        <p data-i18n="rubamazzettoDesc" style="color: #ecf0f1; font-size: 0.95rem; line-height: 1.4; margin: 0 0 15px 0; flex: 1;">Ruba il mazzetto avversario se cali una carta uguale alla sua cima, o prendi dal banco!</p>
+                        <div style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
+                            <button data-i18n="playRubamazzettoBtn" onclick="selezionaGioco('rubamazzetto')" style="background: #9b59b6; color: white; border: none; padding: 11px; border-radius: 6px; font-size: 1.05rem; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">GIOCA A RUBAMAZZETTO</button>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="apriRegoleRubamazzetto()" style="flex: 1; background: rgba(255,255,255,0.1); color: #e056fd; border: 1px solid #e056fd; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 0.85rem;">📜 Regole</button>
+                                <button onclick="apriClassificaRubamazzetto()" style="flex: 1; background: rgba(255,255,255,0.1); color: #9b59b6; border: 1px solid #9b59b6; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 0.85rem;">🏆 ELO Ruba</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card Briscola -->
+                    <div class="game-select-card" style="background: rgba(50, 30, 20, 0.9); border: 2px solid #e67e22; border-radius: 14px; padding: 22px; box-shadow: 0 8px 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center;">
+                        <div style="font-size: 3.2rem; margin-bottom: 8px;">⚔️</div>
+                        <h2 style="color: #e67e22; margin: 0 0 4px 0; font-size: 1.6rem;">Briscola</h2>
+                        <div style="font-size: 0.8rem; color: #f39c12; margin-bottom: 8px; font-weight: bold;">(Classica & Chiamata a 5)</div>
+                        <p data-i18n="briscolaDesc" style="color: #ecf0f1; font-size: 0.95rem; line-height: 1.4; margin: 0 0 15px 0; flex: 1;">Fai più di 60 punti a suon di carichi (Asso, 3) e briscole, o gioca a 5 con il socio segreto!</p>
+                        <div style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
+                            <button data-i18n="playBriscolaBtn" onclick="selezionaGioco('briscola')" style="background: #e67e22; color: white; border: none; padding: 11px; border-radius: 6px; font-size: 1.05rem; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">GIOCA A BRISCOLA</button>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="apriRegoleBriscola()" style="flex: 1; background: rgba(255,255,255,0.1); color: #f39c12; border: 1px solid #f39c12; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 0.85rem;">📜 Regole</button>
+                                <button onclick="apriClassificaBriscola()" style="flex: 1; background: rgba(255,255,255,0.1); color: #e67e22; border: 1px solid #e67e22; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 0.85rem;">🏆 ELO Briscola</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card Tressette -->
+                    <div class="game-select-card" style="background: rgba(20, 35, 60, 0.9); border: 2px solid #3498db; border-radius: 14px; padding: 22px; box-shadow: 0 8px 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center;">
+                        <div style="font-size: 3.2rem; margin-bottom: 8px;">👑</div>
+                        <h2 style="color: #3498db; margin: 0 0 4px 0; font-size: 1.6rem;">Tressette</h2>
+                        <div style="font-size: 0.8rem; color: #5dade2; margin-bottom: 8px; font-weight: bold;">(Classico a 2 o a 4 giocatori)</div>
+                        <p data-i18n="tressetteDesc" style="color: #ecf0f1; font-size: 0.95rem; line-height: 1.4; margin: 0 0 15px 0; flex: 1;">Il re dei giochi tradizionali italiani! 3, 2, carichi e il punto dell'ultima presa per raggiungere 21 o 31 punti.</p>
+                        <div style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
+                            <button data-i18n="playTressetteBtn" onclick="selezionaGioco('tressette')" style="background: #2980b9; color: white; border: none; padding: 11px; border-radius: 6px; font-size: 1.05rem; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">GIOCA A TRESSETTE</button>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="apriRegoleTressette()" style="flex: 1; background: rgba(255,255,255,0.1); color: #5dade2; border: 1px solid #5dade2; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 0.85rem;">📜 Regole</button>
+                                <button onclick="apriClassificaTressette()" style="flex: 1; background: rgba(255,255,255,0.1); color: #3498db; border: 1px solid #3498db; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 0.85rem;">🏆 ELO Tressette</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div>
@@ -311,6 +522,24 @@
                         <option value="31" selected>31 Punti (Classica)</option>
                         <option value="41">41 Punti (Media)</option>
                         <option value="100">100 Punti (Lunga)</option>
+                    </select>
+                </div>
+
+                <!-- Opzioni specifiche Scopa -->
+                <div id="scopa-options-container" style="display: none; margin-bottom: 15px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(39,174,96,0.4);">
+                    <label style="color: #ddd; font-size: 0.9rem; display: block; margin-bottom: 5px; font-weight: bold;">Punteggio di Vittoria:</label>
+                    <select id="select-scopa-limite" style="padding: 8px; border-radius: 5px; border: none; font-size: 0.95rem; font-weight: bold; cursor: pointer; width: 100%; background: #fff; color: #333;">
+                        <option value="11" selected>11 Punti (Classica)</option>
+                        <option value="21">21 Punti (Lunga)</option>
+                    </select>
+                </div>
+
+                <!-- Opzioni specifiche Tressette -->
+                <div id="tressette-options-container" style="display: none; margin-bottom: 15px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(52,152,219,0.4);">
+                    <label style="color: #ddd; font-size: 0.9rem; display: block; margin-bottom: 5px; font-weight: bold;">Punteggio di Vittoria:</label>
+                    <select id="select-tressette-limite" style="padding: 8px; border-radius: 5px; border: none; font-size: 0.95rem; font-weight: bold; cursor: pointer; width: 100%; background: #fff; color: #333;">
+                        <option value="21" selected>21 Punti (Classica)</option>
+                        <option value="31">31 Punti (Lunga)</option>
                     </select>
                 </div>
 
@@ -386,6 +615,18 @@
                 
                 <div id="ciapano-scarti-bar" style="display:none; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 150; background: rgba(0,0,0,0.75); border: 1px solid #f39c12; padding: 6px 14px; border-radius: 8px; font-size: 0.9rem; color: #f1c40f; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
                     <span id="ciapano-scarti-testo">Carte Scartate: -</span>
+                </div>
+
+                <!-- Banner Briscola Chiamata a 5 -->
+                <div id="briscola-chiamata-banner" style="display:none; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 150; background: rgba(0,0,0,0.85); border: 2px solid #e67e22; padding: 6px 16px; border-radius: 8px; font-size: 0.95rem; color: #f1c40f; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                    <span id="briscola-chiamata-testo">-</span>
+                </div>
+
+                <!-- Display Tallone e Carta di Briscola -->
+                <div id="briscola-deck-container" style="display:none; position: absolute; left: calc(50% - 210px); top: 48%; transform: translateY(-50%); z-index: 95; text-align: center;">
+                    <div id="briscola-carta-scoperta" class="card" style="transform: rotate(90deg) scale(0.65); position: absolute; left: -22px; top: 12px; z-index: 1; pointer-events: none;"></div>
+                    <div id="briscola-tallone" class="card card-back" style="position: relative; z-index: 2; transform: scale(0.65); box-shadow: 3px 3px 10px rgba(0,0,0,0.7); pointer-events: none;"></div>
+                    <div id="briscola-deck-count" style="margin-top: -15px; font-size: 0.8rem; color: #f1c40f; font-weight: bold; text-shadow: 1px 1px 2px #000;">-</div>
                 </div>
 
                 <div id="info-giro">
