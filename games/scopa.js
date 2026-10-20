@@ -1,5 +1,6 @@
 // =============================================
 // SCOPA - LOGICA DI GIOCO COMPLETA (SERVER)
+// Include: Classica, Asso Piglia Tutto, Scopa Ladra, Combinata
 // =============================================
 
 const SEMI = ["Coppe", "Denari", "Bastoni", "Spade"];
@@ -116,9 +117,10 @@ class ScopaPlayer {
 }
 
 class ScopaGame {
-    constructor(numPlayers = 2, limitePunti = 11) {
-        this.numPlayers = numPlayers; // tipicamente 2 (o 4)
+    constructor(numPlayers = 2, limitePunti = 11, variante = 'classica') {
+        this.numPlayers = numPlayers; // 2 o 4
         this.limitePunti = limitePunti;
+        this.variante = variante; // 'classica', 'asso_piglia_tutto', 'scopa_ladra', 'combinata'
         this.players = Array.from({ length: numPlayers }, (_, i) => new ScopaPlayer(i, `CPU ${i}`));
         this.mazzo = [];
         this.tavolo = []; // Carte scoperte sul tavolo
@@ -126,11 +128,17 @@ class ScopaGame {
         this.turnoAttuale = 0;
         this.ultimoPresista = -1;
         this.smazzataNum = 1;
-        this.distribuzioneNum = 1; // Mani da 3 carte (1..6 a 2 giocatori)
+        this.distribuzioneNum = 1; // Mani da 3 carte (1..6 a 2 giocatori, 1..3 a 4 giocatori)
         this.fase = "gioco"; // "gioco" | "fine_smazzata" | "fine_partita"
         this.botThinking = false;
         this.matchId = null;
         this.hostNickname = null;
+    }
+
+    getCimaMazzetto(playerIdx) {
+        const p = this.players[playerIdx];
+        if (!p || p.prese.length === 0) return null;
+        return p.prese[p.prese.length - 1];
     }
 
     creaMazzo() {
@@ -187,13 +195,95 @@ class ScopaGame {
         if (!p || cartaIdx < 0 || cartaIdx >= p.mano.length) return null;
 
         const cartaGiocata = p.mano.splice(cartaIdx, 1)[0];
-        const esitoPresa = calcolaPresaScopa(cartaGiocata, this.tavolo);
+        const isLadra = (this.variante === 'scopa_ladra' || this.variante === 'combinata');
+        const isAssoPigliaTutto = (this.variante === 'asso_piglia_tutto' || this.variante === 'combinata');
 
+        // 1. In Scopa Ladra: verifica prima se ruba il mazzetto di un avversario
+        if (isLadra) {
+            for (let oppIdx = 0; oppIdx < this.numPlayers; oppIdx++) {
+                if (oppIdx === playerIdx) continue;
+                // Se a 4 giocatori, non rubare al compagno di squadra
+                if (this.numPlayers === 4 && (oppIdx % 2 === playerIdx % 2)) continue;
+
+                const opp = this.players[oppIdx];
+                if (opp.prese.length > 0) {
+                    const cima = opp.prese[opp.prese.length - 1];
+                    if (valoreNominale(cima.valore) === valoreNominale(cartaGiocata.valore)) {
+                        // Furto riuscito!
+                        const carteRubate = opp.prese.splice(0, opp.prese.length);
+                        const tutteCatturate = [...carteRubate, cartaGiocata];
+                        p.prese.push(...tutteCatturate);
+                        this.ultimoPresista = playerIdx;
+
+                        return {
+                            cartaGiocata,
+                            presa: true,
+                            tipoPresa: 'furto',
+                            rubatoAIdx: oppIdx,
+                            rubatoANome: opp.nome,
+                            cartePrese: tutteCatturate,
+                            isScopa: false
+                        };
+                    }
+                }
+            }
+        }
+
+        // 2. In Asso Piglia Tutto: se giochi un Asso
+        if (isAssoPigliaTutto && cartaGiocata.valore === 'Asso') {
+            const cAssoSulTavolo = this.tavolo.find(c => c.valore === 'Asso');
+            if (cAssoSulTavolo) {
+                // Se c'è già un asso a terra, prende solo quell'asso (regola presa singola obbligatoria)
+                const idx = this.tavolo.indexOf(cAssoSulTavolo);
+                this.tavolo.splice(idx, 1);
+                const carteCatturate = [cAssoSulTavolo, cartaGiocata];
+                p.prese.push(...carteCatturate);
+                this.ultimoPresista = playerIdx;
+
+                const isUltimaCartaAssoluta = (this.mazzo.length === 0 && this.players.every(pl => pl.mano.length === 0));
+                const isScopa = (this.tavolo.length === 0 && !isUltimaCartaAssoluta);
+                if (isScopa) p.scope++;
+
+                return {
+                    cartaGiocata,
+                    presa: true,
+                    tipoPresa: 'singola',
+                    cartePrese: carteCatturate,
+                    isScopa
+                };
+            } else if (this.tavolo.length > 0) {
+                // Prende tutto il tavolo! (Non è considerata scopa per regola tradizionale)
+                const cartePreseDalTavolo = this.tavolo.splice(0, this.tavolo.length);
+                const carteCatturate = [...cartePreseDalTavolo, cartaGiocata];
+                p.prese.push(...carteCatturate);
+                this.ultimoPresista = playerIdx;
+
+                return {
+                    cartaGiocata,
+                    presa: true,
+                    tipoPresa: 'asso_piglia_tutto',
+                    cartePrese: carteCatturate,
+                    isScopa: false
+                };
+            } else {
+                // Tavolo vuoto: l'asso resta a terra
+                this.tavolo.push(cartaGiocata);
+                return {
+                    cartaGiocata,
+                    presa: false,
+                    tipoPresa: 'nessuna',
+                    cartePrese: [],
+                    isScopa: false
+                };
+            }
+        }
+
+        // 3. Regola normale di Scopa (singola o per somma)
+        const esitoPresa = calcolaPresaScopa(cartaGiocata, this.tavolo);
         let isScopa = false;
         let carteCatturate = [];
 
         if (esitoPresa.presaPossibile) {
-            // Rimuovi dal tavolo le carte prese
             for (let cPresa of esitoPresa.cartePrese) {
                 const idx = this.tavolo.findIndex(tc => tc.valore === cPresa.valore && tc.seme === cPresa.seme);
                 if (idx !== -1) {
@@ -204,14 +294,12 @@ class ScopaGame {
             p.prese.push(...carteCatturate);
             this.ultimoPresista = playerIdx;
 
-            // Verifica Scopa: tavolo vuoto e NON è l'ultimissima carta della smazzata
             const isUltimaCartaAssoluta = (this.mazzo.length === 0 && this.players.every(pl => pl.mano.length === 0));
             if (this.tavolo.length === 0 && !isUltimaCartaAssoluta) {
                 p.scope++;
                 isScopa = true;
             }
         } else {
-            // Carta non prende: resta sul tavolo
             this.tavolo.push(cartaGiocata);
         }
 
@@ -231,16 +319,14 @@ class ScopaGame {
             return { smazzataFinita: false, nuovaManoDistribuita: false };
         }
 
-        // Se tutti hanno finito le carte della mano:
         if (this.mazzo.length > 0) {
-            // Distribuisci altre 3 carte
             this.distribuzioneNum++;
             this.distribuisciMano();
             this.turnoAttuale = (this.turnoAttuale + 1) % this.numPlayers;
             return { smazzataFinita: false, nuovaManoDistribuita: true };
         } else {
-            // Mazzo esaurito: la smazzata è terminata!
-            // L'ultimo che ha preso prende le carte rimaste sul tavolo (senza scopa)
+            // Mazzo esaurito: smazzata terminata!
+            // L'ultimo che ha fatto presa prende le carte rimaste sul tavolo (senza scopa)
             if (this.tavolo.length > 0 && this.ultimoPresista !== -1) {
                 const ultP = this.players[this.ultimoPresista];
                 if (ultP) {
@@ -253,17 +339,61 @@ class ScopaGame {
     }
 
     calcolaPunteggiSmazzata() {
-        // Punti tradizionali Scopa:
-        // 1. Scope (1 punto per scopa)
-        // 2. Carte (chi ha > 20 carte, a 2 giocatori)
-        // 3. Denari (chi ha > 5 carte di denari)
-        // 4. Settebello (chi ha il 7 di Denari)
-        // 5. Primiera
+        if (this.numPlayers === 4) {
+            // A 4 giocatori: squadre (0 e 2 contro 1 e 3)
+            const team0Prese = [...this.players[0].prese, ...this.players[2].prese];
+            const team1Prese = [...this.players[1].prese, ...this.players[3].prese];
+            const team0Scope = this.players[0].scope + this.players[2].scope;
+            const team1Scope = this.players[1].scope + this.players[3].scope;
 
+            let pSmazzata0 = team0Scope;
+            let pSmazzata1 = team1Scope;
+            const dett0 = { scope: team0Scope, carte: 0, denari: 0, settebello: 0, primiera: 0 };
+            const dett1 = { scope: team1Scope, carte: 0, denari: 0, settebello: 0, primiera: 0 };
+
+            // Carte (> 20)
+            if (team0Prese.length > team1Prese.length && team0Prese.length > 20) { pSmazzata0 += 1; dett0.carte = 1; }
+            else if (team1Prese.length > team0Prese.length && team1Prese.length > 20) { pSmazzata1 += 1; dett1.carte = 1; }
+
+            // Denari (> 5)
+            const denari0 = team0Prese.filter(c => c.seme === 'Denari').length;
+            const denari1 = team1Prese.filter(c => c.seme === 'Denari').length;
+            if (denari0 > denari1 && denari0 > 5) { pSmazzata0 += 1; dett0.denari = 1; }
+            else if (denari1 > denari0 && denari1 > 5) { pSmazzata1 += 1; dett1.denari = 1; }
+
+            // Settebello
+            const haSettebello0 = team0Prese.some(c => c.valore === '7' && c.seme === 'Denari');
+            const haSettebello1 = team1Prese.some(c => c.valore === '7' && c.seme === 'Denari');
+            if (haSettebello0) { pSmazzata0 += 1; dett0.settebello = 1; }
+            else if (haSettebello1) { pSmazzata1 += 1; dett1.settebello = 1; }
+
+            // Primiera
+            const prim0 = calcolaPrimiera(team0Prese);
+            const prim1 = calcolaPrimiera(team1Prese);
+            if (prim0.semiMancanti === 0 && prim1.semiMancanti > 0) { pSmazzata0 += 1; dett0.primiera = 1; }
+            else if (prim1.semiMancanti === 0 && prim0.semiMancanti > 0) { pSmazzata1 += 1; dett1.primiera = 1; }
+            else if (prim0.semiMancanti === prim1.semiMancanti) {
+                if (prim0.totale > prim1.totale) { pSmazzata0 += 1; dett0.primiera = 1; }
+                else if (prim1.totale > prim0.totale) { pSmazzata1 += 1; dett1.primiera = 1; }
+            }
+
+            [this.players[0], this.players[2]].forEach(p => { p.puntiSmazzata = pSmazzata0; p.puntiTotali += pSmazzata0; p.dettaglioPuntiSmazzata = dett0; });
+            [this.players[1], this.players[3]].forEach(p => { p.puntiSmazzata = pSmazzata1; p.puntiTotali += pSmazzata1; p.dettaglioPuntiSmazzata = dett1; });
+
+            const maxPunti = Math.max(this.players[0].puntiTotali, this.players[1].puntiTotali);
+            let gameOver = false;
+            let vincitoreId = -1;
+            if (maxPunti >= this.limitePunti && this.players[0].puntiTotali !== this.players[1].puntiTotali) {
+                gameOver = true;
+                vincitoreId = (this.players[0].puntiTotali > this.players[1].puntiTotali) ? this.players[0].id : this.players[1].id;
+            }
+            return { gameOver, vincitoreId, dett0, dett1, denari0, denari1, prim0, prim1 };
+        }
+
+        // A 2 giocatori (1 contro 1)
         const p0 = this.players[0];
         const p1 = this.players[1];
 
-        // 1. Scope
         p0.puntiSmazzata = p0.scope;
         p1.puntiSmazzata = p1.scope;
 
@@ -326,7 +456,6 @@ class ScopaGame {
         p0.dettaglioPuntiSmazzata = dett0;
         p1.dettaglioPuntiSmazzata = dett1;
 
-        // Verifica vittoria: qualcuno ha raggiunto o superato il limite (11 o 21 pt)
         let gameOver = false;
         let vincitoreId = -1;
 
@@ -343,46 +472,61 @@ class ScopaGame {
         const p = this.players[playerIdx];
         if (!p || p.mano.length === 0) return null;
 
-        // Valuta ogni carta in mano e assegna un punteggio euristico alla mossa
+        const isLadra = (this.variante === 'scopa_ladra' || this.variante === 'combinata');
+        const isAssoPigliaTutto = (this.variante === 'asso_piglia_tutto' || this.variante === 'combinata');
+
         let mossaMiglioreIdx = 0;
         let punteggioMigliore = -999;
 
         p.mano.forEach((carta, idx) => {
             let score = 0;
-            const esito = calcolaPresaScopa(carta, this.tavolo);
 
-            if (esito.presaPossibile) {
-                score += 10; // Fare presa è sempre positivo
-
-                // Scopa (+100 punti euristici!)
-                const tavRimanente = this.tavolo.length - esito.cartePrese.length;
-                if (tavRimanente === 0) {
-                    score += 100;
+            // Priorità 1: In Scopa Ladra, furto del mazzetto avversario!
+            if (isLadra) {
+                for (let oppIdx = 0; oppIdx < this.numPlayers; oppIdx++) {
+                    if (oppIdx === playerIdx) continue;
+                    if (this.numPlayers === 4 && (oppIdx % 2 === playerIdx % 2)) continue;
+                    const opp = this.players[oppIdx];
+                    if (opp.prese.length > 0) {
+                        const cima = opp.prese[opp.prese.length - 1];
+                        if (valoreNominale(cima.valore) === valoreNominale(carta.valore)) {
+                            score += 80 + opp.prese.length * 3;
+                            if (opp.prese.some(c => c.valore === '7' && c.seme === 'Denari')) score += 60;
+                        }
+                    }
                 }
+            }
 
-                // Settebello preso (+50)
+            // Priorità 2: In Asso Piglia Tutto, calare l'Asso se il tavolo è ricco
+            if (isAssoPigliaTutto && carta.valore === 'Asso') {
+                const haAssoATerra = this.tavolo.some(c => c.valore === 'Asso');
+                if (!haAssoATerra && this.tavolo.length > 0) {
+                    score += 40 + this.tavolo.length * 5;
+                    if (this.tavolo.some(c => c.valore === '7' && c.seme === 'Denari')) score += 70;
+                }
+            }
+
+            // Valutazione presa standard
+            const esito = calcolaPresaScopa(carta, this.tavolo);
+            if (esito.presaPossibile) {
+                score += 10;
+                const tavRimanente = this.tavolo.length - esito.cartePrese.length;
+                if (tavRimanente === 0) score += 100; // Scopa!
+
                 if (carta.valore === '7' && carta.seme === 'Denari') score += 50;
                 if (esito.cartePrese.some(c => c.valore === '7' && c.seme === 'Denari')) score += 50;
 
-                // Denari presi (+15 per ogni carta di denari)
                 if (carta.seme === 'Denari') score += 15;
                 score += esito.cartePrese.filter(c => c.seme === 'Denari').length * 15;
-
-                // Numero di carte (+5 per carta)
                 score += (esito.cartePrese.length + 1) * 5;
 
-                // Carte alte di primiera (7, 6, Asso)
                 if (['7', '6', 'Asso'].includes(carta.valore)) score += 10;
                 esito.cartePrese.forEach(c => {
                     if (['7', '6', 'Asso'].includes(c.valore)) score += 10;
                 });
             } else {
-                // Non prende: carta va sul tavolo. Penalizza lasciare carte facili da scopa
-                // Non scartare il Settebello se possibile!
                 if (carta.valore === '7' && carta.seme === 'Denari') score -= 80;
                 else if (carta.seme === 'Denari') score -= 20;
-
-                // Preferisci scartare carte con valore alto (Re=10) che sono più difficili da sommare
                 score += valoreNominale(carta.valore) * 2;
             }
 

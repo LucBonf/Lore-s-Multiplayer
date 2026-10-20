@@ -1148,8 +1148,10 @@ window.creaNuovaStanza = () => {
     const nome = userProfile ? userProfile.nickname : "Host";
     const num = document.getElementById('select-players').value;
     let limitePunti = 31;
+    let scopaVariante = 'classica';
     if (currentGameType === 'scopa') {
         limitePunti = document.getElementById('select-scopa-limite') ? parseInt(document.getElementById('select-scopa-limite').value || 11) : 11;
+        scopaVariante = document.getElementById('select-scopa-variante') ? document.getElementById('select-scopa-variante').value : 'classica';
     } else if (currentGameType === 'ciapano') {
         limitePunti = document.getElementById('select-ciapano-limite') ? parseInt(document.getElementById('select-ciapano-limite').value || 31) : 31;
     } else if (currentGameType === 'tressette') {
@@ -1162,6 +1164,7 @@ window.creaNuovaStanza = () => {
         uniqueCode: userProfile ? userProfile.uniqueCode : null,
         gameType: currentGameType,
         limitePunti: limitePunti,
+        scopaVariante: scopaVariante,
         tressetteLimite: limitePunti
     });
 };
@@ -2640,7 +2643,12 @@ socket.on('conferma_inizio_scopa', (dati) => {
     nascondiErrore();
 
     const titleEl = document.getElementById('game-title');
-    if (titleEl) titleEl.innerText = 'Scopa';
+    if (titleEl) {
+        if (dati.variante === 'asso_piglia_tutto') titleEl.innerText = 'Asso Piglia Tutto';
+        else if (dati.variante === 'scopa_ladra') titleEl.innerText = 'Scopa Ladra';
+        else if (dati.variante === 'combinata') titleEl.innerText = 'Asso Piglia Tutto & Ladra';
+        else titleEl.innerText = 'Scopa';
+    }
 
     switchSection('game-area');
 
@@ -2685,9 +2693,16 @@ socket.on('conferma_inizio_scopa', (dati) => {
 
 socket.on('mossa_scopa', (dati) => {
     if (dati.carta) sound.playCardPlay(dati.carta);
-    if (dati.scopa) {
-        const mioIndice = window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.isMe || p.socketId === socket.id);
-        const isMe = (dati.playerIdx === mioIndice);
+    const mioIndice = window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.isMe || p.socketId === socket.id);
+    const isMe = (dati.playerIdx === mioIndice);
+
+    if (dati.tipoPresa === 'furto') {
+        sound.playTrickWon(isMe);
+        mostraErrore(`🥷 FURTO! ${dati.nome} ha rubato il mazzetto di ${dati.rubatoANome}!`);
+    } else if (dati.tipoPresa === 'asso_piglia_tutto') {
+        sound.playTrickWon(isMe);
+        mostraErrore(`⚡ ASSO PIGLIA TUTTO! ${dati.nome} ha spazzato il tavolo!`);
+    } else if (dati.isScopa || dati.scopa) {
         sound.playTrickWon(isMe);
         mostraErrore(`🧹 SCOPA di ${dati.nome}!`);
     }
@@ -2750,7 +2765,11 @@ function renderGiocatoriScopa(data) {
     let mioIndice = data.tuttiGiocatori.findIndex(p => p.isMe || p.socketId === socket.id);
     if (mioIndice === -1) mioIndice = 0;
 
-    infoGiro.innerText = `Smazzata ${data.smazzataNum} | Obiettivo: ${data.limitePunti || 11} pt`;
+    let labelVariante = 'Scopa Classica';
+    if (data.variante === 'asso_piglia_tutto') labelVariante = '⚡ Asso Piglia Tutto';
+    else if (data.variante === 'scopa_ladra') labelVariante = '🥷 Scopa Ladra';
+    else if (data.variante === 'combinata') labelVariante = '🔥 Asso + Ladra';
+    infoGiro.innerText = `${labelVariante} | Smazzata ${data.smazzataNum} | Obiettivo: ${data.limitePunti || 11} pt`;
 
     const isMobile = window.innerWidth <= 768;
     const scalaPlayerBlock = isMobile ? 1 : 1;
@@ -2796,9 +2815,25 @@ function renderGiocatoriScopa(data) {
             timerHtml = `<div class="turn-timer" id="turn-timer-display" style="display: none;">30s</div>`;
         }
 
+        let cimaHtml = '';
+        if (data.variante === 'scopa_ladra' || data.variante === 'combinata') {
+            if (p.cimaMazzetto) {
+                const iconSeme = getSemeSimbolo(p.cimaMazzetto.seme);
+                cimaHtml = `
+                    <div class="cima-mazzetto-box" title="Cima del mazzetto: rubabile con carta di valore uguale!">
+                        <span class="cima-mazzetto-label">Cima:</span>
+                        <span class="cima-mazzetto-valore">${p.cimaMazzetto.valore} ${iconSeme}</span>
+                    </div>
+                `;
+            } else {
+                cimaHtml = `<div style="font-size:0.75rem; color:#888; margin-top:2px;">(Nessuna presa)</div>`;
+            }
+        }
+
         pBlock.innerHTML = `
             <div class="name">${nomeConStemma}${ruolo}</div>
-            <div class="stats"><span class="scopa-punti-badge">Punti: ${p.puntiTotali}</span> | Scope: <span class="scopa-badge">${p.scopeCount || 0}</span> | Prese: ${p.cartePreseCount || 0}</div>
+            <div class="stats"><span class="scopa-punti-badge">Punti: ${p.puntiTotali}</span> | Scope: <span class="scopa-badge">${p.scopeCount || 0}</span> | Prese: ${p.preseCount !== undefined ? p.preseCount : (p.cartePreseCount || 0)}</div>
+            ${cimaHtml}
             ${timerHtml}
         `;
 

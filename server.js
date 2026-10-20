@@ -2685,7 +2685,8 @@ io.on('connection', (socket) => {
         if (lobby.parametri?.gameType === 'scopa') {
             const limite = parseInt(lobby.parametri.limitePunti || 11);
             const numG = parseInt(lobby.parametri.numGiocatori || 2);
-            lobby.gameInstance = new ScopaGame(numG, limite);
+            const variante = lobby.parametri.scopaVariante || 'classica';
+            lobby.gameInstance = new ScopaGame(numG, limite, variante);
             inviaLobbyPubblicheTutti();
 
             lobby.gameInstance.players.forEach((p, i) => {
@@ -4404,6 +4405,7 @@ io.on('connection', (socket) => {
                 roomCode: code,
                 turnoAttuale: game.turnoAttuale,
                 fase: game.fase,
+                variante: game.variante || 'classica',
                 tavolo: game.tavolo,
                 smazzataNum: game.smazzataNum,
                 distribuzioneNum: game.distribuzioneNum,
@@ -4418,6 +4420,7 @@ io.on('connection', (socket) => {
                         isHuman: p.isHuman,
                         numCarte: p.mano.length,
                         preseCount: p.prese.length,
+                        cimaMazzetto: game.getCimaMazzetto(i),
                         scopeCount: p.scope,
                         puntiTotali: p.puntiTotali,
                         isMazziere: (i === game.indiceMazziere),

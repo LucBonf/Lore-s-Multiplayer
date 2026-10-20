@@ -241,6 +241,19 @@
                 <hr style="border-color: rgba(255,255,255,0.1);">
                 <p><strong>🧹 La Scopa (+1 punto):</strong> Se una presa lascia il banco completamente vuoto, il giocatore realizza una Scopa! (Tranne che sull'ultima presa dell'ultima mano).</p>
                 <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>⚡ Variante: Asso Piglia Tutto (Scopa d'Assi):</strong><br>
+                • Giocando un <strong>Asso</strong>, prendi <strong>tutte le carte</strong> presenti sul banco!<br>
+                • <em>Eccezione:</em> se sul banco c'è già un Asso, la regola di presa singola obbliga a prendere solo quell'Asso.<br>
+                • Prendere tutto il banco con l'Asso è una presa speciale e non conta come punto di Scopa.</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>🥷 Variante: Scopa Ladra (con Furto del Mazzetto):</strong><br>
+                • Le carte prese da ciascun giocatore formano un mazzetto con la <strong>carta in cima scoperta</strong>.<br>
+                • Se giochi una carta dello stesso valore della carta in cima al mazzetto di un avversario, <strong>rubi l'intero mazzetto avversario!</strong><br>
+                • A 4 giocatori a coppie, non puoi rubare al tuo compagno di squadra.</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+                <p><strong>🔥 Variante: Asso Piglia Tutto + Scopa Ladra (Combinata):</strong><br>
+                • Entrambe le regole speciali attive insieme: l'Asso prende tutto il banco e puoi rubare i mazzetti avversari calando carte uguali alla loro cima!</p>
+                <hr style="border-color: rgba(255,255,255,0.1);">
                 <p><strong>💰 Punti di Smazzata:</strong><br>
                 • <strong>Scope:</strong> 1 punto per ogni scopa.<br>
                 • <strong>Carte:</strong> 1 punto a chi ha preso più di 20 carte.<br>
@@ -443,7 +456,7 @@
                     <div class="game-select-card" style="background: rgba(22, 50, 35, 0.9); border: 2px solid #27ae60; border-radius: 14px; padding: 22px; box-shadow: 0 8px 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center;">
                         <div style="font-size: 3.2rem; margin-bottom: 8px;">🧹</div>
                         <h2 style="color: #2ecc71; margin: 0 0 4px 0; font-size: 1.6rem;">Scopa</h2>
-                        <div style="font-size: 0.8rem; color: #27ae60; margin-bottom: 8px; font-weight: bold;">(Classica Italiana)</div>
+                        <div style="font-size: 0.8rem; color: #27ae60; margin-bottom: 8px; font-weight: bold;">(Classica, Asso Piglia Tutto, Scopa Ladra)</div>
                         <p data-i18n="scopaDesc" style="color: #ecf0f1; font-size: 0.95rem; line-height: 1.4; margin: 0 0 15px 0; flex: 1;">Fai scopa svuotando il banco! Prendi il Settebello, fai primiera, denari e più carte per vincere!</p>
                         <div style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
                             <button data-i18n="playScopaBtn" onclick="selezionaGioco('scopa')" style="background: #27ae60; color: white; border: none; padding: 11px; border-radius: 6px; font-size: 1.05rem; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">GIOCA A SCOPA</button>
@@ -526,7 +539,14 @@
                 </div>
 
                 <!-- Opzioni specifiche Scopa -->
-                <div id="scopa-options-container" style="display: none; margin-bottom: 15px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(39,174,96,0.4);">
+                <div id="scopa-options-container" style="display: none; margin-bottom: 15px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(39,174,96,0.4); text-align: left;">
+                    <label style="color: #ddd; font-size: 0.9rem; display: block; margin-bottom: 5px; font-weight: bold;">Variante del Gioco:</label>
+                    <select id="select-scopa-variante" style="padding: 8px; border-radius: 5px; border: none; font-size: 0.95rem; font-weight: bold; cursor: pointer; width: 100%; background: #fff; color: #333; margin-bottom: 10px;">
+                        <option value="classica" selected>🃏 Scopa Classica</option>
+                        <option value="asso_piglia_tutto">⚡ Asso Piglia Tutto</option>
+                        <option value="scopa_ladra">🥷 Scopa Ladra</option>
+                        <option value="combinata">🔥 Asso Piglia Tutto + Ladra</option>
+                    </select>
                     <label style="color: #ddd; font-size: 0.9rem; display: block; margin-bottom: 5px; font-weight: bold;">Punteggio di Vittoria:</label>
                     <select id="select-scopa-limite" style="padding: 8px; border-radius: 5px; border: none; font-size: 0.95rem; font-weight: bold; cursor: pointer; width: 100%; background: #fff; color: #333;">
                         <option value="11" selected>11 Punti (Classica)</option>
