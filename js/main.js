@@ -175,8 +175,13 @@ socket.on('riconnessione_fallita', () => {
 // --- NOVITÀ: Gestione Centralizzata delle Sezioni (Resiliente) ---
 function switchSection(activeId) {
     try {
-        if (activeId === 'setup-menu' && typeof window.richiediLobbyPubbliche === 'function') {
-            window.richiediLobbyPubbliche();
+        if (activeId === 'setup-menu') {
+            if (typeof window.aggiornaRenderingLobbyPubbliche === 'function') {
+                window.aggiornaRenderingLobbyPubbliche();
+            }
+            if (typeof window.richiediLobbyPubbliche === 'function') {
+                window.richiediLobbyPubbliche();
+            }
         }
         const sections = ['login-menu', 'game-select', 'setup-menu', 'lobby-wait', 'game-area', 'classifica-finale-container'];
         sections.forEach(id => {
@@ -1322,22 +1327,67 @@ window.tornaAllaLobby = () => {
     socket.emit('torna_in_lobby');
 };
 
-socket.on('lista_lobby_pubbliche', (list) => {
+window.ultimeLobbyPubbliche = [];
+
+window.aggiornaRenderingLobbyPubbliche = () => {
     const container = document.getElementById('public-lobbies-container');
     const listEl = document.getElementById('public-lobbies-list');
     if (!container || !listEl) return;
 
-    if (!list || list.length === 0) {
+    const gameCorrente = (typeof currentGameType !== 'undefined' && currentGameType) ? currentGameType : 'lucas';
+    const lista = Array.isArray(window.ultimeLobbyPubbliche) ? window.ultimeLobbyPubbliche : [];
+
+    // Mostra SOLO ed ESCLUSIVAMENTE le lobby del gioco attualmente selezionato
+    const filtrate = lista.filter(l => (l.gameType || 'lucas') === gameCorrente);
+
+    if (filtrate.length === 0) {
         container.style.display = 'none';
         listEl.innerHTML = '';
         return;
     }
 
     container.style.display = 'block';
-    listEl.innerHTML = list.map(l => {
-        const badgeColor = l.gameType === 'ciapano' ? '#e74c3c' : (l.gameType === 'scopa' ? '#27ae60' : (l.gameType === 'rubamazzetto' ? '#9b59b6' : (l.gameType === 'briscola' ? '#e67e22' : (l.gameType === 'tressette' ? '#3498db' : '#f1c40f'))));
-        const badgeText = l.gameType === 'ciapano' ? 'Ciapanò' : (l.gameType === 'scopa' ? 'Scopa' : (l.gameType === 'rubamazzetto' ? 'Rubamazzetto' : (l.gameType === 'briscola' ? 'Briscola' : (l.gameType === 'tressette' ? 'Tressette' : 'Lucas'))));
-        const badgeTextColor = (l.gameType === 'ciapano' || l.gameType === 'scopa' || l.gameType === 'rubamazzetto' || l.gameType === 'briscola' || l.gameType === 'tressette') ? 'white' : '#111';
+
+    const headerTitleEl = document.getElementById('public-lobbies-header-title');
+    const nomeGioco = gameCorrente === 'ciapano' ? 'Ciapanò' :
+                      (gameCorrente === 'scopa' ? 'Scopa' :
+                      (gameCorrente === 'rubamazzetto' ? 'Rubamazzetto' :
+                      (gameCorrente === 'briscola' ? 'Briscola' :
+                      (gameCorrente === 'tressette' ? 'Tressette' : 'Lucas'))));
+    if (headerTitleEl) {
+        headerTitleEl.innerText = `🌐 Partite Pubbliche (${nomeGioco})`;
+    }
+
+    listEl.innerHTML = filtrate.map(l => {
+        let badgeColor = '#f1c40f';
+        let badgeText = 'Lucas';
+        let badgeTextColor = '#111';
+
+        if (l.gameType === 'ciapano') {
+            badgeColor = '#e74c3c';
+            badgeText = 'Ciapanò';
+            badgeTextColor = 'white';
+        } else if (l.gameType === 'scopa') {
+            badgeColor = '#27ae60';
+            badgeTextColor = 'white';
+            if (l.scopaVariante === 'asso_piglia_tutto') badgeText = 'Asso Piglia Tutto';
+            else if (l.scopaVariante === 'scopa_ladra') badgeText = 'Scopa Ladra';
+            else if (l.scopaVariante === 'combinata') badgeText = 'Asso + Ladra';
+            else badgeText = 'Scopa Classica';
+        } else if (l.gameType === 'rubamazzetto') {
+            badgeColor = '#9b59b6';
+            badgeText = 'Rubamazzetto';
+            badgeTextColor = 'white';
+        } else if (l.gameType === 'briscola') {
+            badgeColor = '#e67e22';
+            badgeText = 'Briscola';
+            badgeTextColor = 'white';
+        } else if (l.gameType === 'tressette') {
+            badgeColor = '#3498db';
+            badgeText = 'Tressette';
+            badgeTextColor = 'white';
+        }
+
         return `
         <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; margin-bottom: 4px;">
             <div style="display: flex; align-items: center;">
@@ -1349,6 +1399,11 @@ socket.on('lista_lobby_pubbliche', (list) => {
         </div>
     `;
     }).join('');
+};
+
+socket.on('lista_lobby_pubbliche', (list) => {
+    window.ultimeLobbyPubbliche = Array.isArray(list) ? list : [];
+    window.aggiornaRenderingLobbyPubbliche();
 });
 
 socket.on('conferma_inizio_partita', (dati) => {
@@ -1969,6 +2024,9 @@ window.selezionaGioco = (tipo) => {
     }
 
     switchSection('setup-menu');
+    if (typeof window.aggiornaRenderingLobbyPubbliche === 'function') {
+        window.aggiornaRenderingLobbyPubbliche();
+    }
 };
 
 window.tornaASelezioneGioco = () => {

@@ -1883,7 +1883,7 @@ function inviaAggiornamentoLobby(code) {
     });
 }
 
-function inviaLobbyPubblicheTutti() {
+function ottieniListaLobbyPubbliche() {
     const publicLobbies = [];
     for (const code in lobbies) {
         const l = lobbies[code];
@@ -1895,12 +1895,17 @@ function inviaLobbyPubblicheTutti() {
                 hostName: hostName,
                 stemma: hostPlayer ? ottieniStemma(hostPlayer.uniqueCode, hostPlayer.nome) : null,
                 playersCount: l.giocatori.length,
-                maxPlayers: parseInt(l.parametri.numGiocatori),
-                gameType: l.parametri?.gameType || 'lucas'
+                maxPlayers: parseInt(l.parametri?.numGiocatori || 4),
+                gameType: l.parametri?.gameType || 'lucas',
+                scopaVariante: l.parametri?.scopaVariante || null
             });
         }
     }
-    io.emit('lista_lobby_pubbliche', publicLobbies);
+    return publicLobbies;
+}
+
+function inviaLobbyPubblicheTutti() {
+    io.emit('lista_lobby_pubbliche', ottieniListaLobbyPubbliche());
 }
 
 let umaniConnessi = 0;
@@ -2299,22 +2304,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('richiedi_lobby_pubbliche', () => {
-        const publicLobbies = [];
-        for (const code in lobbies) {
-            const l = lobbies[code];
-            if (l.pubblica && !l.gameInstance && l.giocatori.length > 0) {
-                const hostPlayer = l.giocatori.find(p => p.id === l.host);
-                const hostName = hostPlayer ? hostPlayer.nome : "Sconosciuto";
-                publicLobbies.push({
-                    code: code,
-                    hostName: hostName,
-                    stemma: hostPlayer ? ottieniStemma(hostPlayer.uniqueCode, hostPlayer.nome) : null,
-                    playersCount: l.giocatori.length,
-                    maxPlayers: parseInt(l.parametri.numGiocatori)
-                });
-            }
-        }
-        socket.emit('lista_lobby_pubbliche', publicLobbies);
+        socket.emit('lista_lobby_pubbliche', ottieniListaLobbyPubbliche());
     });
 
     socket.on('torna_in_lobby', () => {
