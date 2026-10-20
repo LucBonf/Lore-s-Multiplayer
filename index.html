@@ -385,6 +385,31 @@
                 <p style="text-align: center;">Caricamento classifica in corso...</p>
             </div>
         </div>
+    <!-- Modal Info e Presentazione Lucas & Piattaforma -->
+    <div id="modal-info-seo" class="modal">
+        <div class="modal-content" style="max-width: 720px; text-align: left;">
+            <span class="close-btn" onclick="chiudiModalInfoSeo()">&times;</span>
+            <h2 style="color: #f1c40f; margin-top: 0; text-align: center;">ℹ️ Lucas Card Games & Piattaforma</h2>
+            <div style="line-height: 1.7; font-size: 1rem; color: #ddd; max-height: 70vh; overflow-y: auto; padding-right: 8px;">
+                <h3 style="color: #f1c40f; margin-bottom: 6px;">Cos'è Lucas?</h3>
+                <p>Lucas è un innovativo gioco di carte online basato su un sistema di prese e dichiarazioni. Sfida giocatori da tutto il mondo o metti alla prova le tue abilità contro l'intelligenza artificiale avanzata. Include inoltre una vasta suite di giochi tradizionali italiani: <strong>Ciapanò (Traversone)</strong>, <strong>Scopa (Classica, Asso Piglia Tutto, Scopa Ladra, Combinata)</strong>, <strong>Rubamazzetto</strong>, <strong>Briscola (Classica e Chiamata)</strong> e <strong>Tressette</strong>.</p>
+                
+                <h3 style="color: #f1c40f; margin-top: 20px; margin-bottom: 6px;">🔒 Privacy & Termini Legali</h3>
+                <p>La tua privacy e la sicurezza dei tuoi dati sono prioritari. Puoi consultare i documenti completi qui:</p>
+                <div style="display: flex; gap: 15px; margin: 15px 0; flex-wrap: wrap;">
+                    <a href="privacy.html" target="_blank" style="background: rgba(46, 204, 113, 0.2); border: 1px solid #2ecc71; color: #2ecc71; padding: 6px 14px; border-radius: 6px; text-decoration: none; font-weight: bold;">🔒 Privacy Policy</a>
+                    <a href="terms.html" target="_blank" style="background: rgba(52, 152, 219, 0.2); border: 1px solid #3498db; color: #3498db; padding: 6px 14px; border-radius: 6px; text-decoration: none; font-weight: bold;">📜 Termini di Servizio</a>
+                    <a href="mailto:support@lucas-game.onrender.com" style="background: rgba(243, 156, 18, 0.2); border: 1px solid #f39c12; color: #f39c12; padding: 6px 14px; border-radius: 6px; text-decoration: none; font-weight: bold;">✉️ Contatta il Supporto</a>
+                </div>
+
+                <h3 style="color: #f1c40f; margin-top: 20px; margin-bottom: 6px;">Regolamento Rapido di Lucas</h3>
+                <p><strong>1. Mazzo e Giocatori:</strong> 40 carte napoletane con mani decrescenti.<br>
+                <strong>2. Gerarchia dei Semi:</strong> Denari &gt; Spade &gt; Coppe &gt; Bastoni.<br>
+                <strong>3. Forza Carte:</strong> Asso, 3, Re, Cavallo, Fante, 7, 6, 5, 4, 2.<br>
+                <strong>4. Dichiarazione:</strong> Ognuno prevede quante prese farà; vincolo del mazziere attivo.<br>
+                <strong>5. Bonus:</strong> +8 pt per dichiarazione esatta, +1 pt per presa fatta.</p>
+            </div>
+        </div>
     </div>
 
     <div id="game-container">
@@ -398,10 +423,40 @@
                 <button data-i18n="rulesBtn" id="btn-regole" class="header-btn" onclick="apriRegole()">📜 Regole</button>
             </div>
 
-            <div class="top-controls right">
+            <div class="top-controls right" style="align-items: center;">
                 <button data-i18n="replaysBtn" id="btn-replays" class="header-btn" onclick="apriReplays()" style="display:none;">🎬 Replay</button>
                 <button data-i18n="leaderboardBtn" id="btn-leaderboard" class="header-btn" onclick="apriClassifica()">🏆 Classifica</button>
                 <button data-i18n="exitBtn" id="btn-esci-principale" class="header-btn" onclick="esciDallaPartita()" style="display:none;">🚪 ESCI</button>
+                
+                <!-- Menu a Tendina Info, Privacy & Termini -->
+                <div id="legal-dropdown-container" style="position: relative; display: inline-block;">
+                    <button id="btn-legal-menu" class="header-btn" onclick="toggleLegalMenu(event)" title="Info, Privacy e Termini" style="display: flex; align-items: center; gap: 6px; background: rgba(44, 62, 80, 0.9); border-color: rgba(241, 196, 15, 0.7); color: #f1c40f;">
+                        <span>⚖️ Info</span>
+                        <span style="font-size: 0.75rem;">▼</span>
+                    </button>
+                    <div id="legal-dropdown-menu" style="display: none; position: absolute; right: 0; top: calc(100% + 8px); background: rgba(18, 24, 32, 0.98); backdrop-filter: blur(12px); border: 1px solid rgba(241, 196, 15, 0.4); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.85); min-width: 220px; z-index: 3000; padding: 6px 0; text-align: left;">
+                        <a href="privacy.html" target="_blank" class="legal-dropdown-item" style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #ecf0f1; text-decoration: none; font-size: 0.95rem;">
+                            <span>🔒</span>
+                            <span>Privacy Policy</span>
+                        </a>
+                        <a href="terms.html" target="_blank" class="legal-dropdown-item" style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #ecf0f1; text-decoration: none; font-size: 0.95rem;">
+                            <span>📜</span>
+                            <span>Termini di Servizio</span>
+                        </a>
+                        <a href="mailto:support@lucas-game.onrender.com" class="legal-dropdown-item" style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #ecf0f1; text-decoration: none; font-size: 0.95rem;">
+                            <span>✉️</span>
+                            <span>Contatti & Supporto</span>
+                        </a>
+                        <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 6px 0;"></div>
+                        <button onclick="apriModalInfoSeo()" class="legal-dropdown-item" style="width: 100%; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #f1c40f; font-size: 0.95rem; font-weight: bold; font-family: inherit;">
+                            <span>📖</span>
+                            <span>Cos'è Lucas & Dettagli</span>
+                        </button>
+                        <div style="padding: 6px 16px; font-size: 0.75rem; color: #888; text-align: center;">
+                            © 2026 Lucas Game
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- MENU DI LOGIN (Nascosto di default) -->
@@ -418,7 +473,7 @@
             </div>
 
             <!-- SELEZIONE DEL GIOCO (Mostrato dopo il Login) -->
-            <div id="game-select" style="display: none; text-align: center; width: 100%; max-width: 620px; z-index: 2500; padding: 15px;">
+            <div id="game-select" style="display: none; text-align: center; width: 100%; max-width: 650px; max-height: 84vh; overflow-y: auto; overflow-x: hidden; z-index: 2500; padding: 15px; scrollbar-width: thin; scrollbar-color: #f1c40f rgba(0,0,0,0.3);">
                 <div id="game-select-welcome" style="color: #f1c40f; font-size: 1.4rem; font-weight: bold; margin-bottom: 6px; text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">Benvenuto!</div>
                 <p data-i18n="selectGameSubtitle" style="color: #ddd; margin-top: 0; margin-bottom: 22px; font-size: 1.05rem;">Scegli il gioco a cui vuoi partecipare:</p>
 
@@ -678,8 +733,8 @@
         </div>
     </div>
 
-    <!-- SEZIONE CONTENUTI PER ADSENSE E SEO -->
-    <div id="seo-content-container">
+    <!-- SEZIONE CONTENUTI PER ADSENSE E SEO (Accessibile anche da Menu Info & Legal) -->
+    <div id="seo-content-container" style="display: none;">
         <article class="content-section">
             <header>
                 <h1>Lucas: Il Gioco di Carte Strategico Multiplayer</h1>

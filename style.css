@@ -1211,6 +1211,42 @@ button {
 }
 
 /* ========================================= */
+/* STILI MENU A TENDINA INFO & PRIVACY       */
+/* ========================================= */
+.legal-dropdown-item {
+    transition: background 0.2s, color 0.2s;
+}
+
+.legal-dropdown-item:hover {
+    background: rgba(241, 196, 15, 0.15) !important;
+    color: #f1c40f !important;
+}
+
+#legal-dropdown-menu a:hover {
+    background: rgba(241, 196, 15, 0.15) !important;
+    color: #f1c40f !important;
+}
+
+/* SCROLLBAR PULITA PER SELEZIONE GIOCO */
+#game-select::-webkit-scrollbar {
+    width: 6px;
+}
+
+#game-select::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+}
+
+#game-select::-webkit-scrollbar-thumb {
+    background: #f1c40f;
+    border-radius: 6px;
+}
+
+#game-select::-webkit-scrollbar-thumb:hover {
+    background: #e67e22;
+}
+
+/* ========================================= */
 /* STILI CHAT DI GRUPPO (Glassmorphism)      */
 /* ========================================= */
 #chat-wrapper {

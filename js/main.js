@@ -169,7 +169,7 @@ socket.on('connect', () => {
 
 socket.on('riconnessione_fallita', () => {
     sessionStorage.removeItem('lucas_room');
-    switchSection('setup-menu');
+    switchSection('game-select');
 });
 
 // --- NOVITÀ: Gestione Centralizzata delle Sezioni (Resiliente) ---
@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- SICUREZZA TOTALE (SELF-HEALING): SE DOPO 3 SECONDI IL TAVOLO È ANCORA VUOTO, FORZA ---
         setTimeout(() => {
-            const sections = ['game-area', 'lobby-wait', 'setup-menu', 'login-menu'];
+            const sections = ['login-menu', 'game-select', 'setup-menu', 'lobby-wait', 'game-area', 'classifica-finale-container'];
             const isAnythingVisible = sections.some(id => {
                 const el = document.getElementById(id);
                 return el && el.style.display !== 'none';
@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!isAnythingVisible) {
                 console.warn("Rilevato stato 'Empty Table'. Tentativo di ripristino UI...");
                 if (savedUser) {
-                    switchSection('setup-menu');
+                    switchSection('game-select');
                 } else {
                     switchSection('login-menu');
                 }
@@ -1216,8 +1216,8 @@ window.esciDallaPartita = () => {
     sessionStorage.removeItem('lucas_room');
     voiceManager.leaveVoice();
     socket.emit('esci_partita');
-    // Torniamo alla schermata di setup
-    window.switchSection('setup-menu');
+    // Torniamo alla schermata di selezione gioco
+    window.switchSection('game-select');
     // Pulizia chat
     const chatMsgs = document.getElementById('chat-messages');
     if (chatMsgs) chatMsgs.innerHTML = '';
@@ -3904,3 +3904,35 @@ function renderTuaManoTressette(handCont, mano, isMyTurn, tavolo) {
         handCont.appendChild(div);
     });
 }
+
+// =============================================
+// MENU A TENDINA: INFO, PRIVACY & TERMINI
+// =============================================
+window.toggleLegalMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('legal-dropdown-menu');
+    if (menu) {
+        const isHidden = (menu.style.display === 'none' || !menu.style.display);
+        menu.style.display = isHidden ? 'block' : 'none';
+    }
+};
+
+window.apriModalInfoSeo = () => {
+    const menu = document.getElementById('legal-dropdown-menu');
+    if (menu) menu.style.display = 'none';
+    const modal = document.getElementById('modal-info-seo');
+    if (modal) modal.style.display = 'block';
+};
+
+window.chiudiModalInfoSeo = () => {
+    const modal = document.getElementById('modal-info-seo');
+    if (modal) modal.style.display = 'none';
+};
+
+document.addEventListener('click', (e) => {
+    const container = document.getElementById('legal-dropdown-container');
+    const menu = document.getElementById('legal-dropdown-menu');
+    if (container && menu && !container.contains(e.target)) {
+        menu.style.display = 'none';
+    }
+});
