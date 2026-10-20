@@ -1240,14 +1240,7 @@ socket.on('lobby_creata', (d) => {
     if (d.gameType) {
         currentGameType = d.gameType;
         const titleEl = document.getElementById('game-title');
-        if (titleEl) {
-            if (currentGameType === 'ciapano') titleEl.innerText = 'Ciapanò';
-            else if (currentGameType === 'scopa') titleEl.innerText = 'Scopa';
-            else if (currentGameType === 'rubamazzetto') titleEl.innerText = 'Rubamazzetto';
-            else if (currentGameType === 'briscola') titleEl.innerText = 'Briscola';
-            else if (currentGameType === 'tressette') titleEl.innerText = 'Tressette';
-            else titleEl.innerText = 'Lucas';
-        }
+        if (titleEl) titleEl.innerText = 'Lucas';
     }
     
     // Mostriamo il tasto avvia partita solo se siamo il creatore/host
@@ -1274,14 +1267,7 @@ socket.on('aggiorna_lobby', (dati) => {
     if (dati.gameType) {
         currentGameType = dati.gameType;
         const titleEl = document.getElementById('game-title');
-        if (titleEl) {
-            if (currentGameType === 'ciapano') titleEl.innerText = 'Ciapanò';
-            else if (currentGameType === 'scopa') titleEl.innerText = 'Scopa';
-            else if (currentGameType === 'rubamazzetto') titleEl.innerText = 'Rubamazzetto';
-            else if (currentGameType === 'briscola') titleEl.innerText = 'Briscola';
-            else if (currentGameType === 'tressette') titleEl.innerText = 'Tressette';
-            else titleEl.innerText = 'Lucas';
-        }
+        if (titleEl) titleEl.innerText = 'Lucas';
     }
 
     // Mostriamo il codice stanza all'amico e la lista aggiornata
@@ -1915,7 +1901,6 @@ window.selezionaGioco = (tipo) => {
     };
 
     if (tipo === 'ciapano') {
-        if (titleEl) titleEl.innerText = 'Ciapanò';
         if (badgeEl) {
             badgeEl.innerText = 'Gioco: Ciapanò (Traversone)';
             badgeEl.style.borderColor = '#e74c3c';
@@ -1927,7 +1912,6 @@ window.selezionaGioco = (tipo) => {
         if (tressetteOpts) tressetteOpts.style.display = 'none';
         impostaOpzioniGiocatori([2, 3, 4, 5, 6, 7, 8], 4);
     } else if (tipo === 'scopa') {
-        if (titleEl) titleEl.innerText = 'Scopa';
         if (badgeEl) {
             badgeEl.innerText = 'Gioco: Scopa';
             badgeEl.style.borderColor = '#27ae60';
@@ -1939,7 +1923,6 @@ window.selezionaGioco = (tipo) => {
         if (tressetteOpts) tressetteOpts.style.display = 'none';
         impostaOpzioniGiocatori([2, 4], 2);
     } else if (tipo === 'rubamazzetto') {
-        if (titleEl) titleEl.innerText = 'Rubamazzetto';
         if (badgeEl) {
             badgeEl.innerText = 'Gioco: Rubamazzetto';
             badgeEl.style.borderColor = '#9b59b6';
@@ -1951,7 +1934,6 @@ window.selezionaGioco = (tipo) => {
         if (tressetteOpts) tressetteOpts.style.display = 'none';
         impostaOpzioniGiocatori([2, 3, 4], 2);
     } else if (tipo === 'briscola') {
-        if (titleEl) titleEl.innerText = 'Briscola';
         if (badgeEl) {
             badgeEl.innerText = 'Gioco: Briscola';
             badgeEl.style.borderColor = '#d35400';
@@ -1963,7 +1945,6 @@ window.selezionaGioco = (tipo) => {
         if (tressetteOpts) tressetteOpts.style.display = 'none';
         impostaOpzioniGiocatori([2, 4, 5], 2);
     } else if (tipo === 'tressette') {
-        if (titleEl) titleEl.innerText = 'Tressette';
         if (badgeEl) {
             badgeEl.innerText = 'Gioco: Tressette';
             badgeEl.style.borderColor = '#2980b9';
@@ -1975,7 +1956,6 @@ window.selezionaGioco = (tipo) => {
         if (tressetteOpts) tressetteOpts.style.display = 'block';
         impostaOpzioniGiocatori([2, 4], 4);
     } else {
-        if (titleEl) titleEl.innerText = 'Lucas';
         if (badgeEl) {
             badgeEl.innerText = 'Gioco: Lucas';
             badgeEl.style.borderColor = '#f1c40f';
@@ -2262,7 +2242,7 @@ socket.on('conferma_inizio_ciapano', (dati) => {
     nascondiErrore();
 
     const titleEl = document.getElementById('game-title');
-    if (titleEl) titleEl.innerText = 'Ciapanò';
+    if (titleEl) titleEl.innerText = 'Lucas';
 
     switchSection('game-area');
 
@@ -2584,7 +2564,10 @@ function renderTuaManoCiapano(handCont, mano, isMyTurn, tavolo) {
         div.onclick = () => {
             if (isMyTurn && canPlay && !isReplayMode) {
                 if (haSemeUscita && c.seme !== semeUscita) {
-                    mostraErrore(`Devi rispondere al seme di uscita (${semeUscita})!`);
+                    const lang = localStorage.getItem('lucas_lang') || 'it';
+                    const d = dictionary[lang] || dictionary['it'];
+                    const template = d.alertMustFollowSuit || "Devi rispondere al seme di uscita ({suit})!";
+                    mostraErrore(template.replace('{suit}', semeUscita));
                     return;
                 }
                 nascondiErrore();
@@ -2643,12 +2626,7 @@ socket.on('conferma_inizio_scopa', (dati) => {
     nascondiErrore();
 
     const titleEl = document.getElementById('game-title');
-    if (titleEl) {
-        if (dati.variante === 'asso_piglia_tutto') titleEl.innerText = 'Asso Piglia Tutto';
-        else if (dati.variante === 'scopa_ladra') titleEl.innerText = 'Scopa Ladra';
-        else if (dati.variante === 'combinata') titleEl.innerText = 'Asso Piglia Tutto & Ladra';
-        else titleEl.innerText = 'Scopa';
-    }
+    if (titleEl) titleEl.innerText = 'Lucas';
 
     switchSection('game-area');
 
@@ -2695,16 +2673,21 @@ socket.on('mossa_scopa', (dati) => {
     if (dati.carta) sound.playCardPlay(dati.carta);
     const mioIndice = window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.isMe || p.socketId === socket.id);
     const isMe = (dati.playerIdx === mioIndice);
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const d = dictionary[lang] || dictionary['it'];
 
     if (dati.tipoPresa === 'furto') {
         sound.playTrickWon(isMe);
-        mostraErrore(`🥷 FURTO! ${dati.nome} ha rubato il mazzetto di ${dati.rubatoANome}!`);
+        const template = d.alertFurto || "🥷 FURTO! {name} ha rubato il mazzetto di {victim}!";
+        mostraErrore(template.replace('{name}', dati.nome).replace('{victim}', dati.rubatoANome || 'avversario'));
     } else if (dati.tipoPresa === 'asso_piglia_tutto') {
         sound.playTrickWon(isMe);
-        mostraErrore(`⚡ ASSO PIGLIA TUTTO! ${dati.nome} ha spazzato il tavolo!`);
+        const template = d.alertAssoPigliaTutto || "⚡ ASSO PIGLIA TUTTO! {name} ha spazzato il tavolo!";
+        mostraErrore(template.replace('{name}', dati.nome));
     } else if (dati.isScopa || dati.scopa) {
         sound.playTrickWon(isMe);
-        mostraErrore(`🧹 SCOPA di ${dati.nome}!`);
+        const template = d.alertScopa || "🧹 SCOPA di {name}!";
+        mostraErrore(template.replace('{name}', dati.nome));
     }
 });
 
@@ -2922,7 +2905,7 @@ socket.on('conferma_inizio_rubamazzetto', (dati) => {
     nascondiErrore();
 
     const titleEl = document.getElementById('game-title');
-    if (titleEl) titleEl.innerText = 'Rubamazzetto';
+    if (titleEl) titleEl.innerText = 'Lucas';
 
     switchSection('game-area');
 
@@ -2967,12 +2950,15 @@ socket.on('conferma_inizio_rubamazzetto', (dati) => {
 
 socket.on('mossa_rubamazzetto', (dati) => {
     if (dati.carta) sound.playCardPlay(dati.carta);
-    if (dati.tipo === 'furto') {
+    if (dati.tipo === 'furto' || dati.tipoPresa === 'furto') {
         const mioIndice = window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.isMe || p.socketId === socket.id);
         const isMe = (dati.playerIdx === mioIndice);
         sound.playTrickWon(isMe);
-        const rubatoANome = dati.rubatoA?.nome || 'avversario';
-        mostraErrore(`🥷 FURTO! ${dati.nome} ha rubato il mazzetto di ${rubatoANome}!`);
+        const rubatoANome = dati.rubatoANome || dati.rubatoA?.nome || 'avversario';
+        const lang = localStorage.getItem('lucas_lang') || 'it';
+        const d = dictionary[lang] || dictionary['it'];
+        const template = d.alertFurto || "🥷 FURTO! {name} ha rubato il mazzetto di {victim}!";
+        mostraErrore(template.replace('{name}', dati.nome).replace('{victim}', rubatoANome));
     }
 });
 
@@ -3170,11 +3156,7 @@ socket.on('conferma_inizio_briscola', (dati) => {
     nascondiErrore();
 
     const titleEl = document.getElementById('game-title');
-    if (titleEl) {
-        titleEl.innerText = (dati.variante === 'chiamata' || (dati.tuttiGiocatori && dati.tuttiGiocatori.length === 5))
-            ? 'Briscola Chiamata (a 5)'
-            : 'Briscola';
-    }
+    if (titleEl) titleEl.innerText = 'Lucas';
 
     switchSection('game-area');
 
@@ -3567,9 +3549,7 @@ socket.on('conferma_inizio_tressette', (dati) => {
     nascondiErrore();
 
     const titleEl = document.getElementById('game-title');
-    if (titleEl) {
-        titleEl.innerText = (dati.numPlayers === 4) ? 'Tressette (a 4)' : 'Tressette (a 2)';
-    }
+    if (titleEl) titleEl.innerText = 'Lucas';
 
     switchSection('game-area');
 
@@ -3892,7 +3872,10 @@ function renderTuaManoTressette(handCont, mano, isMyTurn, tavolo) {
         div.onclick = () => {
             if (isMyTurn && canPlay && !isReplayMode) {
                 if (haSemeUscita && c.seme !== semeUscita) {
-                    mostraErrore(`Devi rispondere al seme di uscita (${semeUscita})!`);
+                    const lang = localStorage.getItem('lucas_lang') || 'it';
+                    const d = dictionary[lang] || dictionary['it'];
+                    const template = d.alertMustFollowSuit || "Devi rispondere al seme di uscita ({suit})!";
+                    mostraErrore(template.replace('{suit}', semeUscita));
                     return;
                 }
                 nascondiErrore();
