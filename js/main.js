@@ -178,7 +178,7 @@ function switchSection(activeId) {
         if (activeId === 'setup-menu' && typeof window.richiediLobbyPubbliche === 'function') {
             window.richiediLobbyPubbliche();
         }
-        const sections = ['login-menu', 'setup-menu', 'lobby-wait', 'game-area', 'classifica-finale-container'];
+        const sections = ['login-menu', 'game-select', 'setup-menu', 'lobby-wait', 'game-area', 'classifica-finale-container'];
         sections.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
@@ -200,10 +200,10 @@ function switchSection(activeId) {
             btnEsci.style.display = isGame ? 'inline-block' : 'none';
         }
 
-        // Gestione tasto Replay: visibile solo nel menu setup (dopo login)
+        // Gestione tasto Replay: visibile solo nel menu setup (dopo login) e solo per Lucas
         const btnReplays = document.getElementById('btn-replays');
         if (btnReplays) {
-            btnReplays.style.display = (activeId === 'setup-menu') ? 'inline-block' : 'none';
+            btnReplays.style.display = (activeId === 'setup-menu' && currentGameType === 'lucas') ? 'inline-block' : 'none';
         }
 
 
@@ -214,7 +214,7 @@ function switchSection(activeId) {
     // Gestione visibilità selettore lingua
     const langSelector = document.getElementById('language-selector-container');
     if (langSelector) {
-        const showLang = ['login-menu', 'setup-menu', 'lobby-wait'].includes(activeId);
+        const showLang = ['login-menu', 'game-select', 'setup-menu', 'lobby-wait'].includes(activeId);
         langSelector.style.display = showLang ? 'block' : 'none';
     }
 
@@ -351,14 +351,20 @@ let userProfile = null;
 
 function aggiornaWelcomeMessage() {
     const welcome = document.getElementById('welcome-message');
-    if (welcome && userProfile) {
+    const selectWelcome = document.getElementById('game-select-welcome');
+    if (userProfile) {
         const lang = localStorage.getItem('lucas_lang') || 'it';
         const d = dictionary[lang];
         const nomeConStemma = renderNomeConStemma(userProfile.nickname, userProfile.stemma);
-        welcome.innerHTML = `
-            ${d.welcome} ${nomeConStemma}! 
-            <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">${d.wins}: ${userProfile.partiteVinte} | ${d.pts}: ${userProfile.punteggioTotale}</div>
-        `;
+        if (welcome) {
+            welcome.innerHTML = `
+                ${d.welcome} ${nomeConStemma}! 
+                <div style="font-size:0.9rem; margin-top:5px; color:#ddd;">${d.wins}: ${userProfile.partiteVinte} | ELO Lucas: ${userProfile.elo || 1000} | ELO Ciapanò: ${userProfile.eloCiapano || 1000}</div>
+            `;
+        }
+        if (selectWelcome) {
+            selectWelcome.innerHTML = `${d.welcome} ${nomeConStemma}!`;
+        }
     }
 }
 
@@ -399,12 +405,12 @@ socket.on('login_ok', (profile) => {
     // Aggiorna stato UI voce in base ai permessi account
     updateVoiceUI(voiceManager.isEnabled, voiceManager.isMuted, voiceManager.isDeafened, voiceManager.peers.size);
 
-    // Mostriamo il menu di setup solo se non siamo già in partita
+    // Mostriamo il menu di selezione gioco dopo il login
     if (!sessionStorage.getItem('lucas_room')) {
-        switchSection('setup-menu');
+        switchSection('game-select');
     }
 
-    // Mostriamo i dati dell'utente nel menu setup
+    // Mostriamo i dati dell'utente nei menu
     aggiornaWelcomeMessage();
 });
 
@@ -414,8 +420,12 @@ socket.on('login_err', (msg) => {
 });
 
 window.apriClassifica = () => {
-    document.getElementById('modal-classifica').style.display = 'block';
-    socket.emit('richiedi_classifica');
+    if (currentGameType === 'ciapano') {
+        window.apriClassificaCiapano();
+    } else {
+        document.getElementById('modal-classifica').style.display = 'block';
+        socket.emit('richiedi_classifica');
+    }
 };
 
 window.chiudiClassifica = () => {
@@ -1108,11 +1118,15 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
 
         div.onclick = () => {
             // Clicchi per giocare la carta. 
-            if (isMyTurn && fase === 'gioco' && canPlay && !isReplayMode) {
+            if (isMyTurn && (fase === 'gioco' || fase === 'ciapano_gioco') && canPlay && !isReplayMode) {
                 nascondiErrore(); 
                 canPlay = false; 
                 sound.playCardPlay(c);
-                socket.emit('gioca_carta', { cartaIdx: mano.indexOf(c) });
+                if (currentGameType === 'ciapano') {
+                    socket.emit('gioca_carta_ciapano', { cartaIdx: mano.indexOf(c) });
+                } else {
+                    socket.emit('gioca_carta', { cartaIdx: mano.indexOf(c) });
+                }
             }
         };
         handCont.appendChild(div);
@@ -1123,7 +1137,15 @@ window.creaNuovaStanza = () => {
     sessionStorage.removeItem('lucas_room');
     const nome = userProfile ? userProfile.nickname : "Host";
     const num = document.getElementById('select-players').value;
-    socket.emit('crea_lobby', { nome: nome, numGiocatori: num, token: sessionToken, uniqueCode: userProfile ? userProfile.uniqueCode : null });
+    const limitePunti = document.getElementById('select-ciapano-limite') ? parseInt(document.getElementById('select-ciapano-limite').value || 31) : 31;
+    socket.emit('crea_lobby', {
+        nome: nome,
+        numGiocatori: num,
+        token: sessionToken,
+        uniqueCode: userProfile ? userProfile.uniqueCode : null,
+        gameType: currentGameType,
+        limitePunti: limitePunti
+    });
 };
 
 window.uniscitiAStanza = () => {
@@ -1193,6 +1215,12 @@ socket.on('lobby_creata', (d) => {
     switchSection('lobby-wait');
     document.getElementById('display-room-code').innerText = d.code;
     document.getElementById('lobby-info').style.display = 'block';
+
+    if (d.gameType) {
+        currentGameType = d.gameType;
+        const titleEl = document.getElementById('game-title');
+        if (titleEl) titleEl.innerText = (currentGameType === 'ciapano') ? 'Ciapanò' : 'Lucas';
+    }
     
     // Mostriamo il tasto avvia partita solo se siamo il creatore/host
     const isHost = (d.host === socket.id);
@@ -1214,6 +1242,12 @@ socket.on('lobby_creata', (d) => {
 
 socket.on('aggiorna_lobby', (dati) => {
     switchSection('lobby-wait');
+
+    if (dati.gameType) {
+        currentGameType = dati.gameType;
+        const titleEl = document.getElementById('game-title');
+        if (titleEl) titleEl.innerText = (currentGameType === 'ciapano') ? 'Ciapanò' : 'Lucas';
+    }
 
     // Mostriamo il codice stanza all'amico e la lista aggiornata
     if (dati.code) {
@@ -1281,7 +1315,8 @@ socket.on('lista_lobby_pubbliche', (list) => {
     container.style.display = 'block';
     listEl.innerHTML = list.map(l => `
         <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; margin-bottom: 4px;">
-            <div>
+            <div style="display: flex; align-items: center;">
+                <span style="display: inline-block; padding: 2px 6px; font-size: 0.75rem; font-weight: bold; border-radius: 4px; margin-right: 8px; background: ${l.gameType === 'ciapano' ? '#e74c3c' : '#f1c40f'}; color: ${l.gameType === 'ciapano' ? 'white' : '#111'};">${l.gameType === 'ciapano' ? 'Ciapanò' : 'Lucas'}</span>
                 <span style="font-weight: bold; color: #f1c40f;">${renderNomeConStemma(l.hostName, l.stemma)}</span>
                 <span style="color: #bbb; font-size: 0.9rem; margin-left: 8px;">(${l.playersCount}/${l.maxPlayers})</span>
             </div>
@@ -1448,7 +1483,11 @@ socket.on('fine_partita', (cl) => {
 
 // Funzioni per l'apertura e chiusura del Regolamento
 window.apriRegole = () => {
-    document.getElementById('modal-regole').style.display = 'block';
+    if (currentGameType === 'ciapano') {
+        window.apriRegoleCiapano();
+    } else {
+        document.getElementById('modal-regole').style.display = 'block';
+    }
 };
 
 window.chiudiRegole = () => {
@@ -1459,12 +1498,16 @@ window.chiudiRegole = () => {
 window.onclick = (event) => {
     const modalRegole = document.getElementById('modal-regole');
     const modalClassifica = document.getElementById('modal-classifica');
+    const modalRegoleCiapano = document.getElementById('modal-regole-ciapano');
+    const modalClassificaCiapano = document.getElementById('modal-classifica-ciapano');
     const modalLingua = document.getElementById('modal-lingua');
     const modalReport = document.getElementById('modal-report');
     const modalReplays = document.getElementById('modal-replays');
 
     if (event.target === modalRegole) modalRegole.style.display = 'none';
     if (event.target === modalClassifica) modalClassifica.style.display = 'none';
+    if (event.target === modalRegoleCiapano) modalRegoleCiapano.style.display = 'none';
+    if (event.target === modalClassificaCiapano) modalClassificaCiapano.style.display = 'none';
     if (event.target === modalLingua) chiudiLingua();
     if (event.target === modalReport) chiudiReport();
     if (event.target === modalReplays) chiudiReplays();
@@ -1780,3 +1823,441 @@ socket.on('mossa_automatica', (d) => {
         messagesCont.scrollTop = messagesCont.scrollHeight;
     }
 });
+
+// =============================================
+// SELEZIONE GIOCO & MOTORE CLIENT CIAPANÒ
+// =============================================
+
+let currentGameType = 'lucas';
+
+window.selezionaGioco = (tipo) => {
+    currentGameType = tipo;
+    const titleEl = document.getElementById('game-title');
+    const badgeEl = document.getElementById('current-game-badge');
+    const opt2 = document.getElementById('opt-players-2');
+    const ciapanoOpts = document.getElementById('ciapano-options-container');
+
+    if (tipo === 'ciapano') {
+        if (titleEl) titleEl.innerText = 'Ciapanò';
+        if (badgeEl) {
+            badgeEl.innerText = 'Gioco: Ciapanò (Traversone)';
+            badgeEl.style.borderColor = '#e74c3c';
+            badgeEl.style.color = '#e74c3c';
+            badgeEl.style.background = 'rgba(231,76,60,0.2)';
+        }
+        if (opt2) opt2.style.display = 'block';
+        if (ciapanoOpts) ciapanoOpts.style.display = 'block';
+    } else {
+        if (titleEl) titleEl.innerText = 'Lucas';
+        if (badgeEl) {
+            badgeEl.innerText = 'Gioco: Lucas';
+            badgeEl.style.borderColor = '#f1c40f';
+            badgeEl.style.color = '#f1c40f';
+            badgeEl.style.background = 'rgba(241,196,15,0.2)';
+        }
+        if (opt2) opt2.style.display = 'none';
+        if (ciapanoOpts) ciapanoOpts.style.display = 'none';
+        const selectP = document.getElementById('select-players');
+        if (selectP && selectP.value === '2') selectP.value = '4';
+    }
+
+    switchSection('setup-menu');
+};
+
+window.tornaASelezioneGioco = () => {
+    switchSection('game-select');
+};
+
+window.apriRegoleCiapano = () => {
+    document.getElementById('modal-regole-ciapano').style.display = 'block';
+};
+
+window.chiudiRegoleCiapano = () => {
+    document.getElementById('modal-regole-ciapano').style.display = 'none';
+};
+
+window.apriClassificaCiapano = () => {
+    document.getElementById('modal-classifica-ciapano').style.display = 'block';
+    socket.emit('richiedi_classifica_ciapano');
+};
+
+window.chiudiClassificaCiapano = () => {
+    document.getElementById('modal-classifica-ciapano').style.display = 'none';
+};
+
+// --- RICEZIONE DATI CLASSIFICA ELO CIAPANÒ ---
+socket.on('classifica_dati_ciapano', ({ top10, userRank }) => {
+    const listEl = document.getElementById('leaderboard-ciapano-list');
+    if (!listEl) return;
+    if (!top10 || top10.length === 0) {
+        listEl.innerHTML = '<p style="text-align: center; color: #aaa;">Nessuna partita a Ciapanò registrata.</p>';
+        return;
+    }
+    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    top10.forEach((u, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+        const nomeConStemma = renderNomeConStemma(u.nickname, u.stemma);
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <span style="font-weight: bold;">${medal} ${nomeConStemma}</span>
+                <span style="color: #e74c3c; font-weight: bold;">ELO: ${u.eloCiapano || 1000}</span>
+            </div>
+        `;
+    });
+    if (userRank) {
+        const uNome = renderNomeConStemma(userRank.nickname, userRank.stemma);
+        html += `
+            <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+                <div style="color: #f1c40f; font-size: 0.95rem; margin-bottom: 5px;">La tua posizione:</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(231,76,60,0.2); border: 1px solid #e74c3c; border-radius: 8px;">
+                    <span style="font-weight: bold;">#${userRank.posizione} ${uNome}</span>
+                    <span style="color: #e74c3c; font-weight: bold;">ELO: ${userRank.eloCiapano || 1000}</span>
+                </div>
+            </div>
+        `;
+    }
+    html += '</div>';
+    listEl.innerHTML = html;
+});
+
+// --- RICEZIONE STATO GIOCO CIAPANÒ ---
+socket.on('conferma_inizio_ciapano', (dati) => {
+    currentGameType = 'ciapano';
+    window.ultimoStatoGioco = dati;
+    nascondiErrore();
+
+    const titleEl = document.getElementById('game-title');
+    if (titleEl) titleEl.innerText = 'Ciapanò';
+
+    switchSection('game-area');
+
+    const areaScommessa = document.getElementById('dichiarazione-area');
+    if (areaScommessa) areaScommessa.style.display = 'none';
+
+    renderGiocatoriCiapano(dati);
+    updateChatVisibility(dati.tuttiGiocatori);
+
+    const pAttuale = dati.tuttiGiocatori[dati.turnoAttuale];
+    const eMioTurno = pAttuale && (pAttuale.isMe || pAttuale.socketId === socket.id);
+    if (eMioTurno) {
+        sound.playYourTurn();
+    }
+
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    const timerDisplay = document.getElementById('turn-timer-display');
+    if (timerDisplay) {
+        let timeLeft = 30;
+        window.clientTurnInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 10) {
+                timerDisplay.style.display = 'block';
+                timerDisplay.innerText = `${timeLeft}s`;
+            }
+            if (timeLeft <= 0) {
+                clearInterval(window.clientTurnInterval);
+                timerDisplay.innerText = "Timeout!";
+            }
+        }, 1000);
+    }
+
+    canPlay = false;
+    setTimeout(() => { canPlay = true; }, 400);
+});
+
+socket.on('vincitore_presa_ciapano', ({ playerId, card }) => {
+    const pBlock = document.querySelector(`.player-block[data-player-id="${playerId}"]`);
+    if (pBlock) {
+        pBlock.classList.add('winner-pulse');
+        setTimeout(() => pBlock.classList.remove('winner-pulse'), 1200);
+    }
+});
+
+socket.on('fine_smazzata_ciapano', (data) => {
+    let msg = data.cappotto ? "🔥 CAPPOTTO! Chi ha preso tutto fa 0 pt, tutti gli altri +11! 🔥\n" : "Punteggi Smazzata:\n";
+    data.punteggi.forEach(p => {
+        msg += `${p.nome}: ${p.puntiTotali} pt ${p.eliminato ? '(ELIMINATO)' : ''}\n`;
+    });
+    mostraErrore(msg);
+});
+
+socket.on('fine_partita_ciapano', (data) => {
+    if (window.clientTurnInterval) {
+        clearInterval(window.clientTurnInterval);
+        window.clientTurnInterval = null;
+    }
+    sessionStorage.removeItem('lucas_room');
+
+    const modal = document.getElementById('modal-endgame');
+    if (modal) {
+        modal.style.display = 'block';
+        const h2El = modal.querySelector('h2');
+        if (h2El) h2El.innerText = "Classifica Finale Ciapanò";
+        const listEl = document.getElementById('endgame-list');
+        if (listEl && data.classifica) {
+            listEl.innerHTML = data.classifica.map(p => {
+                const medal = p.posizione === 1 ? '🥇' : p.posizione === 2 ? '🥈' : p.posizione === 3 ? '🥉' : `#${p.posizione}`;
+                const eloStr = p.eloChange ? ` (ELO ${p.eloChange > 0 ? '+' : ''}${p.eloChange})` : '';
+                const elimStr = p.eliminato ? ' <span style="color:#e74c3c; font-size:0.85rem;">[ELIMINATO]</span>' : '';
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <span>${medal} ${renderNomeConStemma(p.nome, p.stemma)}${elimStr}</span>
+                        <span style="color: #f1c40f; font-weight: bold;">${p.puntiTotali} pt${eloStr}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+});
+
+const PESO_CIAPANO_CLIENT = { "3": 10, "2": 9, "Asso": 8, "Re": 7, "Cavallo": 6, "Fante": 5, "7": 4, "6": 3, "5": 2, "4": 1 };
+
+function renderGiocatoriCiapano(data) {
+    const playersCircle = document.getElementById('players-circle');
+    const cardsOnTable = document.getElementById('cards-on-table');
+    const infoGiro = document.getElementById('info-giro');
+    const scartiBar = document.getElementById('ciapano-scarti-bar');
+    const scartiTesto = document.getElementById('ciapano-scarti-testo');
+
+    if (scartiBar && scartiTesto) {
+        if (data.carteScartate && data.carteScartate.length > 0) {
+            scartiBar.style.display = 'block';
+            scartiTesto.innerText = 'Scarti: ' + data.carteScartate.map(c => `${c.valore} di ${c.seme}`).join(', ');
+        } else {
+            scartiBar.style.display = 'none';
+        }
+    }
+
+    const prevTableCount = window.ultimoTavoloCount || 0;
+    const currentTableCount = data.tavolo ? data.tavolo.length : 0;
+    if (currentTableCount > prevTableCount) {
+        const ultimaGiocata = data.tavolo[currentTableCount - 1];
+        sound.playCardPlay(ultimaGiocata ? ultimaGiocata.card : null);
+    }
+    window.ultimoTavoloCount = currentTableCount;
+
+    playersCircle.innerHTML = '';
+    cardsOnTable.innerHTML = '';
+
+    const numPlayers = data.tuttiGiocatori.length;
+    let mioIndice = data.tuttiGiocatori.findIndex(p => p.isMe || p.socketId === socket.id);
+    if (mioIndice === -1) mioIndice = 0;
+
+    infoGiro.innerText = `Smazzata ${data.smazzataNum} | Limite: ${data.limitePunti} pt`;
+
+    const isMobile = window.innerWidth <= 768;
+    let scalaPlayerBlock = isMobile ? 1 : 1; 
+    let scalaTableCard = isMobile ? 0.4 : 0.8; 
+
+    if (numPlayers >= 7) {
+        scalaPlayerBlock = isMobile ? 0.65 : 0.7;
+        scalaTableCard = isMobile ? 0.3 : 0.55;
+    } else if (numPlayers >= 5) {
+        scalaPlayerBlock = isMobile ? 0.75 : 0.8;
+        scalaTableCard = isMobile ? 0.35 : 0.7;
+    }
+
+    const posizioniCarteTavoloPerGiocatore = new Map();
+    const raggioCarteX = 26;
+    const raggioCarteY = 18;
+
+    for (let i = 0; i < numPlayers; i++) {
+        const serverPlayerIndex = (mioIndice + i) % numPlayers;
+        const p = data.tuttiGiocatori[serverPlayerIndex];
+        const isMe = p.isMe || (p.socketId === socket.id);
+
+        let posX, posY;
+        let angoloGradi;
+
+        if (isMe) {
+            posX = 50;
+            posY = 85; 
+            angoloGradi = 90;
+        } else {
+            const indexOpp = i - 1;
+            const numOpp = numPlayers - 1;
+            
+            if (numOpp === 1) {
+                angoloGradi = 270;
+            } else {
+                const startA = 160;
+                const endA = 380;
+                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
+            }
+
+            const radiotherapy = angoloGradi * (Math.PI / 180);
+            posX = 50 + 44 * Math.cos(radiotherapy);
+            posY = 40 + 30 * Math.sin(radiotherapy);
+        }
+
+        const pBlock = document.createElement('div');
+        pBlock.className = 'player-block';
+        pBlock.setAttribute('data-player-id', serverPlayerIndex);
+        pBlock.setAttribute('data-socket-id', isMe ? 'me' : (p.socketId || ''));
+        if (isMe) pBlock.classList.add('me');
+        if (p.eliminato) pBlock.classList.add('eliminato');
+        if (data.turnoAttuale === serverPlayerIndex && !p.eliminato) pBlock.classList.add('active-turn');
+        
+        pBlock.style.left = `${posX}%`;
+        pBlock.style.top = `${posY}%`;
+        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+
+        const ruolo = p.isMazziere ? " (Mazziere)" : "";
+        const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
+        let timerHtml = "";
+        if (data.turnoAttuale === serverPlayerIndex && p.isHuman !== false && !p.eliminato) {
+            timerHtml = `<div class="turn-timer" id="turn-timer-display" style="display: none;">30s</div>`;
+        }
+
+        const elimBadge = p.eliminato ? `<div class="eliminato-badge">ELIMINATO</div>` : '';
+
+        pBlock.innerHTML = `
+            <div class="name">${nomeConStemma}${ruolo}</div>
+            <div class="stats"><span class="ciapano-punti-badge">Punti: ${p.puntiTotali}</span> | Presa: ${p.preseCount}</div>
+            ${elimBadge}
+            ${timerHtml}
+        `;
+
+        if (isMe) {
+            const myHandCont = document.createElement('div');
+            myHandCont.id = 'tu-mano';
+            pBlock.appendChild(myHandCont);
+            renderTuaManoCiapano(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale && !p.eliminato, data.tavolo);
+        } else {
+            const oppHandCont = document.createElement('div');
+            oppHandCont.className = 'opponent-hand';
+            const carteInMano = p.mano ? p.mano.filter(c => !c.giocata) : [];
+            const carteInManoCount = carteInMano.length;
+
+            let margineNegativo = 0;
+            if (carteInManoCount > 1) {
+                const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
+                margineNegativo = Math.min(0, spazioPerCarta - 35);
+            }
+
+            for (let c = 0; c < carteInManoCount; c++) {
+                const cardBack = document.createElement('div');
+                cardBack.className = 'card-back';
+                if (c > 0) cardBack.style.marginLeft = `${margineNegativo}px`;
+                oppHandCont.appendChild(cardBack);
+            }
+            pBlock.appendChild(oppHandCont);
+        }
+
+        playersCircle.appendChild(pBlock);
+
+        let cartaX, cartaY;
+        if (isMe) {
+            cartaX = 50;
+            cartaY = 68;
+        } else {
+            cartaX = 50 + raggioCarteX * Math.cos( angoloGradi * (Math.PI / 180) );
+            cartaY = 44 + raggioCarteY * Math.sin( angoloGradi * (Math.PI / 180) );
+        }
+        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
+    }
+
+    let winnerCardDiv = null;
+    let maxPeso = -1;
+    let semeUscita = data.tavolo && data.tavolo.length > 0 ? data.tavolo[0].card.seme : null;
+
+    data.tavolo.forEach((giocata, index) => {
+        const c = giocata.card;
+        const pId = giocata.playerId;
+        const posData = posizioniCarteTavoloPerGiocatore.get(pId);
+
+        if (posData) {
+            const divCartaTavolo = document.createElement('div');
+            divCartaTavolo.className = `card seme-${c.seme} val-${c.valore} table-card`;
+            divCartaTavolo.style.left = `${posData.x}%`;
+            divCartaTavolo.style.top = `${posData.y}%`;
+            divCartaTavolo.style.zIndex = 100 + index;
+
+            const randRot = (Math.random() * 14) - 7;
+            divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${randRot}deg)`;
+
+            if (c.seme === semeUscita) {
+                const peso = PESO_CIAPANO_CLIENT[c.valore] || 0;
+                if (peso > maxPeso) {
+                    maxPeso = peso;
+                    winnerCardDiv = divCartaTavolo;
+                }
+            }
+
+            cardsOnTable.appendChild(divCartaTavolo);
+        }
+    });
+
+    if (winnerCardDiv) {
+        winnerCardDiv.classList.add('card-winning');
+    }
+}
+
+function renderTuaManoCiapano(handCont, mano, isMyTurn, tavolo) {
+    if (!handCont) return;
+    handCont.innerHTML = '';
+
+    const carteDaDisegnare = mano.filter(c => !c.giocata);
+
+    const ORDINE_SEMI = { "Denari": 1, "Spade": 2, "Coppe": 3, "Bastoni": 4 };
+    carteDaDisegnare.sort((a, b) => {
+        const diffSeme = (ORDINE_SEMI[a.seme] || 0) - (ORDINE_SEMI[b.seme] || 0);
+        if (diffSeme !== 0) return diffSeme;
+        return (PESO_CIAPANO_CLIENT[b.valore] || 0) - (PESO_CIAPANO_CLIENT[a.valore] || 0);
+    });
+
+    const numCarte = carteDaDisegnare.length;
+    const isMobile = window.innerWidth <= 768;
+    const baseScale = isMobile ? 0.65 : 1.0;
+    let dynamicScale = baseScale;
+    if (numCarte > 7) {
+        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08);
+    }
+
+    let marginLeft = 0;
+    if (isMobile) {
+        if (numCarte > 1) {
+            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
+            marginLeft = overlapFactor;
+        }
+    } else {
+        if (numCarte > 10) marginLeft = -35;
+        else if (numCarte > 7) marginLeft = -20;
+    }
+
+    const semeUscita = tavolo && tavolo.length > 0 ? tavolo[0].card.seme : null;
+    const haSemeUscita = semeUscita ? carteDaDisegnare.some(c => c.seme === semeUscita) : false;
+
+    carteDaDisegnare.forEach((c, idx) => {
+        const div = document.createElement('div');
+        div.style.transform = `scale(${dynamicScale})`;
+        div.style.transformOrigin = "center";
+        if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
+        div.className = `card seme-${c.seme} val-${c.valore}`;
+        div.style.zIndex = 10 + idx;
+
+        if (isMyTurn && haSemeUscita && c.seme !== semeUscita) {
+            div.style.opacity = '0.45';
+            div.style.filter = 'grayscale(50%)';
+            div.style.cursor = 'not-allowed';
+        } else if (isMyTurn) {
+            div.style.cursor = 'pointer';
+        }
+
+        div.onclick = () => {
+            if (isMyTurn && canPlay && !isReplayMode) {
+                if (haSemeUscita && c.seme !== semeUscita) {
+                    mostraErrore(`Devi rispondere al seme di uscita (${semeUscita})!`);
+                    return;
+                }
+                nascondiErrore();
+                canPlay = false;
+                sound.playCardPlay(c);
+                socket.emit('gioca_carta_ciapano', { cartaIdx: mano.indexOf(c) });
+            }
+        };
+        handCont.appendChild(div);
+    });
+}

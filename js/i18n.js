@@ -103,7 +103,12 @@ const dictionary = {
         'prepDi': 'di',
         'betAction': 'scommessa',
         'humansOnline': 'umani online',
-        'voiceLoginRequired': 'La chat vocale è disponibile solo per gli utenti registrati. Accedi con il tuo account!'
+        'voiceLoginRequired': 'La chat vocale è disponibile solo per gli utenti registrati. Accedi con il tuo account!',
+        'selectGameSubtitle': 'Scegli il gioco a cui vuoi partecipare:',
+        'lucasDesc': 'Previsioni, prese e scommesse a mani decrescenti. Precisione e strategia pura!',
+        'ciapanoDesc': 'Vince chi fa meno punti! Evita le figure (⅓ pt) e gli assi (1 pt), o fai la Sola!',
+        'playLucasBtn': 'GIOCA A LUCAS',
+        'playCiapanoBtn': 'GIOCA A CIAPANÒ'
     },
     'en': {
         'chooseLanguage': 'Choose Language',
@@ -201,7 +206,12 @@ const dictionary = {
         'prepDi': 'of',
         'betAction': 'bid',
         'humansOnline': 'humans online',
-        'voiceLoginRequired': 'Voice chat is available only for registered users. Log in with your account!'
+        'voiceLoginRequired': 'Voice chat is available only for registered users. Log in with your account!',
+        'selectGameSubtitle': 'Choose the game you want to play:',
+        'lucasDesc': 'Predictions, tricks, and decreasing hand sizes. Pure precision and strategy!',
+        'ciapanoDesc': 'Fewest points wins! Avoid face cards (⅓ pt) and aces (1 pt), or aim for a Clean Sweep (Sola)!',
+        'playLucasBtn': 'PLAY LUCAS',
+        'playCiapanoBtn': 'PLAY CIAPANÒ'
     },
     'fr': {
         'chooseLanguage': 'Choisissez la Langue',
@@ -299,7 +309,12 @@ const dictionary = {
         'prepDi': 'de',
         'betAction': 'annonce',
         'humansOnline': 'humains en ligne',
-        'voiceLoginRequired': 'Le chat vocal est réservé aux utilisateurs enregistrés. Connectez-vous avec votre compte !'
+        'voiceLoginRequired': 'Le chat vocal est réservé aux utilisateurs enregistrés. Connectez-vous avec votre compte !',
+        'selectGameSubtitle': 'Choisissez le jeu auquel vous voulez jouer :',
+        'lucasDesc': 'Prédictions, plis et enchères en mains décroissantes. Pure précision et stratégie !',
+        'ciapanoDesc': 'Le moins de points gagne ! Évitez les figures (⅓ pt) et les as (1 pt), ou tentez la Sola !',
+        'playLucasBtn': 'JOUER À LUCAS',
+        'playCiapanoBtn': 'JOUER À CIAPANÒ'
     },
     'es': {
         'chooseLanguage': 'Elige el Idioma',
@@ -397,7 +412,12 @@ const dictionary = {
         'prepDi': 'de',
         'betAction': 'declaración',
         'humansOnline': 'humanos en línea',
-        'voiceLoginRequired': '¡El chat de voz está disponible solo para usuarios registrados. Inicia sesión con tu cuenta!'
+        'voiceLoginRequired': '¡El chat de voz está disponible solo para usuarios registrados. Inicia sesión con tu cuenta!',
+        'selectGameSubtitle': 'Elige el juego al que quieres jugar:',
+        'lucasDesc': 'Predicciones, bazas y apuestas con manos decrecientes. ¡Pura precisión y estrategia!',
+        'ciapanoDesc': '¡Gana quien consiga menos puntos! Evita las figuras (⅓ pt) y los ases (1 pt), o haz la Sola.',
+        'playLucasBtn': 'JUGAR A LUCAS',
+        'playCiapanoBtn': 'JUGAR A CIAPANÒ'
     },
     'de': {
         'chooseLanguage': 'Sprache Wählen',
@@ -495,7 +515,12 @@ const dictionary = {
         'prepDi': 'von',
         'betAction': 'Ansage',
         'humansOnline': 'Menschen online',
-        'voiceLoginRequired': 'Der Sprachchat ist nur für registrierte Benutzer verfügbar. Melde dich mit deinem Konto an!'
+        'voiceLoginRequired': 'Der Sprachchat ist nur für registrierte Benutzer verfügbar. Melde dich mit deinem Konto an!',
+        'selectGameSubtitle': 'Wähle das Spiel, das du spielen möchtest:',
+        'lucasDesc': 'Vorhersagen, Stiche und Wetten mit abnehmenden Händen. Reine Präzision und Strategie!',
+        'ciapanoDesc': 'Die wenigsten Punkte gewinnen! Vermeide Bildkarten (⅓ Pkt.) und Asse (1 Pkt.) oder wage die Sola!',
+        'playLucasBtn': 'LUCAS SPIELEN',
+        'playCiapanoBtn': 'CIAPANÒ SPIELEN'
     }
 };
 

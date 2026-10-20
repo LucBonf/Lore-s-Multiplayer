@@ -45,6 +45,7 @@ const userSchema = new mongoose.Schema({
     partiteVinte: { type: Number, default: 0 },
     punteggioTotale: { type: Number, default: 0 },
     elo: { type: Number, default: 1000 },
+    eloCiapano: { type: Number, default: 1000 },
     lastLogin: { type: Date, default: Date.now },
     stemmi: { type: [String], default: [] }
 });
@@ -52,6 +53,7 @@ const userSchema = new mongoose.Schema({
 // INDICI PER PERFORMANCE (Classifiche e Ricerche istantanee)
 userSchema.index({ punteggioTotale: -1 });
 userSchema.index({ elo: -1 });
+userSchema.index({ eloCiapano: -1 });
 userSchema.index({ lastLogin: -1 });
 userSchema.index({ nickname: 'text' }); // Per ricerca veloce per nome
 
@@ -1473,6 +1475,251 @@ class LucasGame {
     }
 }
 
+// =============================================
+// CIAPANÒ (TRAVERSONE) - LOGICA DI GIOCO
+// =============================================
+
+const PESO_VALORE_CIAPANO = { "3": 10, "2": 9, "Asso": 8, "Re": 7, "Cavallo": 6, "Fante": 5, "7": 4, "6": 3, "5": 2, "4": 1 };
+
+function puntiCartaCiapano(valore) {
+    if (valore === 'Asso') return 3; // 1 punto = 3 terzi
+    if (['3', '2', 'Re', 'Cavallo', 'Fante'].includes(valore)) return 1; // 1/3 punto = 1 terzo
+    return 0; // 7, 6, 5, 4 = 0 punti
+}
+
+function formattaPuntiCiapano(punti) {
+    return `${punti}`;
+}
+
+function puntiCiapanoNumerico(punti) {
+    return punti;
+}
+
+function calcolaDistrCiapano(numPlayers) {
+    switch (numPlayers) {
+        case 2: return { cartePerGiocatore: 20, scartiRegola: 'nessuno' };
+        case 3: return { cartePerGiocatore: 13, scartiRegola: 'un_4' };
+        case 4: return { cartePerGiocatore: 10, scartiRegola: 'nessuno' };
+        case 5: return { cartePerGiocatore: 8, scartiRegola: 'nessuno' };
+        case 6: return { cartePerGiocatore: 6, scartiRegola: 'tutti_4' };
+        case 7: return { cartePerGiocatore: 5, scartiRegola: 'tutti_4_un_5' };
+        case 8: return { cartePerGiocatore: 5, scartiRegola: 'nessuno' };
+        default: return { cartePerGiocatore: 10, scartiRegola: 'nessuno' };
+    }
+}
+
+class CiapanoPlayer {
+    constructor(id, nome, isHuman = false, token = null, uniqueCode = null) {
+        this.id = id;
+        this.nome = nome;
+        this.isHuman = isHuman;
+        this.token = token;
+        this.uniqueCode = uniqueCode;
+        this.mano = [];
+        this.preseFatte = []; // carte prese (array piatto di carte)
+        this.puntiSmazzata = 0; // Punti interi arrotondati per difetto
+        this.puntiTotali = 0;   // Punti interi totali cumulati
+        this.eloMomentaneo = 1000;
+        this.eliminato = false;
+        this.aiLevel = 0;
+        this.aiVariant = "Human";
+    }
+    resetSmazzata() {
+        this.mano = [];
+        this.preseFatte = [];
+        this.puntiSmazzata = 0;
+    }
+    contaPuntiPrese() {
+        let terzi = 0;
+        this.preseFatte.forEach(carta => {
+            terzi += puntiCartaCiapano(carta.valore);
+        });
+        return terzi;
+    }
+}
+
+class CiapanoGame {
+    constructor(numPlayers, limitePunti = 31) {
+        this.numPlayers = numPlayers;
+        this.players = Array.from({ length: numPlayers }, (_, i) => new CiapanoPlayer(i, `CPU ${i}`));
+        this.indiceMazziere = Math.floor(Math.random() * numPlayers);
+        this.turnoAttuale = 0;
+        this.tavolo = [];
+        this.fase = "gioco"; // gioco | sola_choice | fine_smazzata
+        this.carteScartate = [];
+        this.limitePunti = limitePunti;
+        this.smazzataNum = 1;
+        this.ultimoPresista = -1; // indice giocatore che ha preso l'ultima mano
+        this.acceptInput = true;
+        this.botThinking = false;
+        this.matchId = null;
+        this.hostNickname = null;
+        this.carteUscite = [];
+    }
+
+    getGiocatoriAttivi() {
+        return this.players.filter(p => !p.eliminato);
+    }
+
+    prossimoGiocatoreAttivo(idx) {
+        let count = 0;
+        while (this.players[idx].eliminato && count < this.numPlayers) {
+            idx = (idx + 1) % this.numPlayers;
+            count++;
+        }
+        return idx;
+    }
+
+    numGiocatoriAttivi() {
+        return this.players.filter(p => !p.eliminato).length;
+    }
+
+    numGiocatoriInPresa() {
+        // Numero di giocatori attivi che partecipano alla presa corrente
+        return this.getGiocatoriAttivi().length;
+    }
+
+    distribuisci() {
+        let mazzo = [];
+        SEMI.forEach(s => VALORI.forEach(v => mazzo.push({ valore: v, seme: s, giocata: false })));
+
+        const numAttivi = this.numGiocatoriAttivi();
+        const distr = calcolaDistrCiapano(numAttivi);
+
+        this.carteScartate = [];
+
+        if (distr.scartiRegola === 'un_4') {
+            const idx = mazzo.findIndex(c => c.valore === '4');
+            if (idx !== -1) this.carteScartate.push(mazzo.splice(idx, 1)[0]);
+        } else if (distr.scartiRegola === 'tutti_4') {
+            const nuovoMazzo = [];
+            mazzo.forEach(c => {
+                if (c.valore === '4') this.carteScartate.push(c);
+                else nuovoMazzo.push(c);
+            });
+            mazzo = nuovoMazzo;
+        } else if (distr.scartiRegola === 'tutti_4_un_5') {
+            const nuovoMazzo = [];
+            mazzo.forEach(c => {
+                if (c.valore === '4') this.carteScartate.push(c);
+                else nuovoMazzo.push(c);
+            });
+            mazzo = nuovoMazzo;
+            const idx5 = mazzo.findIndex(c => c.valore === '5');
+            if (idx5 !== -1) this.carteScartate.push(mazzo.splice(idx5, 1)[0]);
+        }
+
+        // Fisher-Yates Shuffle
+        for (let i = mazzo.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [mazzo[i], mazzo[j]] = [mazzo[j], mazzo[i]];
+        }
+
+        // Distribuzione equa solo ai giocatori attivi
+        this.players.forEach(p => {
+            p.resetSmazzata();
+            if (!p.eliminato) {
+                for (let i = 0; i < distr.cartePerGiocatore; i++) {
+                    const c = mazzo.pop();
+                    if (c) p.mano.push(c);
+                }
+            }
+        });
+
+        this.fase = "gioco";
+        this.turnoAttuale = this.prossimoGiocatoreAttivo((this.indiceMazziere + 1) % this.numPlayers);
+        this.tavolo = [];
+        this.ultimoPresista = -1;
+        this.carteUscite = [];
+    }
+
+    calcolaVincitorePresa() {
+        if (this.tavolo.length === 0) return null;
+        const semeUscita = this.tavolo[0].card.seme;
+        // Vince la carta più alta del SEME DI USCITA (no briscola in Ciapanò)
+        const carteDelSeme = this.tavolo.filter(g => g.card.seme === semeUscita);
+        return carteDelSeme.reduce((migliore, attuale) => {
+            return (PESO_VALORE_CIAPANO[attuale.card.valore] > PESO_VALORE_CIAPANO[migliore.card.valore]) ? attuale : migliore;
+        });
+    }
+
+    puoGiocareCarta(playerId, carta) {
+        if (this.tavolo.length === 0) return true;
+        const semeUscita = this.tavolo[0].card.seme;
+        const player = this.players[playerId];
+        const haSeme = player.mano.some(c => !c.giocata && c.seme === semeUscita);
+        if (haSeme) {
+            return carta.seme === semeUscita;
+        }
+        return true;
+    }
+
+    carteGiocabili(playerId) {
+        const player = this.players[playerId];
+        const nonGiocate = player.mano.filter(c => !c.giocata);
+        if (this.tavolo.length === 0) return nonGiocate;
+        const semeUscita = this.tavolo[0].card.seme;
+        const delSeme = nonGiocate.filter(c => c.seme === semeUscita);
+        return delSeme.length > 0 ? delSeme : nonGiocate;
+    }
+
+    calcolaFineSmazzata() {
+        const attivi = this.getGiocatoriAttivi();
+        let sommaAltri = 0;
+        attivi.forEach(p => {
+            if (p.id !== this.ultimoPresista) {
+                // Il punteggio delle prese va arrotondato per difetto (3 terzi = 1 punto)
+                const terzi = p.contaPuntiPrese();
+                p.puntiSmazzata = Math.floor(terzi / 3);
+                sommaAltri += p.puntiSmazzata;
+            }
+        });
+
+        const ultPresistaPlayer = this.players[this.ultimoPresista];
+        if (ultPresistaPlayer) {
+            // Chi ha preso l'ultima mano prende 11 - i punti degli altri
+            ultPresistaPlayer.puntiSmazzata = Math.max(0, 11 - sommaAltri);
+        }
+
+        // Verifica Cappotto: un giocatore ha preso tutti gli 11 punti
+        const cappottoPlayer = attivi.find(p => p.puntiSmazzata === 11);
+        if (cappottoPlayer) {
+            return { isCappotto: true, cappottoPlayerId: cappottoPlayer.id };
+        }
+        return { isCappotto: false, cappottoPlayerId: -1 };
+    }
+
+    applicaPunteggi(isCappotto = false, cappottoPlayerId = -1) {
+        const attivi = this.getGiocatoriAttivi();
+        if (isCappotto && cappottoPlayerId !== -1) {
+            attivi.forEach(p => {
+                if (p.id === cappottoPlayerId) {
+                    p.puntiSmazzata = 0; // Chi ha preso tutti i punti ha +0
+                } else {
+                    p.puntiSmazzata = 11; // Tutti gli altri hanno +11
+                    p.puntiTotali += 11;
+                }
+            });
+        } else {
+            attivi.forEach(p => {
+                p.puntiTotali += p.puntiSmazzata;
+            });
+        }
+
+        // Gestione eliminazioni (punti interi >= limitePunti)
+        attivi.forEach(p => {
+            if (p.puntiTotali >= this.limitePunti) {
+                p.eliminato = true;
+            }
+        });
+
+        const attiviRimasti = this.getGiocatoriAttivi();
+        const gameOver = attiviRimasti.length <= 1;
+        return { gameOver, attiviRimasti };
+    }
+}
+
+
 // --- NUOVO: Funzioni per Persistenza ---
 async function salvaStatoMatch(code) {
     if (!dbConnected) return;
@@ -1614,7 +1861,14 @@ function inviaAggiornamentoLobby(code) {
         ...g,
         stemma: ottieniStemma(g.uniqueCode, g.nome)
     }));
-    io.to(code).emit('aggiorna_lobby', { giocatori: giocatoriConStemma, code: code, host: lobby.host, pubblica: lobby.pubblica || false });
+    io.to(code).emit('aggiorna_lobby', {
+        giocatori: giocatoriConStemma,
+        code: code,
+        host: lobby.host,
+        pubblica: lobby.pubblica || false,
+        gameType: lobby.parametri?.gameType || 'lucas',
+        limitePunti: lobby.parametri?.limitePunti || 31
+    });
 }
 
 function inviaLobbyPubblicheTutti() {
@@ -1629,7 +1883,8 @@ function inviaLobbyPubblicheTutti() {
                 hostName: hostName,
                 stemma: hostPlayer ? ottieniStemma(hostPlayer.uniqueCode, hostPlayer.nome) : null,
                 playersCount: l.giocatori.length,
-                maxPlayers: parseInt(l.parametri.numGiocatori)
+                maxPlayers: parseInt(l.parametri.numGiocatori),
+                gameType: l.parametri?.gameType || 'lucas'
             });
         }
     }
@@ -1724,6 +1979,7 @@ io.on('connection', (socket) => {
             socket.userUniqueCode = user.uniqueCode;
             socket.userNickname = user.nickname;
             socket.userElo = user.elo || 1000;
+            socket.userEloCiapano = user.eloCiapano || 1000;
             const userPayload = user.toObject ? user.toObject() : { ...user };
             userPayload.stemma = ottieniStemma(user.uniqueCode, user.nickname);
             socket.emit('login_ok', userPayload);
@@ -1797,6 +2053,38 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('richiedi_classifica_ciapano', async () => {
+        if (!dbConnected) return socket.emit('classifica_dati_ciapano', { top10: [], userRank: null });
+        try {
+            let top10 = await User.find().sort({ eloCiapano: -1 }).limit(10);
+            const top10ConStemma = top10.map(u => {
+                const uObj = u.toObject ? u.toObject() : { ...u };
+                uObj.stemma = ottieniStemma(u.uniqueCode, u.nickname);
+                return uObj;
+            });
+
+            let userRank = null;
+            if (socket.userUniqueCode) {
+                const user = await User.findOne({ uniqueCode: socket.userUniqueCode });
+                if (user) {
+                    const isInTop10 = top10.some(u => u.uniqueCode === socket.userUniqueCode);
+                    if (!isInTop10) {
+                        const count = await User.countDocuments({ eloCiapano: { $gt: user.eloCiapano || 1000 } });
+                        userRank = {
+                            nickname: user.nickname,
+                            eloCiapano: user.eloCiapano || 1000,
+                            posizione: count + 1,
+                            stemma: ottieniStemma(user.uniqueCode, user.nickname)
+                        };
+                    }
+                }
+            }
+            socket.emit('classifica_dati_ciapano', { top10: top10ConStemma, userRank });
+        } catch (e) {
+            console.error("Errore richiedi_classifica_ciapano:", e);
+        }
+    });
+
     socket.on('crea_lobby', (dati) => {
         try {
             if (!dati || !dati.nome) return socket.emit('errore', "Dati lobby non validi.");
@@ -1804,6 +2092,10 @@ io.on('connection', (socket) => {
             do {
                 code = Math.random().toString(36).substring(2, 6).toUpperCase();
             } while (lobbies[code]);
+
+            const gameType = dati.gameType || 'lucas';
+            const eloValue = (gameType === 'ciapano' ? socket.userEloCiapano : socket.userElo) || 1000;
+
             lobbies[code] = {
                 host: socket.id,
                 parametri: dati,
@@ -1812,7 +2104,8 @@ io.on('connection', (socket) => {
                     nome: dati.nome,
                     token: dati.token,
                     uniqueCode: dati.uniqueCode,
-                    elo: socket.userElo || 1000,
+                    elo: eloValue,
+                    eloCiapano: socket.userEloCiapano || 1000,
                     isHuman: true
                 }]
             };
@@ -1824,7 +2117,14 @@ io.on('connection', (socket) => {
                 ...g,
                 stemma: ottieniStemma(g.uniqueCode, g.nome)
             }));
-            socket.emit('lobby_creata', { code: code, giocatori: giocatoriConStemma, host: lobbies[code].host, pubblica: false });
+            socket.emit('lobby_creata', {
+                code: code,
+                giocatori: giocatoriConStemma,
+                host: lobbies[code].host,
+                pubblica: false,
+                gameType: gameType,
+                limitePunti: dati.limitePunti || 31
+            });
             salvaStatoMatch(code);
         } catch (e) {
             console.error("Errore crea_lobby:", e);
@@ -1942,7 +2242,8 @@ io.on('connection', (socket) => {
                     nome: dati.nome,
                     token: dati.token,
                     uniqueCode: dati.uniqueCode,
-                    elo: socket.userElo || 1000,
+                    elo: (lobby.parametri?.gameType === 'ciapano' ? socket.userEloCiapano : socket.userElo) || 1000,
+                    eloCiapano: socket.userEloCiapano || 1000,
                     isHuman: true
                 });
                 socket.userNickname = dati.nome;
@@ -2015,9 +2316,15 @@ io.on('connection', (socket) => {
                         p.isHuman = false;
                         p.id = null; // Stacca il socketId
                         p.nome += " (Bot)";
-                        inviaStato(code);
-                        gestisciIA(code);
-                        avviaTimerTurno(code);
+                        if (game instanceof CiapanoGame) {
+                            inviaStatoCiapano(code);
+                            gestisciIA_Ciapano(code);
+                            avviaTimerTurnoCiapano(code);
+                        } else {
+                            inviaStato(code);
+                            gestisciIA(code);
+                            avviaTimerTurno(code);
+                        }
                     }
                 } else {
                     // Se era ancora in lobby, aggiorna gli altri
@@ -2057,8 +2364,12 @@ io.on('connection', (socket) => {
                                 lobby.giocatori[index].id = null;
                             }
 
-                            // Opzionale: notifichiamo gli altri che il giocatore è in attesa di riconnessione
-                            inviaStato(code);
+                            // Notifichiamo gli altri che il giocatore è in attesa di riconnessione
+                            if (game instanceof CiapanoGame) {
+                                inviaStatoCiapano(code);
+                            } else {
+                                inviaStato(code);
+                            }
                             salvaStatoMatch(code);
 
                             setTimeout(() => {
@@ -2070,15 +2381,23 @@ io.on('connection', (socket) => {
                                 if (p && p.id === null && p.isHuman) {
                                     p.isHuman = false;
                                     p.nome += " (Bot)";
-                                    inviaStato(code);
-                                    salvaStatoMatch(code);
-
-                                    // Il Bot muove solo se è il suo turno
-                                    if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p) &&
-                                        currentLobby.gameInstance.tavolo.length < currentLobby.gameInstance.numPlayers) {
-                                        gestisciIA(code);
+                                    if (currentLobby.gameInstance instanceof CiapanoGame) {
+                                        inviaStatoCiapano(code);
+                                        salvaStatoMatch(code);
+                                        if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p) &&
+                                            currentLobby.gameInstance.tavolo.length < currentLobby.gameInstance.numGiocatoriInPresa()) {
+                                            gestisciIA_Ciapano(code);
+                                        }
+                                        avviaTimerTurnoCiapano(code);
+                                    } else {
+                                        inviaStato(code);
+                                        salvaStatoMatch(code);
+                                        if (currentLobby.gameInstance.turnoAttuale === currentLobby.gameInstance.players.indexOf(p) &&
+                                            currentLobby.gameInstance.tavolo.length < currentLobby.gameInstance.numPlayers) {
+                                            gestisciIA(code);
+                                        }
+                                        avviaTimerTurno(code);
                                     }
-                                    avviaTimerTurno(code);
                                 }
                             }, 8000); // 8 secondi di tolleranza per il refresh
                         }
@@ -2113,6 +2432,39 @@ io.on('connection', (socket) => {
     function avviaPartita(code) {
         const lobby = lobbies[code];
         if (!lobby || lobby.gameInstance) return;
+
+        if (lobby.parametri?.gameType === 'ciapano') {
+            const limite = parseInt(lobby.parametri.limitePunti || 31);
+            const numG = parseInt(lobby.parametri.numGiocatori);
+            lobby.gameInstance = new CiapanoGame(numG, limite);
+            inviaLobbyPubblicheTutti();
+
+            lobby.gameInstance.players.forEach((p, i) => {
+                if (lobby.giocatori[i]) {
+                    p.nome = lobby.giocatori[i].nome;
+                    p.id = lobby.giocatori[i].id;
+                    p.isHuman = true;
+                    p.token = lobby.giocatori[i].token;
+                    p.uniqueCode = lobby.giocatori[i].uniqueCode;
+                    p.eloMomentaneo = lobby.giocatori[i].eloCiapano || lobby.giocatori[i].elo || 1000;
+                } else {
+                    p.nome = `Bot Ciapanò ${i + 1}`;
+                    p.isHuman = false;
+                }
+            });
+
+            lobby.gameInstance.distribuisci();
+            lobby.gameInstance.matchId = "C-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+            const hostPlayer = lobby.giocatori.find(p => p.id === lobby.host);
+            lobby.gameInstance.hostNickname = hostPlayer ? hostPlayer.nome : "Sconosciuto";
+
+            salvaStatoMatch(code);
+            inviaStatoCiapano(code);
+            gestisciIA_Ciapano(code);
+            avviaTimerTurnoCiapano(code);
+            return;
+        }
+
         lobby.gameInstance = new LucasGame(parseInt(lobby.parametri.numGiocatori));
         inviaLobbyPubblicheTutti();
 
@@ -3298,6 +3650,353 @@ io.on('connection', (socket) => {
                 inviaStato(code);
                 gestisciIA(code);
                 avviaTimerTurno(code);
+            }
+            salvaStatoMatch(code);
+        }
+    }
+
+    // =============================================
+    // CIAPANÒ - SOCKET EVENTS & ENGINE INTEGRATION
+    // =============================================
+
+    function inviaStatoCiapano(code) {
+        const lobby = lobbies[code];
+        if (!lobby || !lobby.gameInstance) return;
+        const game = lobby.gameInstance;
+
+        lobby.giocatori.forEach(giocatoreUmano => {
+            const payload = {
+                gameType: 'ciapano',
+                fase: game.fase,
+                turnoAttuale: game.turnoAttuale,
+                tavolo: game.tavolo,
+                smazzataNum: game.smazzataNum,
+                limitePunti: game.limitePunti,
+                carteScartate: game.carteScartate,
+                tuttiGiocatori: game.players.map((p, i) => {
+                    const isMe = (p.id === giocatoreUmano.id);
+                    let manoDaInviare = p.mano;
+                    if (!isMe) {
+                        manoDaInviare = p.mano.map(c => ({ ...c, valore: "?", seme: "?" }));
+                    }
+                    return {
+                        id: p.id,
+                        nome: p.nome,
+                        puntiTotali: p.puntiTotali,
+                        puntiSmazzata: p.puntiSmazzata,
+                        preseCount: p.preseFatte.length,
+                        eliminato: p.eliminato,
+                        isMazziere: (i === game.indiceMazziere),
+                        isMe: isMe,
+                        socketId: p.id,
+                        stemma: ottieniStemma(p.uniqueCode, p.nome),
+                        mano: manoDaInviare,
+                        isHuman: p.isHuman
+                    };
+                })
+            };
+            if (giocatoreUmano.id) {
+                io.to(giocatoreUmano.id).emit('conferma_inizio_ciapano', payload);
+            }
+        });
+    }
+
+    socket.on('gioca_carta_ciapano', (dati) => {
+        try {
+            const code = socket.roomCode;
+            const lobby = lobbies[code];
+            const game = lobby?.gameInstance;
+            if (!game || !(game instanceof CiapanoGame)) return;
+            const pIdx = game.turnoAttuale;
+            if (game.players[pIdx].id !== socket.id) return socket.emit('errore', "Non è il tuo turno!");
+            if (!game.acceptInput) return socket.emit('errore', "Attendi un istante...");
+            if (game.tavolo.length >= game.numGiocatoriInPresa()) return socket.emit('errore', "La presa si sta chiudendo...");
+
+            const player = game.players[pIdx];
+            const carta = player.mano[dati.cartaIdx];
+            if (!carta || carta.giocata) return;
+
+            if (!game.puoGiocareCarta(pIdx, carta)) {
+                return socket.emit('errore', `Devi rispondere al seme di uscita (${game.tavolo[0].card.seme})!`);
+            }
+
+            carta.giocata = true;
+            game.tavolo.push({ playerId: pIdx, card: carta });
+
+            if (game.tavolo.length >= game.numGiocatoriInPresa()) {
+                inviaStatoCiapano(code);
+                setTimeout(() => risolviPresaCiapano(code), 1200);
+            } else {
+                game.turnoAttuale = game.prossimoGiocatoreAttivo((game.turnoAttuale + 1) % game.numPlayers);
+                game.acceptInput = false;
+                setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 300);
+                inviaStatoCiapano(code);
+                gestisciIA_Ciapano(code);
+                avviaTimerTurnoCiapano(code);
+            }
+            salvaStatoMatch(code);
+        } catch (e) {
+            console.error("Errore gioca_carta_ciapano:", e);
+        }
+    });
+
+    async function risolviPresaCiapano(code) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof CiapanoGame)) return;
+
+        const vincitore = game.calcolaVincitorePresa();
+        if (!vincitore) return;
+
+        io.to(code).emit('vincitore_presa_ciapano', { playerId: vincitore.playerId, card: vincitore.card });
+
+        game.players[vincitore.playerId].preseFatte.push(...game.tavolo.map(t => t.card));
+        game.tavolo.forEach(t => game.carteUscite.push(t.card));
+        game.ultimoPresista = vincitore.playerId;
+        game.tavolo = [];
+        game.turnoAttuale = vincitore.playerId;
+
+        game.acceptInput = false;
+        setTimeout(() => { if (lobbies[code]?.gameInstance) lobbies[code].gameInstance.acceptInput = true; }, 500);
+
+        const attivi = game.getGiocatoriAttivi();
+        const smazzataFinita = attivi.every(p => p.mano.every(c => c.giocata));
+
+        if (smazzataFinita) {
+            const { isCappotto, cappottoPlayerId } = game.calcolaFineSmazzata();
+            return concludiSmazzataCiapano(code, isCappotto, cappottoPlayerId);
+        } else {
+            inviaStatoCiapano(code);
+            gestisciIA_Ciapano(code);
+            avviaTimerTurnoCiapano(code);
+        }
+    }
+
+    async function concludiSmazzataCiapano(code, isCappotto = false, cappottoPlayerId = -1) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof CiapanoGame)) return;
+
+        const { gameOver } = game.applicaPunteggi(isCappotto, cappottoPlayerId);
+
+        const punteggiSmazzata = game.players.map(p => ({
+            id: p.id,
+            nome: p.nome,
+            puntiSmazzata: p.puntiSmazzata,
+            puntiTotali: p.puntiTotali,
+            eliminato: p.eliminato
+        }));
+
+        io.to(code).emit('fine_smazzata_ciapano', {
+            punteggi: punteggiSmazzata,
+            gameOver: gameOver,
+            cappotto: isCappotto,
+            cappottoPlayerId: cappottoPlayerId
+        });
+
+        if (gameOver) {
+            game.fase = "fine_partita";
+            const classificaFinale = [...game.players].sort((a, b) => {
+                if (a.eliminato !== b.eliminato) return a.eliminato ? 1 : -1;
+                return a.puntiTotali - b.puntiTotali;
+            });
+
+            if (dbConnected) {
+                const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
+                if (humanPlayers.length > 0) {
+                    try {
+                        const userProfiles = await User.find({ uniqueCode: { $in: humanPlayers.map(p => p.uniqueCode) } });
+                        const profileMap = {};
+                        userProfiles.forEach(u => profileMap[u.uniqueCode] = u);
+
+                        for (let p of humanPlayers) {
+                            const currentElo = profileMap[p.uniqueCode]?.eloCiapano || 1000;
+                            const otherElos = game.players.filter(pl => pl.id !== p.id).map(pl => {
+                                if (pl.isHuman) return profileMap[pl.uniqueCode]?.eloCiapano || 1000;
+                                return 1000;
+                            });
+                            const avgOpponentElo = otherElos.length > 0 ? (otherElos.reduce((a, b) => a + b, 0) / otherElos.length) : 1000;
+
+                            const rank = classificaFinale.findIndex(cf => cf.id === p.id);
+                            const actualScore = (game.numPlayers - 1 - rank) / (game.numPlayers - 1);
+                            const expectedScore = 1 / (1 + Math.pow(10, (avgOpponentElo - currentElo) / 400));
+                            const matchesPlayed = profileMap[p.uniqueCode]?.partiteGiocate || 0;
+                            const K = matchesPlayed < 30 ? 50 : 25;
+                            let eloChange = Math.round(K * (actualScore - expectedScore));
+
+                            const isWinner = (p.id === classificaFinale[0].id) ? 1 : 0;
+
+                            await User.updateOne(
+                                { uniqueCode: p.uniqueCode },
+                                {
+                                    $inc: {
+                                        partiteGiocate: 1,
+                                        partiteVinte: isWinner,
+                                        eloCiapano: eloChange
+                                    }
+                                }
+                            );
+                            p.eloChange = eloChange;
+                        }
+                    } catch (errElo) {
+                        console.error("Errore salvataggio ELO Ciapanò:", errElo);
+                    }
+                }
+            }
+
+            io.to(code).emit('fine_partita_ciapano', {
+                classifica: classificaFinale.map((p, idx) => ({
+                    posizione: idx + 1,
+                    nome: p.nome,
+                    puntiTotali: p.puntiTotali,
+                    eliminato: p.eliminato,
+                    eloChange: p.eloChange || 0,
+                    stemma: ottieniStemma(p.uniqueCode, p.nome)
+                }))
+            });
+            salvaStatoMatch(code);
+        } else {
+            setTimeout(() => {
+                const curLobby = lobbies[code];
+                if (!curLobby || !curLobby.gameInstance) return;
+                const curGame = curLobby.gameInstance;
+                curGame.smazzataNum++;
+                curGame.indiceMazziere = curGame.prossimoGiocatoreAttivo((curGame.indiceMazziere + 1) % curGame.numPlayers);
+                curGame.distribuisci();
+                inviaStatoCiapano(code);
+                gestisciIA_Ciapano(code);
+                avviaTimerTurnoCiapano(code);
+                salvaStatoMatch(code);
+            }, 3500);
+        }
+    }
+
+    function gestisciIA_Ciapano(code) {
+        const game = lobbies[code]?.gameInstance;
+        if (!game || !(game instanceof CiapanoGame)) return;
+        const attivo = game.players[game.turnoAttuale];
+        if (!attivo || attivo.isHuman || game.botThinking || game.tavolo.length >= game.numGiocatoriInPresa()) return;
+
+        game.botThinking = true;
+
+        setTimeout(() => {
+            const currentGame = lobbies[code]?.gameInstance;
+            if (!currentGame || !(currentGame instanceof CiapanoGame)) return;
+            const p = currentGame.players[currentGame.turnoAttuale];
+            if (!p || p.isHuman) {
+                currentGame.botThinking = false;
+                return;
+            }
+
+            const giocabili = currentGame.carteGiocabili(currentGame.turnoAttuale);
+            if (giocabili.length === 0) {
+                currentGame.botThinking = false;
+                return;
+            }
+
+            let cartaScelta = null;
+
+            if (currentGame.tavolo.length === 0) {
+                // Gioca preferibilmente carte basse non di presa, evitando di aprire con un Asso
+                const ordinate = [...giocabili].sort((a, b) => PESO_VALORE_CIAPANO[a.valore] - PESO_VALORE_CIAPANO[b.valore]);
+                cartaScelta = ordinate.find(c => c.valore !== 'Asso') || ordinate[0];
+            } else {
+                const semeUscita = currentGame.tavolo[0].card.seme;
+                const haSeme = giocabili.some(c => c.seme === semeUscita);
+
+                if (haSeme) {
+                    const vincenteAttuale = currentGame.calcolaVincitorePresa();
+                    const pesoVincente = PESO_VALORE_CIAPANO[vincenteAttuale.card.valore];
+
+                    const carteSotto = giocabili.filter(c => PESO_VALORE_CIAPANO[c.valore] < pesoVincente);
+                    if (carteSotto.length > 0) {
+                        // Liscia con la carta più alta che rimane sotto alla vincente
+                        carteSotto.sort((a, b) => PESO_VALORE_CIAPANO[b.valore] - PESO_VALORE_CIAPANO[a.valore]);
+                        cartaScelta = carteSotto[0];
+                    } else {
+                        // Deve superare: gioca la carta che assegna meno punti
+                        giocabili.sort((a, b) => {
+                            const ptA = puntiCartaCiapano(a.valore);
+                            const ptB = puntiCartaCiapano(b.valore);
+                            if (ptA !== ptB) return ptA - ptB;
+                            return PESO_VALORE_CIAPANO[a.valore] - PESO_VALORE_CIAPANO[b.valore];
+                        });
+                        cartaScelta = giocabili[0];
+                    }
+                } else {
+                    // Spalato: scarta le carte che danno più punti (Assi poi Figure/2/3) con gerarchia più alta
+                    const perPunti = [...giocabili].sort((a, b) => {
+                        const ptA = puntiCartaCiapano(a.valore);
+                        const ptB = puntiCartaCiapano(b.valore);
+                        if (ptB !== ptA) return ptB - ptA;
+                        return PESO_VALORE_CIAPANO[b.valore] - PESO_VALORE_CIAPANO[a.valore];
+                    });
+                    cartaScelta = perPunti[0];
+                }
+            }
+
+            const cartaIdx = p.mano.findIndex(c => !c.giocata && c.valore === cartaScelta.valore && c.seme === cartaScelta.seme);
+            currentGame.botThinking = false;
+
+            if (cartaIdx !== -1) {
+                const c = p.mano[cartaIdx];
+                c.giocata = true;
+                currentGame.tavolo.push({ playerId: currentGame.turnoAttuale, card: c });
+
+                if (currentGame.tavolo.length >= currentGame.numGiocatoriInPresa()) {
+                    inviaStatoCiapano(code);
+                    setTimeout(() => risolviPresaCiapano(code), 1200);
+                } else {
+                    currentGame.turnoAttuale = currentGame.prossimoGiocatoreAttivo((currentGame.turnoAttuale + 1) % currentGame.numPlayers);
+                    inviaStatoCiapano(code);
+                    gestisciIA_Ciapano(code);
+                    avviaTimerTurnoCiapano(code);
+                }
+                salvaStatoMatch(code);
+            }
+        }, 800 + Math.floor(Math.random() * 400));
+    }
+
+    function avviaTimerTurnoCiapano(code) {
+        if (turnTimers[code]) {
+            clearTimeout(turnTimers[code]);
+            delete turnTimers[code];
+        }
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof CiapanoGame)) return;
+        if (game.tavolo.length >= game.numGiocatoriInPresa()) return;
+
+        const activePlayer = game.players[game.turnoAttuale];
+        if (activePlayer && activePlayer.isHuman) {
+            turnTimers[code] = setTimeout(() => {
+                autogiocaTurnoCiapano(code, game.turnoAttuale);
+            }, 30000);
+        }
+    }
+
+    function autogiocaTurnoCiapano(code, playerIdx) {
+        const lobby = lobbies[code];
+        const game = lobby?.gameInstance;
+        if (!game || !(game instanceof CiapanoGame) || game.turnoAttuale !== playerIdx) return;
+        const p = game.players[playerIdx];
+        if (!p) return;
+        const giocabili = game.carteGiocabili(playerIdx);
+        if (giocabili.length === 0) return;
+        const cartaScelta = giocabili[0];
+        const cIdx = p.mano.findIndex(c => !c.giocata && c.valore === cartaScelta.valore && c.seme === cartaScelta.seme);
+        if (cIdx !== -1) {
+            const carta = p.mano[cIdx];
+            carta.giocata = true;
+            game.tavolo.push({ playerId: playerIdx, card: carta });
+            if (game.tavolo.length >= game.numGiocatoriInPresa()) {
+                inviaStatoCiapano(code);
+                setTimeout(() => risolviPresaCiapano(code), 1200);
+            } else {
+                game.turnoAttuale = game.prossimoGiocatoreAttivo((game.turnoAttuale + 1) % game.numPlayers);
+                inviaStatoCiapano(code);
+                gestisciIA_Ciapano(code);
+                avviaTimerTurnoCiapano(code);
             }
             salvaStatoMatch(code);
         }
