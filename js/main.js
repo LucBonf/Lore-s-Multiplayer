@@ -1731,6 +1731,14 @@ function translatePage(lang) {
         }
     });
 
+    const titleElements = document.querySelectorAll('[data-i18n-title]');
+    titleElements.forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        if (d[key]) {
+            el.title = d[key];
+        }
+    });
+
     const reportBtn = document.getElementById('report-btn');
     if (reportBtn && d.reportBtnTooltip) {
         reportBtn.title = d.reportBtnTooltip;
