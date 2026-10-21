@@ -126,7 +126,8 @@ const reportSchema = new mongoose.Schema({
     nickname: { type: String, default: 'Sconosciuto' },
     testo: { type: String, required: true },
     roomCode: { type: String, default: null },
-    matchId: { type: String, default: null }
+    matchId: { type: String, default: null },
+    gioco: { type: String, default: 'N/D' }
 });
 const Report = mongoose.model('Report', reportSchema);
 
@@ -639,13 +640,45 @@ app.get('/stato-segreta-report-777', authAdmin, async (req, res) => {
             if (reports.length === 0) {
                 html += "<p>Nessuna segnalazione nel database.</p>";
             } else {
+                const colorsGioco = {
+                    'scopa': '#27ae60',
+                    'ciapano': '#e74c3c',
+                    'rubamazzetto': '#9b59b6',
+                    'briscola': '#e67e22',
+                    'tressette': '#2980b9',
+                    'lucas': '#f1c40f',
+                    'generale': '#95a5a6'
+                };
+                const nomiGioco = {
+                    'scopa': 'Scopa',
+                    'ciapano': 'Ciapanò',
+                    'rubamazzetto': 'Rubamazzetto',
+                    'briscola': 'Briscola',
+                    'tressette': 'Tressette',
+                    'lucas': 'Lucas',
+                    'generale': 'Altro / Generale'
+                };
                 reports.forEach(r => {
                     const matchInfo = r.matchId ? '<br><span style="color: #2ecc71; font-size: 0.8rem;">Partita ID: ' + r.matchId + ' (Room: ' + r.roomCode + ')</span>' : '';
+                    let gKey = (r.gioco || '').toLowerCase();
+                    if (!gKey || gKey === 'n/d') {
+                        if (r.matchId?.startsWith('S-')) gKey = 'scopa';
+                        else if (r.matchId?.startsWith('C-')) gKey = 'ciapano';
+                        else if (r.matchId?.startsWith('R-')) gKey = 'rubamazzetto';
+                        else if (r.matchId?.startsWith('B-')) gKey = 'briscola';
+                        else if (r.matchId?.startsWith('T-')) gKey = 'tressette';
+                        else if (r.matchId?.startsWith('M-')) gKey = 'lucas';
+                    }
+                    const colore = colorsGioco[gKey] || '#7f8c8d';
+                    const testoColore = (gKey === 'lucas') ? '#000' : '#fff';
+                    const nomeVisualizzato = nomiGioco[gKey] || r.gioco || 'N/D';
+                    const badgeGioco = `<span style="background: ${colore}; color: ${testoColore}; font-size: 0.75rem; font-weight: bold; padding: 3px 8px; border-radius: 10px; margin-left: 8px; text-transform: uppercase; letter-spacing: 0.5px;">🎮 ${nomeVisualizzato}</span>`;
                     html += `
                     <div class="report-card" id="card-${r._id}">
                         <button class="delete-btn" onclick="eliminaReport('${r._id}')">🗑️</button>
                         <span class="report-date">${r.data.toLocaleString('it-IT')}</span> - 
                         <span class="report-user">Utente: ${r.nickname}</span>
+                        ${badgeGioco}
                         ${matchInfo}
                         <br>
                         <p style="margin-top: 10px; font-style: italic;">"${r.testo}"</p>
@@ -2868,12 +2901,40 @@ io.on('connection', (socket) => {
         avviaTimerTurno(code);
     }
 
-    socket.on('bug_report', async (testo) => {
+    socket.on('bug_report', async (payload) => {
         try {
             if (!dbConnected) return;
+            const testo = (typeof payload === 'string') ? payload : (payload?.testo || '');
+            if (!testo || typeof testo !== 'string' || testo.trim() === '') return;
+
             const lobby = Object.values(lobbies).find(l => l.giocatori.some(p => p.id === socket.id));
             const matchId = lobby?.gameInstance?.matchId || null;
             const roomCode = lobby ? Object.keys(lobbies).find(key => lobbies[key] === lobby) : null;
+
+            let gameType = (typeof payload === 'object' && payload?.gameType) ? payload.gameType : null;
+            if (lobby) {
+                if (lobby.gameInstance instanceof ScopaGame) gameType = 'scopa';
+                else if (lobby.gameInstance instanceof CiapanoGame) gameType = 'ciapano';
+                else if (lobby.gameInstance instanceof RubamazzettoGame) gameType = 'rubamazzetto';
+                else if (lobby.gameInstance instanceof BriscolaGame) gameType = 'briscola';
+                else if (lobby.gameInstance instanceof TressetteGame) gameType = 'tressette';
+                else if (lobby.parametri?.gameType) gameType = lobby.parametri.gameType;
+                else if (matchId?.startsWith('S-')) gameType = 'scopa';
+                else if (matchId?.startsWith('C-')) gameType = 'ciapano';
+                else if (matchId?.startsWith('R-')) gameType = 'rubamazzetto';
+                else if (matchId?.startsWith('B-')) gameType = 'briscola';
+                else if (matchId?.startsWith('T-')) gameType = 'tressette';
+                else if (matchId?.startsWith('M-')) gameType = 'lucas';
+            }
+            if (!gameType) {
+                if (matchId?.startsWith('S-')) gameType = 'scopa';
+                else if (matchId?.startsWith('C-')) gameType = 'ciapano';
+                else if (matchId?.startsWith('R-')) gameType = 'rubamazzetto';
+                else if (matchId?.startsWith('B-')) gameType = 'briscola';
+                else if (matchId?.startsWith('T-')) gameType = 'tressette';
+                else if (matchId?.startsWith('M-')) gameType = 'lucas';
+                else gameType = 'lucas';
+            }
 
             const playerInLobby = lobby?.giocatori?.find(p => p.id === socket.id);
             const nickname = playerInLobby ? playerInLobby.nome : (socket.userNickname || "Anonimo");
@@ -2882,10 +2943,11 @@ io.on('connection', (socket) => {
                 nickname: nickname,
                 testo: testo.substring(0, 500),
                 roomCode: roomCode,
-                matchId: matchId
+                matchId: matchId,
+                gioco: gameType
             });
             await newReport.save();
-            console.log(`🪲 Report salvato su DB da ${newReport.nickname} (Match: ${matchId || 'N/A'})`);
+            console.log(`🪲 Report salvato su DB da ${newReport.nickname} (Gioco: ${gameType}, Match: ${matchId || 'N/A'})`);
         } catch (e) {
             console.error("Errore bug_report:", e);
         }
@@ -4366,6 +4428,7 @@ io.on('connection', (socket) => {
             io.to(code).emit('mossa_scopa', {
                 playerIdx,
                 nome: player.nome,
+                carta: res.cartaGiocata,
                 ...res
             });
 
@@ -4409,6 +4472,7 @@ io.on('connection', (socket) => {
                         nome: p.nome,
                         isHuman: p.isHuman,
                         numCarte: p.mano.length,
+                        mano: isMe ? giocatoreUmano.mano : undefined,
                         preseCount: p.prese.length,
                         cimaMazzetto: game.getCimaMazzetto(i),
                         scopeCount: p.scope,
@@ -4434,6 +4498,7 @@ io.on('connection', (socket) => {
         const ris = game.calcolaPunteggiSmazzata();
 
         io.to(code).emit('fine_smazzata_scopa', {
+            smazzataNum: game.smazzataNum,
             punteggi: game.players.map(p => ({
                 id: p.id,
                 nome: p.nome,
@@ -4524,6 +4589,7 @@ io.on('connection', (socket) => {
             io.to(code).emit('mossa_scopa', {
                 playerIdx: currentGame.turnoAttuale,
                 nome: p.nome,
+                carta: res.cartaGiocata,
                 ...res
             });
 
@@ -4537,7 +4603,7 @@ io.on('connection', (socket) => {
                 avviaTimerTurnoScopa(code);
             }
             salvaStatoMatch(code);
-        }, 800 + Math.floor(Math.random() * 400));
+        }, 1200 + Math.floor(Math.random() * 500));
     }
 
     function avviaTimerTurnoScopa(code) {
@@ -4569,6 +4635,7 @@ io.on('connection', (socket) => {
         io.to(code).emit('mossa_scopa', {
             playerIdx,
             nome: p.nome,
+            carta: res.cartaGiocata,
             ...res
         });
 
@@ -4654,6 +4721,7 @@ io.on('connection', (socket) => {
                         nome: p.nome,
                         isHuman: p.isHuman,
                         numCarte: p.mano.length,
+                        mano: isMe ? giocatoreUmano.mano : undefined,
                         mazzettoCount: p.mazzetto.length,
                         cimaMazzetto: p.cimaMazzetto,
                         puntiTotali: p.puntiTotali,
@@ -4905,6 +4973,7 @@ io.on('connection', (socket) => {
                         nome: p.nome,
                         isHuman: p.isHuman,
                         numCarte: p.mano.length,
+                        mano: isMe ? giocatoreUmano.mano : undefined,
                         cartePreseCount: p.prese.length,
                         puntiTotali: p.puntiTotali,
                         ruolo: ruoloVisibile,
@@ -5174,6 +5243,7 @@ io.on('connection', (socket) => {
                         nome: p.nome,
                         isHuman: p.isHuman,
                         numCarte: p.mano.length,
+                        mano: isMe ? giocatoreUmano.mano : undefined,
                         cartePreseCount: p.prese.length,
                         puntiTotali: p.puntiTotali,
                         puntiSmazzata: p.puntiSmazzata,

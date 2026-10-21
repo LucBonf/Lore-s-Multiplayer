@@ -211,6 +211,13 @@ function switchSection(activeId) {
             btnReplays.style.display = (activeId === 'setup-menu' && currentGameType === 'lucas') ? 'inline-block' : 'none';
         }
 
+        // Chiudi banner ultima azione scopa se si esce dalla game-area
+        const scopaBanner = document.getElementById('scopa-last-action');
+        if (scopaBanner && activeId !== 'game-area') {
+            scopaBanner.style.display = 'none';
+            scopaBanner.style.opacity = '0';
+        }
+
 
     } catch (e) {
         console.error("Errore in switchSection:", e);
@@ -1634,7 +1641,14 @@ window.chiudiLingua = () => {
 
 window.apriReport = () => {
     const modal = document.getElementById('modal-report');
-    if (modal) modal.style.display = 'block';
+    if (modal) {
+        modal.style.display = 'block';
+        const sel = document.getElementById('report-game-select');
+        if (sel) {
+            const g = (typeof currentGameType !== 'undefined' && currentGameType) ? currentGameType : 'lucas';
+            sel.value = g;
+        }
+    }
 };
 
 window.chiudiReport = () => {
@@ -1656,7 +1670,7 @@ window.chiudiReport = () => {
 
 window.inviaSegnalazione = () => {
     const lang = localStorage.getItem('lucas_lang') || 'it';
-    const d = dictionary[lang];
+    const d = dictionary[lang] || dictionary['it'];
     const ta = document.getElementById('valore-report');
     if (!ta) return;
     
@@ -1666,7 +1680,9 @@ window.inviaSegnalazione = () => {
         return;
     }
     
-    socket.emit('bug_report', text);
+    const sel = document.getElementById('report-game-select');
+    const gType = sel ? sel.value : ((typeof currentGameType !== 'undefined' && currentGameType) ? currentGameType : 'lucas');
+    socket.emit('bug_report', { testo: text, gameType: gType });
     chiudiReport();
     
     // Mostriamo un avviso testuale di successo usando window.alert 
@@ -2727,38 +2743,121 @@ socket.on('conferma_inizio_scopa', (dati) => {
     setTimeout(() => { canPlay = true; }, 400);
 });
 
-socket.on('mossa_scopa', (dati) => {
-    if (dati.carta) sound.playCardPlay(dati.carta);
+function mostraMossaScopa(dati) {
+    const cartaGiocata = dati.cartaGiocata || dati.carta;
+    if (cartaGiocata) sound.playCardPlay(cartaGiocata);
+
     const mioIndice = window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.isMe || p.socketId === socket.id);
     const isMe = (dati.playerIdx === mioIndice);
+
+    if (dati.presa) {
+        sound.playTrickWon(isMe);
+    }
+
+    const pBlock = document.querySelector(`.player-block[data-player-id="${dati.playerIdx}"]`);
+    if (pBlock) {
+        pBlock.classList.add('winner-pulse');
+        setTimeout(() => pBlock.classList.remove('winner-pulse'), 1500);
+    }
+
+    const banner = document.getElementById('scopa-last-action');
+    if (!banner || !cartaGiocata) return;
+
+    banner.className = 'scopa-action-banner';
+
+    let titolo = `🃏 ${dati.nome} cala`;
+    if (dati.isScopa || dati.scopa) {
+        titolo = `🧹 SCOPA di ${dati.nome}!`;
+        banner.classList.add('scopa-gold');
+    } else if (dati.tipoPresa === 'asso_piglia_tutto') {
+        titolo = `⚡ ASSO PIGLIA TUTTO di ${dati.nome}!`;
+        banner.classList.add('scopa-cyan');
+    } else if (dati.tipoPresa === 'furto') {
+        titolo = `🥷 FURTO di ${dati.nome} a ${dati.rubatoANome || 'avversario'}!`;
+        banner.classList.add('scopa-purple');
+    } else if (dati.presa) {
+        titolo = `🎯 ${dati.nome} prende!`;
+    } else {
+        banner.classList.add('scopa-blue');
+    }
+
+    const cartaGiocataHtml = `<div class="card mini-move seme-${cartaGiocata.seme} val-${cartaGiocata.valore}" title="${cartaGiocata.valore} di ${cartaGiocata.seme}"></div>`;
+
+    let cartePreseHtml = '';
+    const cartePrese = dati.cartePreseDalTavolo || (dati.cartePrese ? dati.cartePrese.filter(c => !(c.valore === cartaGiocata.valore && c.seme === cartaGiocata.seme)) : []);
+
+    if (dati.tipoPresa === 'furto') {
+        cartePreseHtml = `<div class="scopa-action-arrow">➔</div><div style="font-weight:bold; color:#e056fd; font-size:0.85rem; padding: 4px 8px; background: rgba(155,89,182,0.25); border-radius: 6px;">🥷 Mazzetto intero (${dati.cartePrese ? dati.cartePrese.length : 'tutte'} carte)</div>`;
+    } else if (dati.presa) {
+        if (cartePrese && cartePrese.length > 0) {
+            const cardsHtml = cartePrese.map(c => `<div class="card mini-move seme-${c.seme} val-${c.valore}" title="${c.valore} di ${c.seme}"></div>`).join('');
+            cartePreseHtml = `<div class="scopa-action-arrow">➔</div><div class="scopa-action-group">${cardsHtml}</div>`;
+        } else if (dati.tipoPresa === 'asso_piglia_tutto') {
+            cartePreseHtml = `<div class="scopa-action-arrow">➔</div><div style="font-weight:bold; color:#00d2d3; font-size:0.85rem; padding: 4px 8px; background: rgba(0,210,211,0.25); border-radius: 6px;">⚡ Spazza il tavolo!</div>`;
+        }
+    }
+
+    banner.innerHTML = `
+        <div class="scopa-action-title">${titolo}</div>
+        <div class="scopa-action-cards">
+            <div class="scopa-action-group">${cartaGiocataHtml}</div>
+            ${cartePreseHtml}
+        </div>
+    `;
+    banner.style.display = 'flex';
+    banner.style.opacity = '1';
+
+    if (window.scopaActionTimeout) {
+        clearTimeout(window.scopaActionTimeout);
+    }
+    window.scopaActionTimeout = setTimeout(() => {
+        banner.style.opacity = '0';
+        setTimeout(() => {
+            if (banner.style.opacity === '0') banner.style.display = 'none';
+        }, 300);
+    }, 3200);
+
+    const iconSemeGiocata = getSemeSimbolo(cartaGiocata.seme);
+    let descrPrese = '';
+    if (dati.tipoPresa === 'furto') {
+        descrPrese = ` ➔ Ruba mazzetto a ${dati.rubatoANome || 'avversario'}`;
+    } else if (cartePrese.length > 0) {
+        const elenco = cartePrese.map(c => `${c.valore}${getSemeSimbolo(c.seme)}`).join(', ');
+        descrPrese = ` ➔ Prende [${elenco}]`;
+    } else if (dati.presa) {
+        descrPrese = ` ➔ Prende tutto`;
+    }
+    window.ultimaMossaScopaInfo = `Ultima mossa: ${dati.nome} [${cartaGiocata.valore}${iconSemeGiocata}]${descrPrese}`;
+}
+
+socket.on('mossa_scopa', (dati) => {
+    mostraMossaScopa(dati);
     const lang = localStorage.getItem('lucas_lang') || 'it';
     const d = dictionary[lang] || dictionary['it'];
 
     if (dati.tipoPresa === 'furto') {
-        sound.playTrickWon(isMe);
         const template = d.alertFurto || "🥷 FURTO! {name} ha rubato il mazzetto di {victim}!";
         mostraErrore(template.replace('{name}', dati.nome).replace('{victim}', dati.rubatoANome || 'avversario'));
     } else if (dati.tipoPresa === 'asso_piglia_tutto') {
-        sound.playTrickWon(isMe);
         const template = d.alertAssoPigliaTutto || "⚡ ASSO PIGLIA TUTTO! {name} ha spazzato il tavolo!";
         mostraErrore(template.replace('{name}', dati.nome));
     } else if (dati.isScopa || dati.scopa) {
-        sound.playTrickWon(isMe);
         const template = d.alertScopa || "🧹 SCOPA di {name}!";
         mostraErrore(template.replace('{name}', dati.nome));
     }
 });
 
 socket.on('fine_smazzata_scopa', (data) => {
-    let msg = `Fine Smazzata ${data.smazzataNum}!\n`;
+    let msg = `Fine Smazzata ${data.smazzataNum || ''}!\n`;
     if (data.punteggi && data.punteggi.length > 0) {
         data.punteggi.forEach(p => {
             const dettagli = [];
+            const dett = p.dettaglio || {};
             if (p.scope > 0) dettagli.push(`Scope: ${p.scope}`);
-            if (p.carte > 0) dettagli.push(`Carte: +1`);
-            if (p.denari > 0) dettagli.push(`Denari: +1`);
-            if (p.settebello > 0) dettagli.push(`Settebello: +1`);
-            if (p.primiera > 0) dettagli.push(`Primiera: +1`);
+            if (dett.carte > 0) dettagli.push(`Carte: +1`);
+            if (dett.denari > 0) dettagli.push(`Denari: +1`);
+            if (dett.settebello > 0) dettagli.push(`Settebello: +1`);
+            if (dett.primiera > 0) dettagli.push(`Primiera: +1`);
             const strDet = dettagli.length > 0 ? ` (${dettagli.join(', ')})` : '';
             msg += `${p.nome}: +${p.puntiSmazzata} pt${strDet} -> Totale: ${p.puntiTotali} pt\n`;
         });
@@ -2810,7 +2909,8 @@ function renderGiocatoriScopa(data) {
     if (data.variante === 'asso_piglia_tutto') labelVariante = '⚡ Asso Piglia Tutto';
     else if (data.variante === 'scopa_ladra') labelVariante = '🥷 Scopa Ladra';
     else if (data.variante === 'combinata') labelVariante = '🔥 Asso + Ladra';
-    infoGiro.innerText = `${labelVariante} | Smazzata ${data.smazzataNum} | Obiettivo: ${data.limitePunti || 11} pt`;
+    const subInfo = window.ultimaMossaScopaInfo ? ` | ${window.ultimaMossaScopaInfo}` : '';
+    infoGiro.innerText = `${labelVariante} | Smazzata ${data.smazzataNum} | Obiettivo: ${data.limitePunti || 11} pt${subInfo}`;
 
     const isMobile = window.innerWidth <= 768;
     const scalaPlayerBlock = isMobile ? 1 : 1;
@@ -2882,7 +2982,7 @@ function renderGiocatoriScopa(data) {
             const myHandCont = document.createElement('div');
             myHandCont.id = 'tu-mano';
             pBlock.appendChild(myHandCont);
-            renderTuaManoScopa(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale);
+            renderTuaManoScopa(myHandCont, p.mano || data.mano, serverPlayerIndex === data.turnoAttuale);
         } else {
             const oppHandCont = document.createElement('div');
             oppHandCont.className = 'opponent-hand';
@@ -3130,7 +3230,7 @@ function renderGiocatoriRubamazzetto(data) {
             const myHandCont = document.createElement('div');
             myHandCont.id = 'tu-mano';
             pBlock.appendChild(myHandCont);
-            renderTuaManoRubamazzetto(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale);
+            renderTuaManoRubamazzetto(myHandCont, p.mano || data.mano, serverPlayerIndex === data.turnoAttuale);
         } else {
             const oppHandCont = document.createElement('div');
             oppHandCont.className = 'opponent-hand';
@@ -3444,7 +3544,7 @@ function renderGiocatoriBriscola(data) {
             const myHandCont = document.createElement('div');
             myHandCont.id = 'tu-mano';
             pBlock.appendChild(myHandCont);
-            renderTuaManoBriscola(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale, data.semeBriscola);
+            renderTuaManoBriscola(myHandCont, p.mano || data.mano, serverPlayerIndex === data.turnoAttuale, data.semeBriscola);
         } else {
             const oppHandCont = document.createElement('div');
             oppHandCont.className = 'opponent-hand';
@@ -3805,7 +3905,7 @@ function renderGiocatoriTressette(data) {
             const myHandCont = document.createElement('div');
             myHandCont.id = 'tu-mano';
             pBlock.appendChild(myHandCont);
-            renderTuaManoTressette(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale, data.tavolo);
+            renderTuaManoTressette(myHandCont, p.mano || data.mano, serverPlayerIndex === data.turnoAttuale, data.tavolo);
         } else {
             const oppHandCont = document.createElement('div');
             oppHandCont.className = 'opponent-hand';

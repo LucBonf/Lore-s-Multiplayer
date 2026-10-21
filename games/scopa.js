@@ -222,6 +222,7 @@ class ScopaGame {
                             rubatoAIdx: oppIdx,
                             rubatoANome: opp.nome,
                             cartePrese: tutteCatturate,
+                            cartePreseDalTavolo: [],
                             isScopa: false
                         };
                     }
@@ -249,6 +250,7 @@ class ScopaGame {
                     presa: true,
                     tipoPresa: 'singola',
                     cartePrese: carteCatturate,
+                    cartePreseDalTavolo: [cAssoSulTavolo],
                     isScopa
                 };
             } else if (this.tavolo.length > 0) {
@@ -263,6 +265,7 @@ class ScopaGame {
                     presa: true,
                     tipoPresa: 'asso_piglia_tutto',
                     cartePrese: carteCatturate,
+                    cartePreseDalTavolo: cartePreseDalTavolo,
                     isScopa: false
                 };
             } else {
@@ -273,6 +276,7 @@ class ScopaGame {
                     presa: false,
                     tipoPresa: 'nessuna',
                     cartePrese: [],
+                    cartePreseDalTavolo: [],
                     isScopa: false
                 };
             }
@@ -308,6 +312,7 @@ class ScopaGame {
             presa: esitoPresa.presaPossibile,
             tipoPresa: esitoPresa.tipo,
             cartePrese: carteCatturate,
+            cartePreseDalTavolo: esitoPresa.cartePrese || [],
             isScopa
         };
     }

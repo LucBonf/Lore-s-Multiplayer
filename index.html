@@ -114,8 +114,20 @@
     <div id="modal-report" class="modal">
         <div class="modal-content" style="max-width: 500px; text-align: center;">
             <span class="close-btn" onclick="chiudiReport()">&times;</span>
-            <h2 data-i18n="reportTitle" style="color: #e74c3c; margin-top: 0;">Segnala un Problema</h2>
-            <textarea id="valore-report" data-i18n="reportPlaceholder" placeholder="Descrivi il problema in dettaglio..." maxlength="500" style="width: 100%; height: 150px; margin-top: 15px; padding: 10px; border-radius: 8px; border: 1px solid #7f8c8d; background:#2c3e50; color:#fff; font-family: 'Outfit', sans-serif; resize: none;"></textarea>
+            <h2 data-i18n="reportTitle" style="color: #e74c3c; margin-top: 0; margin-bottom: 8px;">Segnala un Problema</h2>
+            <div style="margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <label for="report-game-select" style="font-size: 0.95rem; font-weight: bold; color: #bbb;">🎮 Gioco:</label>
+                <select id="report-game-select" style="padding: 6px 14px; border-radius: 6px; background: #1e293b; color: #2ecc71; border: 1px solid #334155; font-weight: bold; font-family: 'Outfit', sans-serif; font-size: 0.95rem; cursor: pointer;">
+                    <option value="scopa">Scopa</option>
+                    <option value="lucas">Lucas</option>
+                    <option value="ciapano">Ciapanò (Traversone)</option>
+                    <option value="rubamazzetto">Rubamazzetto</option>
+                    <option value="briscola">Briscola</option>
+                    <option value="tressette">Tressette</option>
+                    <option value="generale">Altro / Generale</option>
+                </select>
+            </div>
+            <textarea id="valore-report" data-i18n="reportPlaceholder" placeholder="Descrivi il problema in dettaglio..." maxlength="500" style="width: 100%; height: 150px; margin-top: 5px; padding: 10px; border-radius: 8px; border: 1px solid #7f8c8d; background:#2c3e50; color:#fff; font-family: 'Outfit', sans-serif; resize: none;"></textarea>
             <div id="char-counter" style="text-align: right; font-size: 0.8rem; color: #7f8c8d; margin-top: 5px;">0 / 500 <span data-i18n="charLimit">caratteri</span></div>
             <button data-i18n="reportSubmit" onclick="inviaSegnalazione()" style="margin-top: 10px; padding: 10px 20px; font-weight: bold; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1rem; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">Invia Segnalazione</button>
         </div>
@@ -719,6 +731,7 @@
 
                 <div id="circular-table">
                     <div id="central-table">
+                        <div id="scopa-last-action" class="scopa-action-banner" style="display: none;"></div>
                         <div id="cards-on-table"></div>
                     </div>
                     <div id="players-circle"></div>

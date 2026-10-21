@@ -5,7 +5,10 @@ dotenv.config();
 const reportSchema = new mongoose.Schema({
     data: { type: Date, default: Date.now },
     nickname: { type: String, default: 'Sconosciuto' },
-    testo: { type: String, required: true }
+    testo: { type: String, required: true },
+    roomCode: { type: String, default: null },
+    matchId: { type: String, default: null },
+    gioco: { type: String, default: 'N/D' }
 });
 const Report = mongoose.model('Report', reportSchema);
 
@@ -26,7 +29,7 @@ async function checkReports() {
         } else {
             console.log(`Trovate ${reports.length} segnalazioni:\n`);
             reports.forEach(r => {
-                console.log(`[${r.data.toISOString()}] ${r.nickname}: ${r.testo}`);
+                console.log(`[${r.data.toISOString()}] [${r.gioco || 'N/D'}] ${r.nickname}: ${r.testo}`);
             });
         }
     } catch (err) {
