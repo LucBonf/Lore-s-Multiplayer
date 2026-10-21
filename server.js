@@ -8,6 +8,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 import filter from 'leo-profanity';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
+import { LucasGame, Player, Card, SEMI, VALORI, PESO_SEME, PESO_VALORE } from './games/lucas.js';
+import { CiapanoGame, CiapanoPlayer, puntiCartaCiapano, formattaPuntiCiapano, puntiCiapanoNumerico, calcolaDistrCiapano, PESO_VALORE_CIAPANO, SEMI_CIAPANO, VALORI_CIAPANO } from './games/ciapano.js';
 import { ScopaGame } from './games/scopa.js';
 import { RubamazzettoGame } from './games/rubamazzetto.js';
 import { BriscolaGame } from './games/briscola.js';
@@ -310,7 +313,17 @@ if (process.env.MONGODB_URI) {
     console.log('⚠️ Nessun MONGODB_URI trovato! Classifiche e Login provvisori (non persistenti).');
 }
 
-app.use(express.static(__dirname));
+app.use(compression());
+app.use(express.static(__dirname, {
+    maxAge: '1h',
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+        } else if (filePath.match(/\.(png|jpg|jpeg|gif|webp|svg|mp3|ogg|wav|ico)$/)) {
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+        }
+    }
+}));
 app.use(cookieParser());
 
 // --- MIDDLEWARE DI PROTEZIONE ADMIN ---
@@ -1417,352 +1430,7 @@ app.post('/elimina-report-777', authAdmin, express.json(), async (req, res) => {
 
 
 
-const SEMI = ["Coppe", "Denari", "Bastoni", "Spade"];
-const VALORI = ["Asso", "2", "3", "4", "5", "6", "7", "Fante", "Cavallo", "Re"];
-const PESO_SEME = { "Denari": 400, "Ori": 400, "Spade": 300, "Coppe": 200, "Bastoni": 100 };
-const PESO_VALORE = { "Asso": 12, "3": 11, "Re": 10, "Cavallo": 9, "Fante": 8, "7": 7, "6": 6, "5": 5, "4": 4, "2": 3 };
-
-class Card {
-    constructor(valore, seme) {
-        this.valore = valore;
-        this.seme = seme;
-        this.forza = PESO_SEME[seme] + PESO_VALORE[valore];
-        this.giocata = false;
-    }
-}
-
-class Player {
-    constructor(id, nome, isHuman = false, token = null, uniqueCode = null) {
-        this.id = id;
-        this.nome = nome;
-        this.isHuman = isHuman;
-        this.eloMomentaneo = 1000; // Valore predefinito, sovrascritto al login/join
-        if (!isHuman) {
-            const level = Math.floor(Math.random() * 4) + 1;
-            const agg = Math.floor(Math.random() * 101);
-            const cons = Math.floor(Math.random() * 101);
-            const sca = Math.floor(Math.random() * 101);
-            this.aiLevel = level;
-            this.aiParams = { agg, cons, sca };
-            this.aiVariant = `V${level}_A${agg}_C${cons}_S${sca}`;
-        } else {
-            this.aiVariant = "Human";
-        }
-        this.token = token;
-        this.uniqueCode = uniqueCode;
-        this.mano = [];
-        this.punti = 0;
-        this.dichiarazione = "-";
-        this.preseFatte = 0;
-        this.voidSuits = []; // Semi che il giocatore ha terminato (scoperti durante il gioco)
-        this.dichiarazioniAzzeccate = 0;
-    }
-    resetGiro() {
-        this.mano = [];
-        this.dichiarazione = "-";
-        this.preseFatte = 0;
-        this.voidSuits = [];
-    }
-}
-
-class LucasGame {
-    constructor(numPlayers) {
-        this.players = Array.from({ length: numPlayers }, (_, i) => new Player(i, `CPU ${i}`));
-        this.numPlayers = numPlayers;
-        this.indiceMazziere = Math.floor(Math.random() * numPlayers);
-        this.maxCarte = Math.floor(40 / numPlayers);
-        this.indiceGiro = 0;
-        this.tavolo = [];
-        this.fase = "scommesse";
-        this.sommaScommesse = 0;
-        this.acceptInput = true;
-        this.carteUscite = []; // MEMORIA: tiene traccia di tutte le carte giocate nel giro attuale
-        this.botThinking = false; // FLAG di sicurezza per evitare IA multiple concorrenti
-
-        let seq = [];
-        for (let i = 2; i <= this.maxCarte; i++) seq.push(i);
-        for (let i = this.maxCarte - 1; i >= 2; i--) seq.push(i);
-        seq.push(1); // Mano finale a 1 (Fronte)
-        this.sequenzaTurni = seq;
-        this.turnoAttuale = (this.indiceMazziere + 1) % numPlayers;
-    }
-
-    distribuisci() {
-        let mazzo = [];
-        SEMI.forEach(s => VALORI.forEach(v => mazzo.push(new Card(v, s))));
-        // Shuffle migliorato (Fisher-Yates)
-        for (let i = mazzo.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [mazzo[i], mazzo[j]] = [mazzo[j], mazzo[i]];
-        }
-
-        let qta = this.sequenzaTurni[this.indiceGiro];
-        this.players.forEach(p => {
-            p.resetGiro();
-            for (let i = 0; i < qta; i++) {
-                const c = mazzo.pop();
-                if (c) p.mano.push(c);
-            }
-        });
-        this.fase = "scommesse";
-        this.turnoAttuale = (this.indiceMazziere + 1) % this.players.length;
-        this.sommaScommesse = 0;
-        this.tavolo = [];
-        this.carteUscite = []; // Reset memoria a ogni nuova distribuzione
-    }
-
-    calcolaVincitorePresa() {
-        return this.tavolo.reduce((migliore, attuale) => {
-            // Poiché la "forza" include già il peso assoluto del seme (es. Denari > Spade > Coppe > Bastoni)
-            // e del valore della carta, vince semplicemente la carta con la forza maggiore.
-            return (attuale.card.forza > migliore.card.forza) ? attuale : migliore;
-        });
-    }
-}
-
-// =============================================
-// CIAPANÒ (TRAVERSONE) - LOGICA DI GIOCO
-// =============================================
-
-const PESO_VALORE_CIAPANO = { "3": 10, "2": 9, "Asso": 8, "Re": 7, "Cavallo": 6, "Fante": 5, "7": 4, "6": 3, "5": 2, "4": 1 };
-
-function puntiCartaCiapano(valore) {
-    if (valore === 'Asso') return 3; // 1 punto = 3 terzi
-    if (['3', '2', 'Re', 'Cavallo', 'Fante'].includes(valore)) return 1; // 1/3 punto = 1 terzo
-    return 0; // 7, 6, 5, 4 = 0 punti
-}
-
-function formattaPuntiCiapano(punti) {
-    return `${punti}`;
-}
-
-function puntiCiapanoNumerico(punti) {
-    return punti;
-}
-
-function calcolaDistrCiapano(numPlayers) {
-    switch (numPlayers) {
-        case 2: return { cartePerGiocatore: 20, scartiRegola: 'nessuno' };
-        case 3: return { cartePerGiocatore: 13, scartiRegola: 'un_4' };
-        case 4: return { cartePerGiocatore: 10, scartiRegola: 'nessuno' };
-        case 5: return { cartePerGiocatore: 8, scartiRegola: 'nessuno' };
-        case 6: return { cartePerGiocatore: 6, scartiRegola: 'tutti_4' };
-        case 7: return { cartePerGiocatore: 5, scartiRegola: 'tutti_4_un_5' };
-        case 8: return { cartePerGiocatore: 5, scartiRegola: 'nessuno' };
-        default: return { cartePerGiocatore: 10, scartiRegola: 'nessuno' };
-    }
-}
-
-class CiapanoPlayer {
-    constructor(id, nome, isHuman = false, token = null, uniqueCode = null) {
-        this.id = id;
-        this.nome = nome;
-        this.isHuman = isHuman;
-        this.token = token;
-        this.uniqueCode = uniqueCode;
-        this.mano = [];
-        this.preseFatte = []; // carte prese (array piatto di carte)
-        this.puntiSmazzata = 0; // Punti interi arrotondati per difetto
-        this.puntiTotali = 0;   // Punti interi totali cumulati
-        this.eloMomentaneo = 1000;
-        this.eliminato = false;
-        this.aiLevel = 0;
-        this.aiVariant = "Human";
-    }
-    resetSmazzata() {
-        this.mano = [];
-        this.preseFatte = [];
-        this.puntiSmazzata = 0;
-    }
-    contaPuntiPrese() {
-        let terzi = 0;
-        this.preseFatte.forEach(carta => {
-            terzi += puntiCartaCiapano(carta.valore);
-        });
-        return terzi;
-    }
-}
-
-class CiapanoGame {
-    constructor(numPlayers, limitePunti = 31) {
-        this.numPlayers = numPlayers;
-        this.players = Array.from({ length: numPlayers }, (_, i) => new CiapanoPlayer(i, `CPU ${i}`));
-        this.indiceMazziere = Math.floor(Math.random() * numPlayers);
-        this.turnoAttuale = 0;
-        this.tavolo = [];
-        this.fase = "gioco"; // gioco | sola_choice | fine_smazzata
-        this.carteScartate = [];
-        this.limitePunti = limitePunti;
-        this.smazzataNum = 1;
-        this.ultimoPresista = -1; // indice giocatore che ha preso l'ultima mano
-        this.acceptInput = true;
-        this.botThinking = false;
-        this.matchId = null;
-        this.hostNickname = null;
-        this.carteUscite = [];
-    }
-
-    getGiocatoriAttivi() {
-        return this.players.filter(p => !p.eliminato);
-    }
-
-    prossimoGiocatoreAttivo(idx) {
-        let count = 0;
-        while (this.players[idx].eliminato && count < this.numPlayers) {
-            idx = (idx + 1) % this.numPlayers;
-            count++;
-        }
-        return idx;
-    }
-
-    numGiocatoriAttivi() {
-        return this.players.filter(p => !p.eliminato).length;
-    }
-
-    numGiocatoriInPresa() {
-        // Numero di giocatori attivi che partecipano alla presa corrente
-        return this.getGiocatoriAttivi().length;
-    }
-
-    distribuisci() {
-        let mazzo = [];
-        SEMI.forEach(s => VALORI.forEach(v => mazzo.push({ valore: v, seme: s, giocata: false })));
-
-        const numAttivi = this.numGiocatoriAttivi();
-        const distr = calcolaDistrCiapano(numAttivi);
-
-        this.carteScartate = [];
-
-        if (distr.scartiRegola === 'un_4') {
-            const idx = mazzo.findIndex(c => c.valore === '4');
-            if (idx !== -1) this.carteScartate.push(mazzo.splice(idx, 1)[0]);
-        } else if (distr.scartiRegola === 'tutti_4') {
-            const nuovoMazzo = [];
-            mazzo.forEach(c => {
-                if (c.valore === '4') this.carteScartate.push(c);
-                else nuovoMazzo.push(c);
-            });
-            mazzo = nuovoMazzo;
-        } else if (distr.scartiRegola === 'tutti_4_un_5') {
-            const nuovoMazzo = [];
-            mazzo.forEach(c => {
-                if (c.valore === '4') this.carteScartate.push(c);
-                else nuovoMazzo.push(c);
-            });
-            mazzo = nuovoMazzo;
-            const idx5 = mazzo.findIndex(c => c.valore === '5');
-            if (idx5 !== -1) this.carteScartate.push(mazzo.splice(idx5, 1)[0]);
-        }
-
-        // Fisher-Yates Shuffle
-        for (let i = mazzo.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [mazzo[i], mazzo[j]] = [mazzo[j], mazzo[i]];
-        }
-
-        // Distribuzione equa solo ai giocatori attivi
-        this.players.forEach(p => {
-            p.resetSmazzata();
-            if (!p.eliminato) {
-                for (let i = 0; i < distr.cartePerGiocatore; i++) {
-                    const c = mazzo.pop();
-                    if (c) p.mano.push(c);
-                }
-            }
-        });
-
-        this.fase = "gioco";
-        this.turnoAttuale = this.prossimoGiocatoreAttivo((this.indiceMazziere + 1) % this.numPlayers);
-        this.tavolo = [];
-        this.ultimoPresista = -1;
-        this.carteUscite = [];
-    }
-
-    calcolaVincitorePresa() {
-        if (this.tavolo.length === 0) return null;
-        const semeUscita = this.tavolo[0].card.seme;
-        // Vince la carta più alta del SEME DI USCITA (no briscola in Ciapanò)
-        const carteDelSeme = this.tavolo.filter(g => g.card.seme === semeUscita);
-        return carteDelSeme.reduce((migliore, attuale) => {
-            return (PESO_VALORE_CIAPANO[attuale.card.valore] > PESO_VALORE_CIAPANO[migliore.card.valore]) ? attuale : migliore;
-        });
-    }
-
-    puoGiocareCarta(playerId, carta) {
-        if (this.tavolo.length === 0) return true;
-        const semeUscita = this.tavolo[0].card.seme;
-        const player = this.players[playerId];
-        const haSeme = player.mano.some(c => !c.giocata && c.seme === semeUscita);
-        if (haSeme) {
-            return carta.seme === semeUscita;
-        }
-        return true;
-    }
-
-    carteGiocabili(playerId) {
-        const player = this.players[playerId];
-        const nonGiocate = player.mano.filter(c => !c.giocata);
-        if (this.tavolo.length === 0) return nonGiocate;
-        const semeUscita = this.tavolo[0].card.seme;
-        const delSeme = nonGiocate.filter(c => c.seme === semeUscita);
-        return delSeme.length > 0 ? delSeme : nonGiocate;
-    }
-
-    calcolaFineSmazzata() {
-        const attivi = this.getGiocatoriAttivi();
-        let sommaAltri = 0;
-        attivi.forEach(p => {
-            if (p.id !== this.ultimoPresista) {
-                // Il punteggio delle prese va arrotondato per difetto (3 terzi = 1 punto)
-                const terzi = p.contaPuntiPrese();
-                p.puntiSmazzata = Math.floor(terzi / 3);
-                sommaAltri += p.puntiSmazzata;
-            }
-        });
-
-        const ultPresistaPlayer = this.players[this.ultimoPresista];
-        if (ultPresistaPlayer) {
-            // Chi ha preso l'ultima mano prende 11 - i punti degli altri
-            ultPresistaPlayer.puntiSmazzata = Math.max(0, 11 - sommaAltri);
-        }
-
-        // Verifica Cappotto: un giocatore ha preso tutti gli 11 punti
-        const cappottoPlayer = attivi.find(p => p.puntiSmazzata === 11);
-        if (cappottoPlayer) {
-            return { isCappotto: true, cappottoPlayerId: cappottoPlayer.id };
-        }
-        return { isCappotto: false, cappottoPlayerId: -1 };
-    }
-
-    applicaPunteggi(isCappotto = false, cappottoPlayerId = -1) {
-        const attivi = this.getGiocatoriAttivi();
-        if (isCappotto && cappottoPlayerId !== -1) {
-            attivi.forEach(p => {
-                if (p.id === cappottoPlayerId) {
-                    p.puntiSmazzata = 0; // Chi ha preso tutti i punti ha +0
-                } else {
-                    p.puntiSmazzata = 11; // Tutti gli altri hanno +11
-                    p.puntiTotali += 11;
-                }
-            });
-        } else {
-            attivi.forEach(p => {
-                p.puntiTotali += p.puntiSmazzata;
-            });
-        }
-
-        // Gestione eliminazioni (punti interi >= limitePunti)
-        attivi.forEach(p => {
-            if (p.puntiTotali >= this.limitePunti) {
-                p.eliminato = true;
-            }
-        });
-
-        const attiviRimasti = this.getGiocatoriAttivi();
-        const gameOver = attiviRimasti.length <= 1;
-        return { gameOver, attiviRimasti };
-    }
-}
+// [Modularizzazione]: Motori di gioco Lucas e Ciapanò estratti nei moduli dedicati games/lucas.js e games/ciapano.js
 
 
 // --- NUOVO: Funzioni per Persistenza ---
@@ -3176,8 +2844,8 @@ io.on('connection', (socket) => {
         const vincitore = game.calcolaVincitorePresa();
         const semeUscita = game.tavolo[0].card.seme;
 
-        // --- LOGGING PER TRAINING AI ---
-        if (dbConnected) {
+        // --- LOGGING PER TRAINING AI (Solo per partite Lucas) ---
+        if (dbConnected && (!game.gameType || game.gameType === 'lucas')) {
             const historyStr = game.carteUscite.map(c => `${c.valore}-${c.seme}`).join('|');
             const voidStr = game.players.map((p, i) => p.voidSuits.length > 0 ? `P${i}:${p.voidSuits.join('&')}` : "").filter(s => s !== "").join('|');
             const tableStr = game.tavolo.map(t => `${t.card.valore}-${t.card.seme}`).join('|');
@@ -3756,7 +3424,7 @@ io.on('connection', (socket) => {
         const lobby = lobbies[code];
         if (!lobby || !lobby.gameInstance) return;
         const game = lobby.gameInstance;
-        const qta = game.sequenzaTurni[game.indiceGiro];
+        const qta = (game.sequenzaTurni && game.indiceGiro !== undefined) ? (game.sequenzaTurni[game.indiceGiro] || 1) : 1;
 
         // Invio uno stato personalizzato solo ai giocatori umani presenti
         lobby.giocatori.forEach(giocatoreUmano => {
