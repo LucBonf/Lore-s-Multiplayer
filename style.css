@@ -1070,35 +1070,48 @@ button {
     }
 
     #info-giro {
-        margin-top: 2px !important;
-        margin-bottom: 6px !important;
-        font-size: 0.78rem !important;
-        padding: 0 75px !important;
-        line-height: 1.25 !important;
-        word-break: break-word;
+        position: absolute !important;
+        top: 36px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: calc(100% - 24px) !important;
+        max-width: 360px !important;
+        margin: 0 !important;
+        font-size: 0.72rem !important;
+        padding: 3px 8px !important;
+        line-height: 1.2 !important;
+        text-align: center;
+        z-index: 99;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: rgba(0, 0, 0, 0.55);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.5);
     }
 
     #ciapano-scarti-bar,
     #briscola-chiamata-banner {
-        top: 28px !important;
-        font-size: 0.75rem !important;
-        padding: 3px 10px !important;
+        top: 58px !important;
+        font-size: 0.70rem !important;
+        padding: 2px 8px !important;
         max-width: 85vw !important;
         border-radius: 6px !important;
     }
 
     #circular-table {
-        height: 62vh;
-        height: 62dvh;
-        margin-top: 10px;
+        height: 64vh;
+        height: 64dvh;
+        margin-top: 26px;
     }
 
     .player-block {
-        width: 95px !important;
-        min-width: 85px !important;
+        width: 88px !important;
+        min-width: 76px !important;
         min-height: unset !important;
-        padding: 4px 3px !important;
-        font-size: 0.65rem !important;
+        padding: 3px 3px !important;
+        font-size: 0.64rem !important;
     }
 
     .player-block .name {
@@ -1181,65 +1194,6 @@ button {
     #login-menu, #setup-menu {
         width: 95% !important;
         transform: scale(0.9);
-    }
-
-    /* Ottimizzazioni per Selettore Gioco Iniziale su telefono */
-    #game-select {
-        padding: 35px 8px 25px 8px !important;
-        max-height: 90vh !important;
-        max-height: 90dvh !important;
-        width: 98% !important;
-    }
-
-    #game-select-welcome {
-        font-size: 1.25rem !important;
-        margin-bottom: 4px !important;
-    }
-
-    #game-select p[data-i18n="selectGameSubtitle"] {
-        font-size: 0.86rem !important;
-        margin-bottom: 12px !important;
-    }
-
-    .games-grid {
-        grid-template-columns: 1fr !important;
-        gap: 12px !important;
-        margin-bottom: 15px !important;
-    }
-
-    .game-select-card {
-        padding: 14px 12px !important;
-        border-radius: 12px !important;
-    }
-
-    .game-select-card > div:first-child {
-        font-size: 2.2rem !important;
-        margin-bottom: 4px !important;
-    }
-
-    .game-select-card h2 {
-        font-size: 1.3rem !important;
-        margin: 0 0 2px 0 !important;
-    }
-
-    .game-select-card div[data-i18n^="sub"] {
-        font-size: 0.74rem !important;
-        margin-bottom: 6px !important;
-        line-height: 1.2 !important;
-    }
-
-    .game-select-card p[data-i18n$="Desc"] {
-        font-size: 0.84rem !important;
-        line-height: 1.3 !important;
-        margin: 0 0 10px 0 !important;
-    }
-
-    .game-select-card button {
-        font-size: 0.82rem !important;
-        padding: 7px 6px !important;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
 }
 /* ========================================= */
@@ -2026,84 +1980,99 @@ button {
 }
 
 /* ========================================= */
-/* BANNER NOTIFICA MOSSA & PRESA SCOPA       */
+/* BANNER NOTIFICA MOSSA & PRESA SCOPA (TOP) */
 /* ========================================= */
 .scopa-action-banner {
     position: absolute;
-    top: 50%;
+    top: 50px;
     left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(15, 23, 42, 0.94);
-    border: 2px solid #2ecc71;
-    border-radius: 12px;
-    padding: 10px 18px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(46, 204, 113, 0.4);
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.95);
+    border: 1.5px solid #2ecc71;
+    border-radius: 16px;
+    padding: 3px 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 10px rgba(46, 204, 113, 0.3);
     z-index: 1200;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
+    gap: 8px;
     pointer-events: none;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-    min-width: 180px;
+    transition: opacity 0.25s ease;
     max-width: 90vw;
-    animation: presa-pop-in 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-@keyframes presa-pop-in {
-    0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
-    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    white-space: nowrap;
 }
 
 .scopa-action-banner.scopa-gold {
     border-color: #f1c40f !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 25px rgba(241, 196, 15, 0.8) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 16px rgba(241, 196, 15, 0.6) !important;
 }
 
 .scopa-action-banner.scopa-cyan {
     border-color: #00d2d3 !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 210, 211, 0.6) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 14px rgba(0, 210, 211, 0.5) !important;
 }
 
 .scopa-action-banner.scopa-purple {
     border-color: #9b59b6 !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(155, 89, 182, 0.6) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 14px rgba(155, 89, 182, 0.5) !important;
 }
 
 .scopa-action-banner.scopa-blue {
     border-color: #3498db !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(52, 152, 219, 0.5) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 12px rgba(52, 152, 219, 0.4) !important;
 }
 
 .scopa-action-title {
-    font-size: 0.95rem;
+    font-size: 0.82rem;
     font-weight: bold;
     color: #fff;
-    margin-bottom: 6px;
-    text-align: center;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.scopa-action-cards {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-}
-
-.scopa-action-group {
+    margin: 0;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
     display: flex;
     align-items: center;
     gap: 4px;
 }
 
+.scopa-action-cards {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.scopa-action-group {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
 .scopa-action-arrow {
-    font-size: 1.4rem;
+    font-size: 1rem;
     color: #f1c40f;
     font-weight: bold;
-    text-shadow: 0 0 6px rgba(241, 196, 15, 0.6);
+}
+
+/* Badge nome giocatore su carta giocata al centro */
+.table-card-player-badge {
+    position: absolute;
+    bottom: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 15, 25, 0.94);
+    color: #f1c40f;
+    font-size: 0.60rem;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+    border: 1px solid rgba(241, 196, 15, 0.5);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.2px;
+    z-index: 10;
 }
 
 .card.mini-move {
@@ -2339,60 +2308,62 @@ button {
 
 @media (max-width: 768px) {
     #game-select {
-        padding: 4px 6px;
-        max-width: 100%;
+        padding: 2px 4px !important;
+        max-width: 420px !important;
+        margin: 0 auto !important;
     }
 
     #game-select-welcome {
-        font-size: 1.1rem;
-        margin-bottom: 1px;
+        font-size: 1.05rem !important;
+        margin-bottom: 1px !important;
     }
 
     #game-select p[data-i18n="selectGameSubtitle"] {
-        font-size: 0.76rem;
-        margin-bottom: 6px;
+        font-size: 0.72rem !important;
+        margin-bottom: 4px !important;
     }
 
     .games-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 6px;
-        margin-bottom: 6px;
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 5px !important;
+        margin-bottom: 4px !important;
     }
 
     .game-select-card {
-        padding: 5px 6px;
-        min-height: 74px;
-        border-radius: 7px;
+        padding: 4px 6px !important;
+        min-height: 60px !important;
+        border-radius: 6px !important;
     }
 
     .game-card-icon {
-        font-size: 1.02rem;
+        font-size: 0.95rem !important;
     }
 
     .game-card-name {
-        font-size: 0.88rem;
+        font-size: 0.84rem !important;
     }
 
     .game-card-sub {
-        font-size: 0.62rem;
+        font-size: 0.58rem !important;
     }
 
     .game-card-desc {
-        font-size: 0.65rem;
-        margin: 2px 0 4px 0;
+        font-size: 0.62rem !important;
+        margin: 1px 0 3px 0 !important;
     }
 
     .btn-play-mini {
-        padding: 3px 4px;
-        font-size: 0.70rem;
-        border-radius: 3px;
+        padding: 2px 4px !important;
+        font-size: 0.68rem !important;
+        border-radius: 3px !important;
     }
 
     .btn-tool-mini {
-        width: 23px;
-        height: 22px;
-        font-size: 0.72rem;
-        border-radius: 3px;
+        width: 21px !important;
+        height: 20px !important;
+        font-size: 0.68rem !important;
+        border-radius: 3px !important;
     }
 }
 

@@ -858,6 +858,22 @@ socket.on('stemma_aggiornato', (data) => {
     }
 });
 
+function getPlayerScaleAndCardScale(numPlayers, isMobile) {
+    let scalaPlayerBlock = isMobile ? 0.88 : 1.0;
+    let scalaTableCard = isMobile ? 0.42 : 0.75;
+    if (numPlayers >= 7) {
+        scalaPlayerBlock = isMobile ? 0.58 : 0.68;
+        scalaTableCard = isMobile ? 0.30 : 0.52;
+    } else if (numPlayers >= 5) {
+        scalaPlayerBlock = isMobile ? 0.66 : 0.78;
+        scalaTableCard = isMobile ? 0.35 : 0.65;
+    } else if (numPlayers >= 4) {
+        scalaPlayerBlock = isMobile ? 0.74 : 0.86;
+        scalaTableCard = isMobile ? 0.38 : 0.70;
+    }
+    return { scalaPlayerBlock, scalaTableCard };
+}
+
 function renderGiocatori(data) {
     const playersCircle = document.getElementById('players-circle');
     const cardsOnTable = document.getElementById('cards-on-table');
@@ -884,18 +900,9 @@ function renderGiocatori(data) {
 
     infoGiro.innerText = `${d.turn} ${data.qtaCarte} | ${d.sum}: ${data.sommaScommesse}`;
 
-    // SCALE DINAMICHE: Rimpiccioliamo i box se ci sono tanti giocatori
+    // SCALE DINAMICHE OTTIMIZZATE (GARANTISCONO SPAZIO SU TELEFONO E CON TANTI GIOCATORI)
     const isMobile = window.innerWidth <= 768;
-    let scalaPlayerBlock = isMobile ? 1 : 1; 
-    let scalaTableCard = isMobile ? 0.4 : 0.8; 
-
-    if (numPlayers >= 7) {
-        scalaPlayerBlock = isMobile ? 0.65 : 0.7;
-        scalaTableCard = isMobile ? 0.3 : 0.55;
-    } else if (numPlayers >= 5) {
-        scalaPlayerBlock = isMobile ? 0.75 : 0.8;
-        scalaTableCard = isMobile ? 0.35 : 0.7;
-    }
+    const { scalaPlayerBlock, scalaTableCard } = getPlayerScaleAndCardScale(numPlayers, isMobile);
 
     const posizioniCarteTavoloPerGiocatore = new Map();
     const raggioCarteX = 26; // Aumentato da 18 per spandere orizzontalmente
@@ -1035,8 +1042,16 @@ function renderGiocatori(data) {
             divCartaTavolo.style.top = `${posData.y}%`;
             divCartaTavolo.style.zIndex = 100 + index;
 
-            const randRot = (Math.random() * 14) - 7;
-            divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${randRot}deg)`;
+            const rot = ((pId * 5) % 9) - 4;
+            divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${rot}deg)`;
+
+            const pObj = data.tuttiGiocatori[pId];
+            if (pObj) {
+                const badge = document.createElement('div');
+                badge.className = 'table-card-player-badge';
+                badge.innerText = pObj.isMe ? 'Tu' : (pObj.nome || `P${pId + 1}`);
+                divCartaTavolo.appendChild(badge);
+            }
 
             // Cerchiamo la carta più forte
             if (c.forza > maxForza) {
@@ -2451,16 +2466,7 @@ function renderGiocatoriCiapano(data) {
     infoGiro.innerText = `Smazzata ${data.smazzataNum} | Limite: ${data.limitePunti} pt`;
 
     const isMobile = window.innerWidth <= 768;
-    let scalaPlayerBlock = isMobile ? 1 : 1; 
-    let scalaTableCard = isMobile ? 0.4 : 0.8; 
-
-    if (numPlayers >= 7) {
-        scalaPlayerBlock = isMobile ? 0.65 : 0.7;
-        scalaTableCard = isMobile ? 0.3 : 0.55;
-    } else if (numPlayers >= 5) {
-        scalaPlayerBlock = isMobile ? 0.75 : 0.8;
-        scalaTableCard = isMobile ? 0.35 : 0.7;
-    }
+    const { scalaPlayerBlock, scalaTableCard } = getPlayerScaleAndCardScale(numPlayers, isMobile);
 
     const posizioniCarteTavoloPerGiocatore = new Map();
     const raggioCarteX = 26;
@@ -2578,8 +2584,16 @@ function renderGiocatoriCiapano(data) {
             divCartaTavolo.style.top = `${posData.y}%`;
             divCartaTavolo.style.zIndex = 100 + index;
 
-            const randRot = (Math.random() * 14) - 7;
-            divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${randRot}deg)`;
+            const rot = ((pId * 5) % 9) - 4;
+            divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${rot}deg)`;
+
+            const pObj = data.tuttiGiocatori[pId];
+            if (pObj) {
+                const badge = document.createElement('div');
+                badge.className = 'table-card-player-badge';
+                badge.innerText = pObj.isMe ? 'Tu' : (pObj.nome || `P${pId + 1}`);
+                divCartaTavolo.appendChild(badge);
+            }
 
             if (c.seme === semeUscita) {
                 const peso = PESO_CIAPANO_CLIENT[c.valore] || 0;
@@ -2679,10 +2693,10 @@ function renderTavoloBanco(cardsOnTable, carteTavolo) {
 
     const count = carteTavolo.length;
     const isMobile = window.innerWidth <= 768;
-    const scala = isMobile ? 0.45 : 0.72;
-    const maxCols = isMobile ? 4 : 5;
-    const stepX = isMobile ? 36 : 64;
-    const stepY = isMobile ? 48 : 88;
+    const scala = isMobile ? (count > 6 ? 0.35 : 0.40) : (count > 6 ? 0.58 : 0.68);
+    const maxCols = isMobile ? (count > 6 ? 4 : 3) : 5;
+    const stepX = isMobile ? (count > 6 ? 28 : 34) : (count > 6 ? 50 : 60);
+    const stepY = isMobile ? 38 : 72;
 
     carteTavolo.forEach((c, idx) => {
         const divCarta = document.createElement('div');
@@ -2915,9 +2929,12 @@ function renderGiocatoriScopa(data) {
     playersCircle.innerHTML = '';
     renderTavoloBanco(cardsOnTable, data.tavolo);
 
+    const isMobile = window.innerWidth <= 768;
     const numPlayers = data.tuttiGiocatori.length;
     let mioIndice = data.tuttiGiocatori.findIndex(p => p.isMe || p.socketId === socket.id);
     if (mioIndice === -1) mioIndice = 0;
+
+    const { scalaPlayerBlock } = getPlayerScaleAndCardScale(numPlayers, isMobile);
 
     let labelVariante = 'Scopa Classica';
     if (data.variante === 'asso_piglia_tutto') labelVariante = '⚡ Asso Piglia Tutto';
@@ -2925,9 +2942,6 @@ function renderGiocatoriScopa(data) {
     else if (data.variante === 'combinata') labelVariante = '🔥 Asso + Ladra';
     const subInfo = (window.ultimaMossaScopaInfo && !isMobile) ? ` | ${window.ultimaMossaScopaInfo}` : '';
     infoGiro.innerText = `${labelVariante} | Smazzata ${data.smazzataNum} | Obiettivo: ${data.limitePunti || 11} pt${subInfo}`;
-
-    const isMobile = window.innerWidth <= 768;
-    const scalaPlayerBlock = isMobile ? 1 : 1;
 
     for (let i = 0; i < numPlayers; i++) {
         const serverPlayerIndex = (mioIndice + i) % numPlayers;
@@ -3177,7 +3191,7 @@ function renderGiocatoriRubamazzetto(data) {
     infoGiro.innerText = `Smazzata ${data.smazzataNum} | Mazzo rimanente: ${data.mazzoRimanente}`;
 
     const isMobile = window.innerWidth <= 768;
-    const scalaPlayerBlock = isMobile ? 1 : 1;
+    const { scalaPlayerBlock } = getPlayerScaleAndCardScale(numPlayers, isMobile);
 
     for (let i = 0; i < numPlayers; i++) {
         const serverPlayerIndex = (mioIndice + i) % numPlayers;
@@ -3485,13 +3499,7 @@ function renderGiocatoriBriscola(data) {
         : `${briscolaSemeTxt} | Tallone: ${data.mazzoRimanente} carte`;
 
     const isMobile = window.innerWidth <= 768;
-    let scalaPlayerBlock = isMobile ? 1 : 1;
-    let scalaTableCard = isMobile ? 0.45 : 0.8;
-
-    if (numPlayers >= 5) {
-        scalaPlayerBlock = isMobile ? 0.75 : 0.82;
-        scalaTableCard = isMobile ? 0.38 : 0.7;
-    }
+    const { scalaPlayerBlock, scalaTableCard } = getPlayerScaleAndCardScale(numPlayers, isMobile);
 
     const posizioniCarteTavoloPerGiocatore = new Map();
     const raggioCarteX = 26;
@@ -3612,8 +3620,16 @@ function renderGiocatoriBriscola(data) {
                 divCartaTavolo.style.top = `${posData.y}%`;
                 divCartaTavolo.style.zIndex = 100 + index;
 
-                const randRot = (Math.random() * 14) - 7;
-                divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${randRot}deg)`;
+                const rot = ((pId * 5) % 9) - 4;
+                divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${rot}deg)`;
+
+                const pObj = data.tuttiGiocatori[pId];
+                if (pObj) {
+                    const badge = document.createElement('div');
+                    badge.className = 'table-card-player-badge';
+                    badge.innerText = pObj.isMe ? 'Tu' : (pObj.nome || `P${pId + 1}`);
+                    divCartaTavolo.appendChild(badge);
+                }
 
                 if (index === 0) {
                     bestDiv = divCartaTavolo;
@@ -3851,13 +3867,7 @@ function renderGiocatoriTressette(data) {
     infoGiro.innerText = `Smazzata ${data.smazzataNum} | Limite: ${data.limitePunti || 21} pt${talloneTxt}`;
 
     const isMobile = window.innerWidth <= 768;
-    let scalaPlayerBlock = isMobile ? 1 : 1;
-    let scalaTableCard = isMobile ? 0.45 : 0.8;
-
-    if (numPlayers >= 4) {
-        scalaPlayerBlock = isMobile ? 0.78 : 0.88;
-        scalaTableCard = isMobile ? 0.4 : 0.75;
-    }
+    const { scalaPlayerBlock, scalaTableCard } = getPlayerScaleAndCardScale(numPlayers, isMobile);
 
     const posizioniCarteTavoloPerGiocatore = new Map();
     const raggioCarteX = 26;
@@ -3970,8 +3980,16 @@ function renderGiocatoriTressette(data) {
             divCartaTavolo.style.top = `${posData.y}%`;
             divCartaTavolo.style.zIndex = 100 + index;
 
-            const randRot = (Math.random() * 14) - 7;
-            divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${randRot}deg)`;
+            const rot = ((pId * 5) % 9) - 4;
+            divCartaTavolo.style.transform = `translate(-50%, -50%) scale(${scalaTableCard}) rotate(${rot}deg)`;
+
+            const pObj = data.tuttiGiocatori[pId];
+            if (pObj) {
+                const badge = document.createElement('div');
+                badge.className = 'table-card-player-badge';
+                badge.innerText = pObj.isMe ? 'Tu' : (pObj.nome || `P${pId + 1}`);
+                divCartaTavolo.appendChild(badge);
+            }
 
             if (c.seme === semeUscita) {
                 const peso = PESO_PRESA_TRESSETTE_CLIENT[c.valore] || 0;
