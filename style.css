@@ -396,38 +396,46 @@ button {
 /* Rende i box avversari fissi e blocca le fuoriuscite */
 .player-block {
     position: absolute;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(13, 20, 36, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     color: white;
     padding: 10px;
-    border-radius: 8px;
+    border-radius: 10px;
     width: 170px;
-    /* Fisso per gli avversari */
-    min-height: 100px;
+    min-height: 95px;
     text-align: center;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    border: 2px solid transparent;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     transition: all 0.3s ease;
     z-index: 10;
 }
 
 /* IL TUO BOX: Si allarga dinamicamente per sfruttare tutto lo spazio orizzontale */
 .player-block.me {
+    background: rgba(13, 20, 36, 0.86);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
     width: auto;
     min-width: 170px;
-    max-width: 98vw; /* Permette di usare quasi tutto lo schermo */
-    z-index: 20;
+    max-width: 98vw;
+    z-index: 25;
 }
 
 /* RISOLUZIONE PROBLEMA TROPPE CARTE TUA MANO */
 #tu-mano {
     display: flex;
     justify-content: center;
+    align-items: flex-end;
     gap: 0;
-    /* IMPORTANTE: Rimuovi il gap! Lo gestiamo col JS */
-    margin-top: 10px;
-    min-height: 130px;
+    margin-top: 6px;
+    min-height: 80px;
     flex-wrap: nowrap;
-    /* IMPORTANTE: Impedisce assolutamente di andare a capo! */
+    overflow: visible;
+    width: 100%;
 }
 
 /* LA GABBIA PER LE CARTE AVVERSARIE (Questa mancava!) */
@@ -500,17 +508,19 @@ button {
     backface-visibility: hidden; /* Migliora rendering su Chrome/Safari */
 }
 
-/* Assicura che la carta passata col mouse scavalchi le altre */
+/* Assicura che la carta passata col mouse scavalchi le altre mantenendo la scala */
 #tu-mano .card {
     position: relative;
-    transition: transform 0.2s, margin 0.2s;
+    flex-shrink: 0;
+    transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s ease;
 }
 
 #tu-mano .card:hover {
-    transform: translateY(-20px) scale(1.1);
+    transform: translateY(-12px) scale(calc(var(--card-scale, 1) * 1.08)) !important;
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.8), 0 0 12px rgba(241, 196, 15, 0.6) !important;
+    filter: brightness(1.08);
     z-index: 100 !important;
     will-change: transform;
-    /* La porta avanti a tutte! */
 }
 
 /* ========================================= */
@@ -1114,6 +1124,21 @@ button {
         font-size: 0.64rem !important;
     }
 
+    .opponent-hand {
+        min-height: 36px !important;
+        margin-top: 3px !important;
+        max-width: 82px !important;
+        overflow: visible !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+
+    .opponent-hand div.card-back:not(.card) {
+        width: 22px !important;
+        height: 32px !important;
+    }
+
     .player-block .name {
         font-size: 0.7rem !important;
         font-weight: bold;
@@ -1161,9 +1186,17 @@ button {
     }
 
     .player-block.me {
+        width: auto !important;
+        max-width: 98vw !important;
         min-width: 130px !important;
-        padding-bottom: 25px !important;
-        padding-top: 6px !important;
+        padding-bottom: 22px !important;
+        padding-top: 5px !important;
+    }
+
+    #tu-mano {
+        min-height: 65px !important;
+        width: 100% !important;
+        max-width: 96vw !important;
     }
 
     .player-block.me .name {

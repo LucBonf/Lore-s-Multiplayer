@@ -882,6 +882,121 @@ function getPlayerScaleAndCardScale(numPlayers, isMobile) {
     return { scalaPlayerBlock, scalaTableCard };
 }
 
+// POSIZIONAMENTO UNIFICATO DEI GIOCATORI AL TAVOLO (EVITA OVERLAP E USCITE DALLO SCHERMO)
+function getPosizioneGiocatoreTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile) {
+    const isMe = (serverPlayerIndex === mioIndice);
+    if (isMe) {
+        return { posX: 50, posY: isMobile ? 86 : 85, angoloGradi: 90, isMe: true };
+    }
+
+    const i = (serverPlayerIndex - mioIndice + numPlayers) % numPlayers;
+    const indexOpp = i - 1;
+    const numOpp = numPlayers - 1;
+    let angoloGradi = 270;
+
+    if (numOpp === 1) {
+        angoloGradi = 270;
+    } else if (numOpp === 2) {
+        angoloGradi = indexOpp === 0 ? 200 : 340;
+    } else if (numOpp === 3) {
+        // 4 giocatori: sinistra (180°), alto (270°), destra (360°)
+        angoloGradi = indexOpp === 0 ? 180 : (indexOpp === 1 ? 270 : 360);
+    } else {
+        const startA = 160;
+        const endA = 380;
+        angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
+    }
+
+    const rad = angoloGradi * (Math.PI / 180);
+    const raggioX = isMobile ? 37 : 43;
+    const raggioY = isMobile ? 25 : 29;
+    const centerY = isMobile ? 42 : 40;
+
+    const posX = 50 + raggioX * Math.cos(rad);
+    const posY = centerY + raggioY * Math.sin(rad);
+
+    return { posX, posY, angoloGradi, isMe: false };
+}
+
+// POSIZIONAMENTO UNIFICATO DELLE CARTE SUL TAVOLO (GIOCHI A PRESE)
+function getPosizioneCartaTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile) {
+    const isMe = (serverPlayerIndex === mioIndice);
+    if (isMe) {
+        return { x: 50, y: isMobile ? 66 : 64 };
+    }
+    const pos = getPosizioneGiocatoreTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
+    const rad = pos.angoloGradi * (Math.PI / 180);
+    const raggioCarteX = isMobile ? 20 : 25;
+    const raggioCarteY = isMobile ? 14 : 17;
+    const centerY = isMobile ? 44 : 42;
+
+    const x = 50 + raggioCarteX * Math.cos(rad);
+    const y = centerY + raggioCarteY * Math.sin(rad);
+    return { x, y };
+}
+
+// CALCOLO RESPONSIVE PRECISO PER LE CARTE IN MANO SU QUALSIASI SCHERMO (COME SU LUCAS)
+function calcolaLayoutCarteMano(numCarte) {
+    const isMobile = window.innerWidth <= 768;
+    const screenW = Math.min(window.innerWidth, window.visualViewport ? window.visualViewport.width : window.innerWidth);
+    // Margine orizzontale di sicurezza dal bordo schermo
+    const maxContainerW = isMobile ? Math.min(screenW - 16, 420) : Math.min(screenW * 0.78, 800);
+
+    let dynamicScale = isMobile ? 0.65 : 1.0;
+    if (numCarte > 10) {
+        dynamicScale = isMobile ? 0.46 : 0.76;
+    } else if (numCarte > 7) {
+        dynamicScale = isMobile ? 0.50 : 0.82;
+    } else if (numCarte > 4) {
+        dynamicScale = isMobile ? 0.58 : 0.90;
+    }
+
+    const visualCardW = 80 * dynamicScale;
+    let stepX = visualCardW * 0.70;
+
+    if (numCarte > 1) {
+        const totalWWithDefault = visualCardW + (numCarte - 1) * stepX;
+        if (totalWWithDefault > maxContainerW) {
+            stepX = Math.max(16, (maxContainerW - visualCardW) / (numCarte - 1));
+        }
+    }
+
+    const marginLeft = numCarte > 1 ? Math.round(stepX - 80) : 0;
+    return { dynamicScale, marginLeft };
+}
+
+function mostraFineSmazzataGenerica({ titolo, righe, extraHtml }) {
+    const toast = document.getElementById('round-recap-toast');
+    if (!toast) return;
+
+    let listHtml = '';
+    if (righe && righe.length > 0) {
+        listHtml = righe.map(r => `
+            <div class="recap-row">
+                <div class="recap-player-name">${renderNomeConStemma(r.nome, r.stemma)}</div>
+                <div class="recap-badges">${r.badge || ''}</div>
+                <div class="recap-scores">
+                    ${r.gain ? `<span class="recap-pts-gain">${r.gain}</span>` : ''}
+                    ${r.total ? `<span class="recap-pts-total">${r.total}</span>` : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    toast.innerHTML = `
+        <div class="recap-title">${titolo}</div>
+        ${extraHtml ? `<div style="font-size:0.85rem; color:#f1c40f; margin-bottom:8px; font-weight:600;">${extraHtml}</div>` : ''}
+        <div class="recap-list">${listHtml}</div>
+        <button class="recap-close-btn" onclick="document.getElementById('round-recap-toast').style.display='none'">CONTINUA</button>
+    `;
+    toast.style.display = 'block';
+
+    if (window.roundRecapTimeout) clearTimeout(window.roundRecapTimeout);
+    window.roundRecapTimeout = setTimeout(() => {
+        if (toast) toast.style.display = 'none';
+    }, 4500);
+}
+
 function renderGiocatori(data) {
     const playersCircle = document.getElementById('players-circle');
     const cardsOnTable = document.getElementById('cards-on-table');
@@ -921,31 +1036,7 @@ function renderGiocatori(data) {
         const p = data.tuttiGiocatori[serverPlayerIndex];
         const isMe = p.isMe || (p.socketId === socket.id);
 
-        let posX, posY;
-        let angoloGradi;
-
-        if (isMe) {
-            // POSIZIONE FISSA IN BASSO PER "ME"
-            posX = 50;
-            posY = 85; 
-            angoloGradi = 90; // La carta lanciata salirà dritta
-        } else {
-            // POSIZIONAMENTO AVVERSARI IN UN ARCO SUPERIORE (160° -> 380°)
-            const indexOpp = i - 1; // 0, 1, 2...
-            const numOpp = numPlayers - 1;
-            
-            if (numOpp === 1) {
-                angoloGradi = 270; // Singolo avversario in alto al centro
-            } else {
-                const startA = 160;
-                const endA = 380;
-                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
-            }
-
-            const rad = angoloGradi * (Math.PI / 180);
-            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
-            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
-        }
+        const pos = getPosizioneGiocatoreTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
 
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
@@ -954,14 +1045,13 @@ function renderGiocatori(data) {
         if (isMe) pBlock.classList.add('me');
         if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
         
-        pBlock.style.left = `${posX}%`;
-        pBlock.style.top = `${posY}%`;
+        pBlock.style.left = `${pos.posX}%`;
+        pBlock.style.top = `${pos.posY}%`;
 
         const lang = localStorage.getItem('lucas_lang') || 'it';
         const d = dictionary[lang];
         
-        // Usiamo la scala dinamica per i box
-        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+        pBlock.style.transform = isMe ? 'translate(-50%, -50%)' : `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
 
         const ruolo = p.isMazziere ? ` ${d.roleDealer}` : "";
         const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
@@ -981,31 +1071,28 @@ function renderGiocatori(data) {
             myHandCont.id = 'tu-mano';
             pBlock.appendChild(myHandCont);
             renderTuaMano(myHandCont, p.mano, serverPlayerIndex === data.turnoAttuale, data.fase);
-                } else {
+        } else {
             const oppHandCont = document.createElement('div');
             oppHandCont.className = 'opponent-hand';
 
             if (data.qtaCarte === 1 && p.cartaFronte) {
                 const fronteDiv = document.createElement('div');
                 fronteDiv.className = `card seme-${p.cartaFronte.seme} val-${p.cartaFronte.valore}`;
-                
-                // Scala ridotta se siamo su mobile, altrimenti la versione desktop
-                const isMobile = window.innerWidth <= 768;
                 const scaleValue = isMobile ? 0.4 : 0.7;
-                
                 fronteDiv.style.transform = `scale(${scaleValue})`;
                 fronteDiv.style.transformOrigin = "center";
-                fronteDiv.style.margin = isMobile ? "-20px auto" : "10px auto"; // Spazio sopra e sotto ridotto su mobile
+                fronteDiv.style.margin = isMobile ? "-20px auto" : "10px auto";
                 oppHandCont.appendChild(fronteDiv);
             } else {
                 const carteInMano = p.mano ? p.mano.filter(c => !c.giocata) : [];
                 const carteInManoCount = carteInMano.length;
 
-                // Standard: disegna il retro delle carte
                 let margineNegativo = 0;
                 if (carteInManoCount > 1) {
-                    const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
-                    margineNegativo = Math.min(0, spazioPerCarta - 35);
+                    const maxSpan = isMobile ? 65 : 125;
+                    const cW = isMobile ? 22 : 35;
+                    const spazioPerCarta = (maxSpan - cW) / (carteInManoCount - 1);
+                    margineNegativo = Math.min(0, Math.round(spazioPerCarta - cW));
                 }
 
                 for (let c = 0; c < carteInManoCount; c++) {
@@ -1020,18 +1107,9 @@ function renderGiocatori(data) {
 
         playersCircle.appendChild(pBlock);
 
-        // POSIZIONE CARTE SUL TAVOLO: Coordinate relative per ogni giocatore
-        let cartaX, cartaY;
-
-        if (isMe) {
-            cartaX = 50;
-            cartaY = 68; // Portata a metà strada (da 62 a 68) tra il box (85) e il centro (circa 50)
-        } else {
-            // Distanziate le carte degli avversari per evitare il centro troppo affollato
-            cartaX = 50 + raggioCarteX * Math.cos( angoloGradi * (Math.PI / 180) );
-            cartaY = 44 + raggioCarteY * Math.sin( angoloGradi * (Math.PI / 180) ); // Centro carte abbassato coerentemente (da 42 a 44)
-        }
-        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
+        // POSIZIONE CARTE SUL TAVOLO UNIFICATA
+        const posCarta = getPosizioneCartaTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
+        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, posCarta);
     }
 
     // --- NOVITÀ: Identifichiamo la carta vincente attuale sul tavolo ---
@@ -1116,55 +1194,25 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
     carteDaDisegnare.sort((a, b) => a.forza - b.forza);
 
     const numCarte = carteDaDisegnare.length;
-
-    // --- NOVITÀ: SCALA PIÙ GENEROSA GRAZIE AL NUOVO SPAZIO ---
-    const isMobile = window.innerWidth <= 768;
-    const baseScale = isMobile ? 0.65 : 1.0; // Aumentata scala base su mobile (da 0.5 a 0.65)
-    
-    // Riduciamo la scala solo se necessario
-    let dynamicScale = baseScale;
-    if (numCarte > 7) {
-        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08); // Più aggressivo nella riduzione su mobile
-    }
-
-    // MATEMATICA: Margine calcolato per stare nei 98vw
-    let marginLeft = 0;
-    if (isMobile) {
-        // Su mobile cerchiamo di usare tutto lo spazio
-        if (numCarte > 1) {
-            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
-            marginLeft = overlapFactor;
-        }
-    } else {
-        if (numCarte > 10) marginLeft = -35;
-        else if (numCarte > 7) marginLeft = -20;
-    }
+    const { dynamicScale, marginLeft } = calcolaLayoutCarteMano(numCarte);
 
     // Applichiamo la scala e il margine dinamico
     carteDaDisegnare.forEach((c, idx) => {
         const div = document.createElement('div');
         div.style.transform = `scale(${dynamicScale})`;
-        div.style.transformOrigin = "center";
+        div.style.setProperty('--card-scale', dynamicScale);
+        div.style.transformOrigin = "bottom center";
         if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
 
         // --- 2. FIX ASSO DI COPPE E DORSO CON IMMAGINE ---
         if (c.valore === "?") {
-            // Aggiungiamo 'card-back' per usare l'immagine definita nel CSS
-            // e manteniamo 'card' per le dimensioni corrette nel tuo box
             div.className = 'card card-back';
-
-            // Rimuoviamo gli stili inline vecchi (quelli del dorso blu)
             div.style.background = '';
             div.style.border = '';
         } else {
-            // Carta normale visibile
             div.className = `card seme-${c.seme} val-${c.valore}`;
         }
 
-        // Applichiamo il margine negativo per farle sovrapporre!
-        if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
-
-        // Assegniamo lo z-index corretto per farle impilare da sinistra verso destra
         div.style.zIndex = 10 + idx;
 
         div.onclick = () => {
@@ -2402,11 +2450,19 @@ socket.on('vincitore_presa_ciapano', ({ playerId, card }) => {
 });
 
 socket.on('fine_smazzata_ciapano', (data) => {
-    let msg = data.cappotto ? "🔥 CAPPOTTO! Chi ha preso tutto fa 0 pt, tutti gli altri +11! 🔥\n" : "Punteggi Smazzata:\n";
-    data.punteggi.forEach(p => {
-        msg += `${p.nome}: ${p.puntiTotali} pt ${p.eliminato ? '(ELIMINATO)' : ''}\n`;
+    const righe = (data.punteggi || []).map(p => ({
+        nome: p.nome,
+        stemma: p.stemma,
+        badge: p.eliminato ? '<span style="color:#e74c3c; font-weight:bold; font-size:0.75rem;">ELIMINATO</span>' : '',
+        gain: p.puntiSmazzata !== undefined ? `+${p.puntiSmazzata} pt` : '',
+        total: `Tot: ${p.puntiTotali} pt`
+    }));
+    const extra = data.cappotto ? '🔥 CAPPOTTO! Chi ha preso tutto fa 0 pt, tutti gli altri +11! 🔥' : '';
+    mostraFineSmazzataGenerica({
+        titolo: '🏁 Fine Smazzata Ciapanò',
+        righe,
+        extraHtml: extra
     });
-    mostraErrore(msg);
 });
 
 socket.on('fine_partita_ciapano', (data) => {
@@ -2485,29 +2541,7 @@ function renderGiocatoriCiapano(data) {
         const p = data.tuttiGiocatori[serverPlayerIndex];
         const isMe = p.isMe || (p.socketId === socket.id);
 
-        let posX, posY;
-        let angoloGradi;
-
-        if (isMe) {
-            posX = 50;
-            posY = 85; 
-            angoloGradi = 90;
-        } else {
-            const indexOpp = i - 1;
-            const numOpp = numPlayers - 1;
-            
-            if (numOpp === 1) {
-                angoloGradi = 270;
-            } else {
-                const startA = 160;
-                const endA = 380;
-                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
-            }
-
-            const rad = angoloGradi * (Math.PI / 180);
-            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
-            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
-        }
+        const pos = getPosizioneGiocatoreTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
 
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
@@ -2517,9 +2551,9 @@ function renderGiocatoriCiapano(data) {
         if (p.eliminato) pBlock.classList.add('eliminato');
         if (data.turnoAttuale === serverPlayerIndex && !p.eliminato) pBlock.classList.add('active-turn');
         
-        pBlock.style.left = `${posX}%`;
-        pBlock.style.top = `${posY}%`;
-        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+        pBlock.style.left = `${pos.posX}%`;
+        pBlock.style.top = `${pos.posY}%`;
+        pBlock.style.transform = isMe ? 'translate(-50%, -50%)' : `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
 
         const ruolo = p.isMazziere ? " (Mazziere)" : "";
         const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
@@ -2550,8 +2584,10 @@ function renderGiocatoriCiapano(data) {
 
             let margineNegativo = 0;
             if (carteInManoCount > 1) {
-                const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
-                margineNegativo = Math.min(0, spazioPerCarta - 35);
+                const maxSpan = isMobile ? 65 : 125;
+                const cW = isMobile ? 22 : 35;
+                const spazioPerCarta = (maxSpan - cW) / (carteInManoCount - 1);
+                margineNegativo = Math.min(0, Math.round(spazioPerCarta - cW));
             }
 
             for (let c = 0; c < carteInManoCount; c++) {
@@ -2565,15 +2601,8 @@ function renderGiocatoriCiapano(data) {
 
         playersCircle.appendChild(pBlock);
 
-        let cartaX, cartaY;
-        if (isMe) {
-            cartaX = 50;
-            cartaY = 68;
-        } else {
-            cartaX = 50 + raggioCarteX * Math.cos( angoloGradi * (Math.PI / 180) );
-            cartaY = 44 + raggioCarteY * Math.sin( angoloGradi * (Math.PI / 180) );
-        }
-        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
+        const posCarta = getPosizioneCartaTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
+        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, posCarta);
     }
 
     let winnerCardDiv = null;
@@ -2634,23 +2663,7 @@ function renderTuaManoCiapano(handCont, mano, isMyTurn, tavolo) {
     });
 
     const numCarte = carteDaDisegnare.length;
-    const isMobile = window.innerWidth <= 768;
-    const baseScale = isMobile ? 0.65 : 1.0;
-    let dynamicScale = baseScale;
-    if (numCarte > 7) {
-        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08);
-    }
-
-    let marginLeft = 0;
-    if (isMobile) {
-        if (numCarte > 1) {
-            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
-            marginLeft = overlapFactor;
-        }
-    } else {
-        if (numCarte > 10) marginLeft = -35;
-        else if (numCarte > 7) marginLeft = -20;
-    }
+    const { dynamicScale, marginLeft } = calcolaLayoutCarteMano(numCarte);
 
     const semeUscita = tavolo && tavolo.length > 0 ? tavolo[0].card.seme : null;
     const haSemeUscita = semeUscita ? carteDaDisegnare.some(c => c.seme === semeUscita) : false;
@@ -2658,7 +2671,8 @@ function renderTuaManoCiapano(handCont, mano, isMyTurn, tavolo) {
     carteDaDisegnare.forEach((c, idx) => {
         const div = document.createElement('div');
         div.style.transform = `scale(${dynamicScale})`;
-        div.style.transformOrigin = "center";
+        div.style.setProperty('--card-scale', dynamicScale);
+        div.style.transformOrigin = "bottom center";
         if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
         div.className = `card seme-${c.seme} val-${c.valore}`;
         div.style.zIndex = 10 + idx;
@@ -3103,23 +3117,7 @@ function renderGiocatoriScopa(data) {
         const p = data.tuttiGiocatori[serverPlayerIndex];
         const isMe = p.isMe || (p.socketId === socket.id);
 
-        let posX, posY;
-        if (isMe) {
-            posX = 50;
-            posY = 85;
-        } else {
-            const indexOpp = i - 1;
-            const numOpp = numPlayers - 1;
-            let angoloGradi = 270;
-            if (numOpp > 1) {
-                const startA = 160;
-                const endA = 380;
-                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
-            }
-            const rad = angoloGradi * (Math.PI / 180);
-            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
-            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
-        }
+        const pos = getPosizioneGiocatoreTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
 
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
@@ -3128,9 +3126,9 @@ function renderGiocatoriScopa(data) {
         if (isMe) pBlock.classList.add('me');
         if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
 
-        pBlock.style.left = `${posX}%`;
-        pBlock.style.top = `${posY}%`;
-        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+        pBlock.style.left = `${pos.posX}%`;
+        pBlock.style.top = `${pos.posY}%`;
+        pBlock.style.transform = isMe ? 'translate(-50%, -50%)' : `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
 
         const ruolo = p.isMazziere ? " (Mazziere)" : "";
         const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
@@ -3177,8 +3175,10 @@ function renderGiocatoriScopa(data) {
 
             let margineNegativo = 0;
             if (carteInManoCount > 1) {
-                const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
-                margineNegativo = Math.min(0, spazioPerCarta - 35);
+                const maxSpan = isMobile ? 65 : 125;
+                const cW = isMobile ? 22 : 35;
+                const spazioPerCarta = (maxSpan - cW) / (carteInManoCount - 1);
+                margineNegativo = Math.min(0, Math.round(spazioPerCarta - cW));
             }
 
             for (let c = 0; c < carteInManoCount; c++) {
@@ -3199,28 +3199,13 @@ function renderTuaManoScopa(handCont, mano, isMyTurn) {
     handCont.innerHTML = '';
     const carteDaDisegnare = (mano || []).filter(c => !c.giocata);
     const numCarte = carteDaDisegnare.length;
-    const isMobile = window.innerWidth <= 768;
-    const baseScale = isMobile ? 0.65 : 1.0;
-    let dynamicScale = baseScale;
-    if (numCarte > 7) {
-        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08);
-    }
-
-    let marginLeft = 0;
-    if (isMobile) {
-        if (numCarte > 1) {
-            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
-            marginLeft = overlapFactor;
-        }
-    } else {
-        if (numCarte > 10) marginLeft = -35;
-        else if (numCarte > 7) marginLeft = -20;
-    }
+    const { dynamicScale, marginLeft } = calcolaLayoutCarteMano(numCarte);
 
     carteDaDisegnare.forEach((c, idx) => {
         const div = document.createElement('div');
         div.style.transform = `scale(${dynamicScale})`;
-        div.style.transformOrigin = "center";
+        div.style.setProperty('--card-scale', dynamicScale);
+        div.style.transformOrigin = "bottom center";
         if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
         div.className = `card seme-${c.seme} val-${c.valore}`;
         div.dataset.seme = c.seme;
@@ -3367,23 +3352,7 @@ function renderGiocatoriRubamazzetto(data) {
         const p = data.tuttiGiocatori[serverPlayerIndex];
         const isMe = p.isMe || (p.socketId === socket.id);
 
-        let posX, posY;
-        if (isMe) {
-            posX = 50;
-            posY = 85;
-        } else {
-            const indexOpp = i - 1;
-            const numOpp = numPlayers - 1;
-            let angoloGradi = 270;
-            if (numOpp > 1) {
-                const startA = 160;
-                const endA = 380;
-                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
-            }
-            const rad = angoloGradi * (Math.PI / 180);
-            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
-            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
-        }
+        const pos = getPosizioneGiocatoreTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
 
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
@@ -3392,9 +3361,9 @@ function renderGiocatoriRubamazzetto(data) {
         if (isMe) pBlock.classList.add('me');
         if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
 
-        pBlock.style.left = `${posX}%`;
-        pBlock.style.top = `${posY}%`;
-        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+        pBlock.style.left = `${pos.posX}%`;
+        pBlock.style.top = `${pos.posY}%`;
+        pBlock.style.transform = isMe ? 'translate(-50%, -50%)' : `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
 
         const ruolo = p.isMazziere ? " (Mazziere)" : "";
         const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
@@ -3435,8 +3404,10 @@ function renderGiocatoriRubamazzetto(data) {
 
             let margineNegativo = 0;
             if (carteInManoCount > 1) {
-                const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
-                margineNegativo = Math.min(0, spazioPerCarta - 35);
+                const maxSpan = isMobile ? 65 : 125;
+                const cW = isMobile ? 22 : 35;
+                const spazioPerCarta = (maxSpan - cW) / (carteInManoCount - 1);
+                margineNegativo = Math.min(0, Math.round(spazioPerCarta - cW));
             }
 
             for (let c = 0; c < carteInManoCount; c++) {
@@ -3457,28 +3428,13 @@ function renderTuaManoRubamazzetto(handCont, mano, isMyTurn) {
     handCont.innerHTML = '';
     const carteDaDisegnare = (mano || []).filter(c => !c.giocata);
     const numCarte = carteDaDisegnare.length;
-    const isMobile = window.innerWidth <= 768;
-    const baseScale = isMobile ? 0.65 : 1.0;
-    let dynamicScale = baseScale;
-    if (numCarte > 7) {
-        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08);
-    }
-
-    let marginLeft = 0;
-    if (isMobile) {
-        if (numCarte > 1) {
-            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
-            marginLeft = overlapFactor;
-        }
-    } else {
-        if (numCarte > 10) marginLeft = -35;
-        else if (numCarte > 7) marginLeft = -20;
-    }
+    const { dynamicScale, marginLeft } = calcolaLayoutCarteMano(numCarte);
 
     carteDaDisegnare.forEach((c, idx) => {
         const div = document.createElement('div');
         div.style.transform = `scale(${dynamicScale})`;
-        div.style.transformOrigin = "center";
+        div.style.setProperty('--card-scale', dynamicScale);
+        div.style.transformOrigin = "bottom center";
         if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
         div.className = `card seme-${c.seme} val-${c.valore}`;
         div.style.zIndex = 10 + idx;
@@ -3682,25 +3638,7 @@ function renderGiocatoriBriscola(data) {
         let posX, posY;
         let angoloGradi;
 
-        if (isMe) {
-            posX = 50;
-            posY = 85;
-            angoloGradi = 90;
-        } else {
-            const indexOpp = i - 1;
-            const numOpp = numPlayers - 1;
-            if (numOpp === 1) {
-                angoloGradi = 270;
-            } else {
-                const startA = 160;
-                const endA = 380;
-                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
-            }
-
-            const rad = angoloGradi * (Math.PI / 180);
-            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
-            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
-        }
+        const pos = getPosizioneGiocatoreTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
 
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
@@ -3709,9 +3647,9 @@ function renderGiocatoriBriscola(data) {
         if (isMe) pBlock.classList.add('me');
         if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
 
-        pBlock.style.left = `${posX}%`;
-        pBlock.style.top = `${posY}%`;
-        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+        pBlock.style.left = `${pos.posX}%`;
+        pBlock.style.top = `${pos.posY}%`;
+        pBlock.style.transform = isMe ? 'translate(-50%, -50%)' : `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
 
         const ruoloMazziere = p.isMazziere ? " (Mazziere)" : "";
         const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
@@ -3743,8 +3681,10 @@ function renderGiocatoriBriscola(data) {
 
             let margineNegativo = 0;
             if (carteInManoCount > 1) {
-                const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
-                margineNegativo = Math.min(0, spazioPerCarta - 35);
+                const maxSpan = isMobile ? 65 : 125;
+                const cW = isMobile ? 22 : 35;
+                const spazioPerCarta = (maxSpan - cW) / (carteInManoCount - 1);
+                margineNegativo = Math.min(0, Math.round(spazioPerCarta - cW));
             }
 
             for (let c = 0; c < carteInManoCount; c++) {
@@ -3758,15 +3698,8 @@ function renderGiocatoriBriscola(data) {
 
         playersCircle.appendChild(pBlock);
 
-        let cartaX, cartaY;
-        if (isMe) {
-            cartaX = 50;
-            cartaY = 68;
-        } else {
-            cartaX = 50 + raggioCarteX * Math.cos(angoloGradi * (Math.PI / 180));
-            cartaY = 44 + raggioCarteY * Math.sin(angoloGradi * (Math.PI / 180));
-        }
-        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
+        const posCarta = getPosizioneCartaTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
+        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, posCarta);
     }
 
     // Calcolo carta temporaneamente vincente sul tavolo
@@ -3843,27 +3776,13 @@ function renderTuaManoBriscola(handCont, mano, isMyTurn, semeBriscola) {
     });
 
     const numCarte = carteDaDisegnare.length;
-    const isMobile = window.innerWidth <= 768;
-    const baseScale = isMobile ? 0.65 : 1.0;
-    let dynamicScale = baseScale;
-    if (numCarte > 7) {
-        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08);
-    }
-
-    let marginLeft = 0;
-    if (isMobile) {
-        if (numCarte > 1) {
-            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
-            marginLeft = overlapFactor;
-        }
-    } else {
-        if (numCarte > 6) marginLeft = -25;
-    }
+    const { dynamicScale, marginLeft } = calcolaLayoutCarteMano(numCarte);
 
     carteDaDisegnare.forEach((c, idx) => {
         const div = document.createElement('div');
         div.style.transform = `scale(${dynamicScale})`;
-        div.style.transformOrigin = "center";
+        div.style.setProperty('--card-scale', dynamicScale);
+        div.style.transformOrigin = "bottom center";
         if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
         div.className = `card seme-${c.seme} val-${c.valore}`;
         div.style.zIndex = 10 + idx;
@@ -3975,13 +3894,16 @@ socket.on('vincitore_presa_tressette', ({ vincitoreId, vincitoreIdx, vincitoreNo
 });
 
 socket.on('fine_smazzata_tressette', (data) => {
-    let msg = `Fine Smazzata ${data.smazzataNum}!\n`;
-    if (data.punteggi && data.punteggi.length > 0) {
-        data.punteggi.forEach(p => {
-            msg += `${p.nome}: +${p.puntiSmazzata} pt -> Totale: ${p.puntiTotali} pt\n`;
-        });
-    }
-    mostraErrore(msg);
+    const righe = (data.punteggi || []).map(p => ({
+        nome: p.nome,
+        stemma: p.stemma,
+        gain: `+${p.puntiSmazzata || 0} pt`,
+        total: `Tot: ${p.puntiTotali || 0} pt`
+    }));
+    mostraFineSmazzataGenerica({
+        titolo: `🏁 Fine Smazzata ${data.smazzataNum || ''}`,
+        righe
+    });
 });
 
 socket.on('fine_partita_tressette', (data) => {
@@ -4047,28 +3969,7 @@ function renderGiocatoriTressette(data) {
         const p = data.tuttiGiocatori[serverPlayerIndex];
         const isMe = p.isMe || (p.socketId === socket.id);
 
-        let posX, posY;
-        let angoloGradi;
-
-        if (isMe) {
-            posX = 50;
-            posY = 85;
-            angoloGradi = 90;
-        } else {
-            const indexOpp = i - 1;
-            const numOpp = numPlayers - 1;
-            if (numOpp === 1) {
-                angoloGradi = 270;
-            } else {
-                const startA = 160;
-                const endA = 380;
-                angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
-            }
-
-            const rad = angoloGradi * (Math.PI / 180);
-            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
-            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
-        }
+        const pos = getPosizioneGiocatoreTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
 
         const pBlock = document.createElement('div');
         pBlock.className = 'player-block';
@@ -4077,9 +3978,9 @@ function renderGiocatoriTressette(data) {
         if (isMe) pBlock.classList.add('me');
         if (data.turnoAttuale === serverPlayerIndex) pBlock.classList.add('active-turn');
 
-        pBlock.style.left = `${posX}%`;
-        pBlock.style.top = `${posY}%`;
-        pBlock.style.transform = `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
+        pBlock.style.left = `${pos.posX}%`;
+        pBlock.style.top = `${pos.posY}%`;
+        pBlock.style.transform = isMe ? 'translate(-50%, -50%)' : `translate(-50%, -50%) scale(${scalaPlayerBlock})`;
 
         const ruoloMazziere = p.isMazziere ? " (Mazziere)" : "";
         const nomeConStemma = renderNomeConStemma(p.nome, p.stemma);
@@ -4106,8 +4007,10 @@ function renderGiocatoriTressette(data) {
 
             let margineNegativo = 0;
             if (carteInManoCount > 1) {
-                const spazioPerCarta = (160 - 35) / (carteInManoCount - 1);
-                margineNegativo = Math.min(0, spazioPerCarta - 35);
+                const maxSpan = isMobile ? 65 : 125;
+                const cW = isMobile ? 22 : 35;
+                const spazioPerCarta = (maxSpan - cW) / (carteInManoCount - 1);
+                margineNegativo = Math.min(0, Math.round(spazioPerCarta - cW));
             }
 
             for (let c = 0; c < carteInManoCount; c++) {
@@ -4121,15 +4024,8 @@ function renderGiocatoriTressette(data) {
 
         playersCircle.appendChild(pBlock);
 
-        let cartaX, cartaY;
-        if (isMe) {
-            cartaX = 50;
-            cartaY = 68;
-        } else {
-            cartaX = 50 + raggioCarteX * Math.cos(angoloGradi * (Math.PI / 180));
-            cartaY = 44 + raggioCarteY * Math.sin(angoloGradi * (Math.PI / 180));
-        }
-        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, { x: cartaX, y: cartaY });
+        const posCarta = getPosizioneCartaTavolo(serverPlayerIndex, mioIndice, numPlayers, isMobile);
+        posizioniCarteTavoloPerGiocatore.set(serverPlayerIndex, posCarta);
     }
 
     // Carta vincente sul tavolo
@@ -4191,23 +4087,7 @@ function renderTuaManoTressette(handCont, mano, isMyTurn, tavolo) {
     });
 
     const numCarte = carteDaDisegnare.length;
-    const isMobile = window.innerWidth <= 768;
-    const baseScale = isMobile ? 0.65 : 1.0;
-    let dynamicScale = baseScale;
-    if (numCarte > 7) {
-        dynamicScale = baseScale * Math.max(0.45, 1 - (numCarte - 7) * 0.08);
-    }
-
-    let marginLeft = 0;
-    if (isMobile) {
-        if (numCarte > 1) {
-            const overlapFactor = numCarte > 8 ? -30 : (numCarte > 5 ? -20 : -10);
-            marginLeft = overlapFactor;
-        }
-    } else {
-        if (numCarte > 10) marginLeft = -35;
-        else if (numCarte > 7) marginLeft = -20;
-    }
+    const { dynamicScale, marginLeft } = calcolaLayoutCarteMano(numCarte);
 
     const semeUscita = tavolo && tavolo.length > 0 ? tavolo[0].card.seme : null;
     const haSemeUscita = semeUscita ? carteDaDisegnare.some(c => c.seme === semeUscita) : false;
@@ -4215,7 +4095,8 @@ function renderTuaManoTressette(handCont, mano, isMyTurn, tavolo) {
     carteDaDisegnare.forEach((c, idx) => {
         const div = document.createElement('div');
         div.style.transform = `scale(${dynamicScale})`;
-        div.style.transformOrigin = "center";
+        div.style.setProperty('--card-scale', dynamicScale);
+        div.style.transformOrigin = "bottom center";
         if (idx > 0) div.style.marginLeft = `${marginLeft}px`;
         div.className = `card seme-${c.seme} val-${c.valore}`;
         div.style.zIndex = 10 + idx;
