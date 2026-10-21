@@ -195,13 +195,19 @@ function switchSection(activeId) {
             }
         });
 
-        // Toggle della visibilità dei tasti in alto a destra (Swap Classifica / ESCI)
+        // Toggle della visibilità dei tasti di testata (Regole, Classifica, ESCI)
+        const btnRegole = document.getElementById('btn-regole');
+        if (btnRegole) {
+            btnRegole.style.display = (activeId === 'game-select' || activeId === 'login-menu') ? 'none' : 'inline-block';
+        }
+
         const btnLeaderboard = document.getElementById('btn-leaderboard');
         const btnEsci = document.getElementById('btn-esci-principale');
         
         if (btnLeaderboard && btnEsci) {
             const isGame = (activeId === 'game-area');
-            btnLeaderboard.style.display = isGame ? 'none' : 'inline-block';
+            const showLeaderboard = (activeId === 'setup-menu' || activeId === 'lobby-wait');
+            btnLeaderboard.style.display = showLeaderboard ? 'inline-block' : 'none';
             btnEsci.style.display = isGame ? 'inline-block' : 'none';
         }
 
@@ -921,9 +927,9 @@ function renderGiocatori(data) {
                 angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
             }
 
-            const radiotherapy = angoloGradi * (Math.PI / 180);
-            posX = 50 + 44 * Math.cos(radiotherapy);
-            posY = 40 + 30 * Math.sin(radiotherapy);
+            const rad = angoloGradi * (Math.PI / 180);
+            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
+            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
         }
 
         const pBlock = document.createElement('div');
@@ -2476,9 +2482,9 @@ function renderGiocatoriCiapano(data) {
                 angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
             }
 
-            const radiotherapy = angoloGradi * (Math.PI / 180);
-            posX = 50 + 44 * Math.cos(radiotherapy);
-            posY = 40 + 30 * Math.sin(radiotherapy);
+            const rad = angoloGradi * (Math.PI / 180);
+            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
+            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
         }
 
         const pBlock = document.createElement('div');
@@ -2909,7 +2915,7 @@ function renderGiocatoriScopa(data) {
     if (data.variante === 'asso_piglia_tutto') labelVariante = '⚡ Asso Piglia Tutto';
     else if (data.variante === 'scopa_ladra') labelVariante = '🥷 Scopa Ladra';
     else if (data.variante === 'combinata') labelVariante = '🔥 Asso + Ladra';
-    const subInfo = window.ultimaMossaScopaInfo ? ` | ${window.ultimaMossaScopaInfo}` : '';
+    const subInfo = (window.ultimaMossaScopaInfo && !isMobile) ? ` | ${window.ultimaMossaScopaInfo}` : '';
     infoGiro.innerText = `${labelVariante} | Smazzata ${data.smazzataNum} | Obiettivo: ${data.limitePunti || 11} pt${subInfo}`;
 
     const isMobile = window.innerWidth <= 768;
@@ -2934,8 +2940,8 @@ function renderGiocatoriScopa(data) {
                 angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
             }
             const rad = angoloGradi * (Math.PI / 180);
-            posX = 50 + 44 * Math.cos(rad);
-            posY = 40 + 30 * Math.sin(rad);
+            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
+            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
         }
 
         const pBlock = document.createElement('div');
@@ -3184,8 +3190,8 @@ function renderGiocatoriRubamazzetto(data) {
                 angoloGradi = startA + (indexOpp * (endA - startA) / (numOpp - 1));
             }
             const rad = angoloGradi * (Math.PI / 180);
-            posX = 50 + 44 * Math.cos(rad);
-            posY = 40 + 30 * Math.sin(rad);
+            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
+            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
         }
 
         const pBlock = document.createElement('div');
@@ -3507,8 +3513,8 @@ function renderGiocatoriBriscola(data) {
             }
 
             const rad = angoloGradi * (Math.PI / 180);
-            posX = 50 + 44 * Math.cos(rad);
-            posY = 40 + 30 * Math.sin(rad);
+            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
+            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
         }
 
         const pBlock = document.createElement('div');
@@ -3873,8 +3879,8 @@ function renderGiocatoriTressette(data) {
             }
 
             const rad = angoloGradi * (Math.PI / 180);
-            posX = 50 + 44 * Math.cos(rad);
-            posY = 40 + 30 * Math.sin(rad);
+            posX = 50 + (isMobile ? 42 : 44) * Math.cos(rad);
+            posY = isMobile ? (42 + 26 * Math.sin(rad)) : (40 + 30 * Math.sin(rad));
         }
 
         const pBlock = document.createElement('div');
