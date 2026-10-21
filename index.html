@@ -731,10 +731,19 @@
                     <div id="briscola-deck-count" style="margin-top: -15px; font-size: 0.8rem; color: #f1c40f; font-weight: bold; text-shadow: 1px 1px 2px #000;">-</div>
                 </div>
 
+                <!-- Display Mazzo Scopa -->
+                <div id="scopa-deck-container" style="display:none;">
+                    <div style="position: relative; display: inline-block;">
+                        <div id="scopa-tallone" class="card card-back" style="transform: scale(0.55); transform-origin: top left; box-shadow: 2px 2px 8px rgba(0,0,0,0.7); pointer-events: none; margin-bottom: -55px; margin-right: -35px;"></div>
+                        <div id="scopa-deck-count" style="position: absolute; top: 12px; left: 10px; background: rgba(0,0,0,0.88); color: #f1c40f; font-size: 0.72rem; font-weight: 800; padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(241,196,15,0.7); box-shadow: 0 2px 4px rgba(0,0,0,0.8);">30</div>
+                    </div>
+                </div>
+
                 <div id="info-giro">
                 </div>
 
                 <div id="scopa-last-action" class="scopa-action-banner" style="display: none;"></div>
+                <div id="round-recap-toast" class="round-recap-modal" style="display: none;"></div>
 
                 <div id="dichiarazione-area" style="display:none;">
                     <h3 data-i18n="yourBet" style="margin-top:0;">La tua dichiarazione</h3>

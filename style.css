@@ -1954,11 +1954,26 @@ button {
     transition: all 0.3s ease;
 }
 
+#scopa-deck-container {
+    position: absolute;
+    left: 18px;
+    top: 54px;
+    z-index: 90;
+    transition: all 0.3s ease;
+}
+
 @media (max-width: 768px) {
     #briscola-deck-container {
         left: 8px !important;
         transform: translateY(-50%) scale(0.65) !important;
         transform-origin: left center !important;
+    }
+
+    #scopa-deck-container {
+        left: 12px !important;
+        top: 48px !important;
+        transform: scale(0.85) !important;
+        transform-origin: top left !important;
     }
 }
 
@@ -1979,77 +1994,207 @@ button {
     font-size: 1.05rem;
 }
 
-/* ========================================= */
-/* BANNER NOTIFICA MOSSA & PRESA SCOPA (TOP) */
-/* ========================================= */
+/* ================================================= */
+/* ANIMAZIONI & DINAMICA DI GIOCO STILE SOLITALIAN   */
+/* ================================================= */
+
+/* Vecchio banner azioni scopa nascosto per non coprire il tavolo */
 .scopa-action-banner {
+    display: none !important;
+}
+
+/* CARTA IN VOLO ANIMATA (play / presa) */
+.flying-card {
+    position: fixed !important;
+    z-index: 9999 !important;
+    pointer-events: none !important;
+    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), left 0.34s cubic-bezier(0.22, 1, 0.36, 1), top 0.34s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+    will-change: transform, left, top;
+}
+
+/* EVIDENZIAZIONE CARTE PRESE DAL TAVOLO */
+.card-capturing-glow {
+    filter: drop-shadow(0 0 10px #f1c40f) drop-shadow(0 0 18px rgba(241, 196, 15, 0.7)) !important;
+    transform: scale(1.10) !important;
+    z-index: 300 !important;
+    transition: all 0.24s ease-out !important;
+}
+
+/* BADGE FLUTTUANTE SCOPA (Senza coprire lo schermo) */
+.scopa-float-badge {
     position: absolute;
-    top: 50px;
+    top: -26px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(15, 23, 42, 0.95);
-    border: 1.5px solid #2ecc71;
-    border-radius: 16px;
+    background: linear-gradient(135deg, #f1c40f, #e67e22);
+    color: #111;
+    font-size: 0.88rem;
+    font-weight: 900;
     padding: 3px 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 10px rgba(46, 204, 113, 0.3);
-    z-index: 1200;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    pointer-events: none;
-    transition: opacity 0.25s ease;
-    max-width: 90vw;
+    border-radius: 14px;
     white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(241, 196, 15, 0.7);
+    pointer-events: none;
+    z-index: 2500;
+    animation: scopa-float-up 1.25s forwards cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 
-.scopa-action-banner.scopa-gold {
-    border-color: #f1c40f !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 16px rgba(241, 196, 15, 0.6) !important;
+@keyframes scopa-float-up {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 4px) scale(0.65);
+    }
+    22% {
+        opacity: 1;
+        transform: translate(-50%, -14px) scale(1.15);
+    }
+    75% {
+        opacity: 1;
+        transform: translate(-50%, -28px) scale(1.0);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -44px) scale(0.85);
+    }
 }
 
-.scopa-action-banner.scopa-cyan {
-    border-color: #00d2d3 !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 14px rgba(0, 210, 211, 0.5) !important;
-}
-
-.scopa-action-banner.scopa-purple {
-    border-color: #9b59b6 !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 14px rgba(155, 89, 182, 0.5) !important;
-}
-
-.scopa-action-banner.scopa-blue {
-    border-color: #3498db !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 12px rgba(52, 152, 219, 0.4) !important;
-}
-
-.scopa-action-title {
-    font-size: 0.82rem;
-    font-weight: bold;
-    color: #fff;
-    margin: 0;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-    display: flex;
+/* Mazzetto delle prese del giocatore (Stile Solitalian) */
+.player-mazzetto-stack {
+    display: inline-flex;
     align-items: center;
     gap: 4px;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 1px 6px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    margin-top: 2px;
+    font-size: 0.65rem;
+    color: #e2e8f0;
 }
 
-.scopa-action-cards {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+.player-mazzetto-mini {
+    width: 13px;
+    height: 18px;
+    border-radius: 2px;
+    background-size: cover;
+    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+    display: inline-block;
 }
 
-.scopa-action-group {
-    display: flex;
-    align-items: center;
-    gap: 3px;
+/* MODALE / TOAST ELEGANTE DI FINE SMAZZATA SCOPA */
+.round-recap-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(13, 20, 36, 0.96);
+    border: 1.5px solid #f1c40f;
+    border-radius: 14px;
+    padding: 16px 20px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.85), 0 0 25px rgba(241, 196, 15, 0.35);
+    z-index: 3500;
+    max-width: 390px;
+    width: 92%;
+    color: white;
+    text-align: center;
+    backdrop-filter: blur(12px);
+    animation: popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 
-.scopa-action-arrow {
-    font-size: 1rem;
+.recap-title {
+    font-size: 1.15rem;
+    font-weight: 800;
     color: #f1c40f;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+}
+
+.recap-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.recap-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 0.84rem;
+}
+
+.recap-player-name {
     font-weight: bold;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 110px;
+}
+
+.recap-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+}
+
+.recap-badge {
+    background: rgba(52, 152, 219, 0.25);
+    color: #74b9ff;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.70rem;
+    font-weight: 600;
+}
+
+.recap-badge-scopa {
+    background: rgba(241, 196, 15, 0.25);
+    color: #f1c40f;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.70rem;
+    font-weight: 700;
+}
+
+.recap-scores {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.recap-pts-gain {
+    color: #2ecc71;
+    font-weight: bold;
+    font-size: 0.90rem;
+}
+
+.recap-pts-total {
+    color: #bdc3c7;
+    font-size: 0.70rem;
+}
+
+.recap-close-btn {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 8px 24px;
+    font-size: 0.88rem;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    transition: background 0.2s;
+}
+
+.recap-close-btn:hover {
+    background: #2ecc71;
 }
 
 /* Badge nome giocatore su carta giocata al centro */
