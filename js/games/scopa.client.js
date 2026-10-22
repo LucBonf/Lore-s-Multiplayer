@@ -268,9 +268,11 @@ function mostraFineSmazzataScopa(data) {
             if (dett.carte > 0) badges.push(`<span class="recap-badge">🂠 Carte +1</span>`);
             if (dett.denari > 0) badges.push(`<span class="recap-badge">🪙 Denari +1</span>`);
             if (dett.settebello > 0) badges.push(`<span class="recap-badge">⭐ Settebello +1</span>`);
+            if (dett.reBello > 0) badges.push(`<span class="recap-badge" style="background: rgba(241, 196, 15, 0.25); border-color: #f1c40f;">🤴 Re Bello +1</span>`);
+            if (dett.napola > 0) badges.push(`<span class="recap-badge" style="background: rgba(230, 126, 34, 0.25); border-color: #e67e22;">👑 Napola +${dett.napola}</span>`);
             if (dett.primiera > 0) {
                 const punteggio = dett.valorePrimiera ? ` (${dett.valorePrimiera} pt)` : '';
-                badges.push(`<span class="recap-badge">👑 Primiera +1${punteggio}</span>`);
+                badges.push(`<span class="recap-badge">🏆 Primiera +1${punteggio}</span>`);
             }
 
             return `

@@ -20,7 +20,7 @@
     <meta name="theme-color" content="#2c3e50">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <script src="/socket.io/socket.io.js"></script>
-    <script src="js/main.js?v=2.9" type="module" defer></script>
+    <script src="js/main.js?v=3.0" type="module" defer></script>
     <!-- Precaricamento Sprite Carte e Retro -->
     <link rel="preload" href="https://gist.github.com/user-attachments/assets/1be959ff-f211-40ab-ac79-46e049cd336a" as="image">
     <link rel="preload" href="https://gist.github.com/user-attachments/assets/455c0814-2a2a-4a25-84c2-02dc542961ad" as="image">
@@ -627,6 +627,7 @@
                     <label data-i18n="scopaVarianteLabel" style="color: #ddd; font-size: 0.9rem; display: block; margin-bottom: 5px; font-weight: bold;">Variante del Gioco:</label>
                     <select id="select-scopa-variante" style="padding: 8px; border-radius: 5px; border: none; font-size: 0.95rem; font-weight: bold; cursor: pointer; width: 100%; background: #fff; color: #333; margin-bottom: 10px;">
                         <option value="classica" selected data-i18n="scopaClassicaOpt">🃏 Scopa Classica</option>
+                        <option value="scopone">🎓 Scopone Scientifico (4 giocatori)</option>
                         <option value="asso_piglia_tutto" data-i18n="scopaAssoOpt">⚡ Asso Piglia Tutto</option>
                         <option value="scopa_ladra" data-i18n="scopaLadraOpt">🥷 Scopa Ladra</option>
                         <option value="combinata" data-i18n="scopaCombOpt">🔥 Asso Piglia Tutto + Ladra</option>
@@ -635,6 +636,25 @@
                     <select id="select-scopa-limite" style="padding: 8px; border-radius: 5px; border: none; font-size: 0.95rem; font-weight: bold; cursor: pointer; width: 100%; background: #fff; color: #333;">
                         <option value="11" selected>11 Punti (Classica)</option>
                         <option value="21">21 Punti (Lunga)</option>
+                    </select>
+                    <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; color: #fff; font-size: 0.88rem; cursor: pointer; margin-bottom: 6px;">
+                            <input type="checkbox" id="check-scopa-napola" style="cursor: pointer; width: 16px; height: 16px;">
+                            <span>👑 Regola <b>Napola</b> (+3 a +10 per la scala d'oro)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; color: #fff; font-size: 0.88rem; cursor: pointer;">
+                            <input type="checkbox" id="check-scopa-rebello" style="cursor: pointer; width: 16px; height: 16px;">
+                            <span>🤴 Regola <b>Re Bello</b> (+1 punto per Re di Denari)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Opzioni specifiche Briscola -->
+                <div id="briscola-options-container" style="display: none; margin-bottom: 15px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(230,126,34,0.4); text-align: left;">
+                    <label style="color: #ddd; font-size: 0.9rem; display: block; margin-bottom: 5px; font-weight: bold;">Variante Briscola:</label>
+                    <select id="select-briscola-variante" style="padding: 8px; border-radius: 5px; border: none; font-size: 0.95rem; font-weight: bold; cursor: pointer; width: 100%; background: #fff; color: #333;">
+                        <option value="classica" selected>🃏 Briscola Tradizionale (Coperte)</option>
+                        <option value="scoperta">👁️ Briscola a Carte Scoperte</option>
                     </select>
                 </div>
 

@@ -1225,12 +1225,23 @@ function renderTuaMano(handCont, mano, isMyTurn, fase) {
 window.creaNuovaStanza = () => {
     sessionStorage.removeItem('lucas_room');
     const nome = userProfile ? userProfile.nickname : "Host";
-    const num = document.getElementById('select-players').value;
+    let num = document.getElementById('select-players').value;
     let limitePunti = 31;
     let scopaVariante = 'classica';
+    let scopaNapola = false;
+    let scopaReBello = false;
+    let briscolaVariante = 'classica';
+
     if (currentGameType === 'scopa') {
         limitePunti = document.getElementById('select-scopa-limite') ? parseInt(document.getElementById('select-scopa-limite').value || 11) : 11;
         scopaVariante = document.getElementById('select-scopa-variante') ? document.getElementById('select-scopa-variante').value : 'classica';
+        scopaNapola = document.getElementById('check-scopa-napola') ? document.getElementById('check-scopa-napola').checked : false;
+        scopaReBello = document.getElementById('check-scopa-rebello') ? document.getElementById('check-scopa-rebello').checked : false;
+        if (scopaVariante === 'scopone') {
+            num = 4;
+        }
+    } else if (currentGameType === 'briscola') {
+        briscolaVariante = document.getElementById('select-briscola-variante') ? document.getElementById('select-briscola-variante').value : 'classica';
     } else if (currentGameType === 'ciapano') {
         limitePunti = document.getElementById('select-ciapano-limite') ? parseInt(document.getElementById('select-ciapano-limite').value || 31) : 31;
     } else if (currentGameType === 'tressette') {
@@ -1244,6 +1255,9 @@ window.creaNuovaStanza = () => {
         gameType: currentGameType,
         limitePunti: limitePunti,
         scopaVariante: scopaVariante,
+        scopaNapola: scopaNapola,
+        scopaReBello: scopaReBello,
+        briscolaVariante: briscolaVariante,
         tressetteLimite: limitePunti
     });
 };
@@ -2032,6 +2046,7 @@ window.selezionaGioco = (tipo) => {
     const badgeEl = document.getElementById('current-game-badge');
     const ciapanoOpts = document.getElementById('ciapano-options-container');
     const scopaOpts = document.getElementById('scopa-options-container');
+    const briscolaOpts = document.getElementById('briscola-options-container');
     const tressetteOpts = document.getElementById('tressette-options-container');
     const selectP = document.getElementById('select-players');
 
@@ -2055,6 +2070,7 @@ window.selezionaGioco = (tipo) => {
         }
         if (ciapanoOpts) ciapanoOpts.style.display = 'block';
         if (scopaOpts) scopaOpts.style.display = 'none';
+        if (briscolaOpts) briscolaOpts.style.display = 'none';
         if (tressetteOpts) tressetteOpts.style.display = 'none';
         impostaOpzioniGiocatori([2, 3, 4, 5, 6, 7, 8], 4);
     } else if (tipo === 'scopa') {
@@ -2066,8 +2082,21 @@ window.selezionaGioco = (tipo) => {
         }
         if (ciapanoOpts) ciapanoOpts.style.display = 'none';
         if (scopaOpts) scopaOpts.style.display = 'block';
+        if (briscolaOpts) briscolaOpts.style.display = 'none';
         if (tressetteOpts) tressetteOpts.style.display = 'none';
-        impostaOpzioniGiocatori([2, 4], 2);
+
+        const selScopaVar = document.getElementById('select-scopa-variante');
+        const aggiornaGiocatoriScopa = () => {
+            if (selScopaVar && selScopaVar.value === 'scopone') {
+                impostaOpzioniGiocatori([4], 4);
+            } else {
+                impostaOpzioniGiocatori([2, 3, 4], 2);
+            }
+        };
+        if (selScopaVar) {
+            selScopaVar.onchange = aggiornaGiocatoriScopa;
+        }
+        aggiornaGiocatoriScopa();
     } else if (tipo === 'rubamazzetto') {
         if (badgeEl) {
             badgeEl.innerText = 'Gioco: Rubamazzetto';
@@ -2077,6 +2106,7 @@ window.selezionaGioco = (tipo) => {
         }
         if (ciapanoOpts) ciapanoOpts.style.display = 'none';
         if (scopaOpts) scopaOpts.style.display = 'none';
+        if (briscolaOpts) briscolaOpts.style.display = 'none';
         if (tressetteOpts) tressetteOpts.style.display = 'none';
         impostaOpzioniGiocatori([2, 3, 4], 2);
     } else if (tipo === 'briscola') {
@@ -2088,6 +2118,7 @@ window.selezionaGioco = (tipo) => {
         }
         if (ciapanoOpts) ciapanoOpts.style.display = 'none';
         if (scopaOpts) scopaOpts.style.display = 'none';
+        if (briscolaOpts) briscolaOpts.style.display = 'block';
         if (tressetteOpts) tressetteOpts.style.display = 'none';
         impostaOpzioniGiocatori([2, 3, 4, 5], 2);
     } else if (tipo === 'tressette') {
@@ -2099,6 +2130,7 @@ window.selezionaGioco = (tipo) => {
         }
         if (ciapanoOpts) ciapanoOpts.style.display = 'none';
         if (scopaOpts) scopaOpts.style.display = 'none';
+        if (briscolaOpts) briscolaOpts.style.display = 'none';
         if (tressetteOpts) tressetteOpts.style.display = 'block';
         impostaOpzioniGiocatori([2, 4], 4);
     } else {
@@ -2110,6 +2142,7 @@ window.selezionaGioco = (tipo) => {
         }
         if (ciapanoOpts) ciapanoOpts.style.display = 'none';
         if (scopaOpts) scopaOpts.style.display = 'none';
+        if (briscolaOpts) briscolaOpts.style.display = 'none';
         if (tressetteOpts) tressetteOpts.style.display = 'none';
         impostaOpzioniGiocatori([3, 4, 5, 6, 7, 8], 4);
     }

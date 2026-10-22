@@ -90,6 +90,18 @@ function calcolaPrimiera(prese) {
     return { totale, semiMancanti, migliori };
 }
 
+export function calcolaNapola(prese) {
+    if (!prese || prese.length === 0) return 0;
+    const valoriDenari = new Set(prese.filter(c => c.seme === 'Denari').map(c => c.valore));
+    const seq = ["Asso", "2", "3", "4", "5", "6", "7", "Fante", "Cavallo", "Re"];
+    let count = 0;
+    for (let v of seq) {
+        if (valoriDenari.has(v)) count++;
+        else break;
+    }
+    return count >= 3 ? count : 0;
+}
+
 class ScopaPlayer {
     constructor(id, nome, isHuman = false, token = null, uniqueCode = null) {
         this.id = id;
@@ -117,18 +129,20 @@ class ScopaPlayer {
 }
 
 class ScopaGame {
-    constructor(numPlayers = 2, limitePunti = 11, variante = 'classica') {
-        this.numPlayers = numPlayers; // 2 o 4
+    constructor(numPlayers = 2, limitePunti = 11, variante = 'classica', opzioni = {}) {
+        this.variante = variante; // 'classica', 'scopone', 'asso_piglia_tutto', 'scopa_ladra', 'combinata'
+        this.numPlayers = (variante === 'scopone') ? 4 : numPlayers; // Scopone è sempre a 4 giocatori
         this.limitePunti = limitePunti;
-        this.variante = variante; // 'classica', 'asso_piglia_tutto', 'scopa_ladra', 'combinata'
-        this.players = Array.from({ length: numPlayers }, (_, i) => new ScopaPlayer(i, `CPU ${i}`));
+        this.napolaAttiva = !!opzioni.napola;
+        this.reBelloAttivo = !!opzioni.reBello;
+        this.players = Array.from({ length: this.numPlayers }, (_, i) => new ScopaPlayer(i, `CPU ${i}`));
         this.mazzo = [];
         this.tavolo = []; // Carte scoperte sul tavolo
-        this.indiceMazziere = Math.floor(Math.random() * numPlayers);
+        this.indiceMazziere = Math.floor(Math.random() * this.numPlayers);
         this.turnoAttuale = 0;
         this.ultimoPresista = -1;
         this.smazzataNum = 1;
-        this.distribuzioneNum = 1; // Mani da 3 carte (1..6 a 2 giocatori, 1..3 a 4 giocatori)
+        this.distribuzioneNum = 1;
         this.fase = "gioco"; // "gioco" | "fine_smazzata" | "fine_partita"
         this.botThinking = false;
         this.matchId = null;
@@ -157,24 +171,34 @@ class ScopaGame {
     }
 
     distribuisciIniziale() {
-        let mazzoValido = false;
-        while (!mazzoValido) {
-            this.mazzo = this.creaMazzo();
-            // 4 carte sul banco
-            this.tavolo = [this.mazzo.pop(), this.mazzo.pop(), this.mazzo.pop(), this.mazzo.pop()];
-            // Regola tradizionale Scopa: se sul tavolo ci sono 3 o 4 Re, si rimescola
-            const numRe = this.tavolo.filter(c => c.valore === 'Re').length;
-            if (numRe < 3) {
-                mazzoValido = true;
-            }
-        }
-
         this.players.forEach(p => p.resetSmazzata());
         this.distribuzioneNum = 1;
         this.ultimoPresista = -1;
 
-        // Distribuisci 3 carte a testa
-        this.distribuisciMano();
+        if (this.variante === 'scopone') {
+            // Scopone Scientifico: 10 carte a testa distribuite tutte all'inizio (40 carte totali), 0 carte sul tavolo!
+            this.mazzo = this.creaMazzo();
+            this.tavolo = [];
+            for (let i = 0; i < 10; i++) {
+                for (let p of this.players) {
+                    p.mano.push(this.mazzo.pop());
+                }
+            }
+        } else {
+            let mazzoValido = false;
+            while (!mazzoValido) {
+                this.mazzo = this.creaMazzo();
+                // 4 carte sul banco
+                this.tavolo = [this.mazzo.pop(), this.mazzo.pop(), this.mazzo.pop(), this.mazzo.pop()];
+                // Regola tradizionale Scopa: se sul tavolo ci sono 3 o 4 Re, si rimescola
+                const numRe = this.tavolo.filter(c => c.valore === 'Re').length;
+                if (numRe < 3) {
+                    mazzoValido = true;
+                }
+            }
+            // Distribuisci 3 carte a testa
+            this.distribuisciMano();
+        }
 
         this.turnoAttuale = (this.indiceMazziere + 1) % this.numPlayers;
         this.fase = "gioco";
@@ -372,6 +396,22 @@ class ScopaGame {
             if (haSettebello0) { pSmazzata0 += 1; dett0.settebello = 1; }
             else if (haSettebello1) { pSmazzata1 += 1; dett1.settebello = 1; }
 
+            // Re Bello (+1 a chi ha il Re di Denari)
+            if (this.reBelloAttivo) {
+                const haReBello0 = team0Prese.some(c => c.valore === 'Re' && c.seme === 'Denari');
+                const haReBello1 = team1Prese.some(c => c.valore === 'Re' && c.seme === 'Denari');
+                if (haReBello0) { pSmazzata0 += 1; dett0.reBello = 1; }
+                else if (haReBello1) { pSmazzata1 += 1; dett1.reBello = 1; }
+            }
+
+            // Napola (+3..+10 punti per sequenza di Denari da Asso-2-3 in poi)
+            if (this.napolaAttiva) {
+                const nap0 = calcolaNapola(team0Prese);
+                const nap1 = calcolaNapola(team1Prese);
+                if (nap0 > 0) { pSmazzata0 += nap0; dett0.napola = nap0; }
+                if (nap1 > 0) { pSmazzata1 += nap1; dett1.napola = nap1; }
+            }
+
             // Primiera: 7=21, 6=18, Asso=16, 5=15, 4=14, 3=13, 2=12, Figure=10 per ciascuno dei 4 semi.
             // Chi totalizza la somma più alta vince la Primiera. In caso di parità, il punto non viene assegnato.
             const prim0 = calcolaPrimiera(team0Prese);
@@ -400,6 +440,95 @@ class ScopaGame {
             return { gameOver, vincitoreId, dett0, dett1, denari0, denari1, prim0, prim1 };
         }
 
+        if (this.numPlayers === 3) {
+            // A 3 giocatori: tutti contro tutti
+            const detts = this.players.map(p => ({
+                scope: p.scope,
+                carte: 0,
+                denari: 0,
+                settebello: 0,
+                primiera: 0,
+                reBello: 0,
+                napola: 0,
+                valorePrimiera: 0,
+                numCarte: p.prese.length,
+                numDenari: p.prese.filter(c => c.seme === 'Denari').length
+            }));
+
+            this.players.forEach((p, idx) => {
+                p.puntiSmazzata = p.scope;
+            });
+
+            // Carte (almeno 14 carte e massimo unico)
+            const carteCounts = this.players.map(p => p.prese.length);
+            const maxCarte = Math.max(...carteCounts);
+            if (maxCarte >= 14 && carteCounts.filter(cnt => cnt === maxCarte).length === 1) {
+                const wIdx = carteCounts.indexOf(maxCarte);
+                this.players[wIdx].puntiSmazzata += 1;
+                detts[wIdx].carte = 1;
+            }
+
+            // Denari (almeno 4 carte e massimo unico)
+            const denariCounts = detts.map(d => d.numDenari);
+            const maxDenari = Math.max(...denariCounts);
+            if (maxDenari >= 4 && denariCounts.filter(cnt => cnt === maxDenari).length === 1) {
+                const wIdx = denariCounts.indexOf(maxDenari);
+                this.players[wIdx].puntiSmazzata += 1;
+                detts[wIdx].denari = 1;
+            }
+
+            // Settebello
+            this.players.forEach((p, idx) => {
+                if (p.prese.some(c => c.valore === '7' && c.seme === 'Denari')) {
+                    p.puntiSmazzata += 1;
+                    detts[idx].settebello = 1;
+                }
+            });
+
+            // Re Bello
+            if (this.reBelloAttivo) {
+                this.players.forEach((p, idx) => {
+                    if (p.prese.some(c => c.valore === 'Re' && c.seme === 'Denari')) {
+                        p.puntiSmazzata += 1;
+                        detts[idx].reBello = 1;
+                    }
+                });
+            }
+
+            // Napola
+            if (this.napolaAttiva) {
+                this.players.forEach((p, idx) => {
+                    const nap = calcolaNapola(p.prese);
+                    if (nap > 0) {
+                        p.puntiSmazzata += nap;
+                        detts[idx].napola = nap;
+                    }
+                });
+            }
+
+            // Primiera (massimo unico tra i 3)
+            const primiere = this.players.map(p => calcolaPrimiera(p.prese));
+            primiere.forEach((pr, idx) => { detts[idx].valorePrimiera = pr.totale; });
+            const maxPrim = Math.max(...primiere.map(pr => pr.totale));
+            if (maxPrim > 0 && primiere.filter(pr => pr.totale === maxPrim).length === 1) {
+                const wIdx = primiere.findIndex(pr => pr.totale === maxPrim);
+                this.players[wIdx].puntiSmazzata += 1;
+                detts[wIdx].primiera = 1;
+            }
+
+            this.players.forEach((p, idx) => {
+                p.puntiTotali += p.puntiSmazzata;
+                p.dettaglioPuntiSmazzata = detts[idx];
+            });
+
+            const maxTot = Math.max(...this.players.map(p => p.puntiTotali));
+            const leaders = this.players.filter(p => p.puntiTotali === maxTot);
+            const gameOver = maxTot >= this.limitePunti && leaders.length === 1;
+            const vincitoreId = gameOver ? leaders[0].id : -1;
+
+            return { gameOver, vincitoreId, detts };
+        }
+
         // A 2 giocatori (1 contro 1)
         const p0 = this.players[0];
         const p1 = this.players[1];
@@ -407,8 +536,8 @@ class ScopaGame {
         p0.puntiSmazzata = p0.scope;
         p1.puntiSmazzata = p1.scope;
 
-        const dett0 = { scope: p0.scope, carte: 0, denari: 0, settebello: 0, primiera: 0 };
-        const dett1 = { scope: p1.scope, carte: 0, denari: 0, settebello: 0, primiera: 0 };
+        const dett0 = { scope: p0.scope, carte: 0, denari: 0, settebello: 0, primiera: 0, reBello: 0, napola: 0 };
+        const dett1 = { scope: p1.scope, carte: 0, denari: 0, settebello: 0, primiera: 0, reBello: 0, napola: 0 };
 
         // 2. Carte (> 20)
         if (p0.prese.length > p1.prese.length && p0.prese.length > 20) {
@@ -439,6 +568,22 @@ class ScopaGame {
         } else if (haSettebello1) {
             p1.puntiSmazzata += 1;
             dett1.settebello = 1;
+        }
+
+        // Re Bello
+        if (this.reBelloAttivo) {
+            const haReBello0 = p0.prese.some(c => c.valore === 'Re' && c.seme === 'Denari');
+            const haReBello1 = p1.prese.some(c => c.valore === 'Re' && c.seme === 'Denari');
+            if (haReBello0) { p0.puntiSmazzata += 1; dett0.reBello = 1; }
+            else if (haReBello1) { p1.puntiSmazzata += 1; dett1.reBello = 1; }
+        }
+
+        // Napola
+        if (this.napolaAttiva) {
+            const nap0 = calcolaNapola(p0.prese);
+            const nap1 = calcolaNapola(p1.prese);
+            if (nap0 > 0) { p0.puntiSmazzata += nap0; dett0.napola = nap0; }
+            if (nap1 > 0) { p1.puntiSmazzata += nap1; dett1.napola = nap1; }
         }
 
         // 5. Primiera: 7=21, 6=18, Asso=16, 5=15, 4=14, 3=13, 2=12, Figure=10 per ciascuno dei 4 semi.

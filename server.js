@@ -2375,9 +2375,14 @@ io.on('connection', (socket) => {
 
         if (lobby.parametri?.gameType === 'scopa') {
             const limite = parseInt(lobby.parametri.limitePunti || 11);
-            const numG = parseInt(lobby.parametri.numGiocatori || 2);
+            let numG = parseInt(lobby.parametri.numGiocatori || 2);
             const variante = lobby.parametri.scopaVariante || 'classica';
-            lobby.gameInstance = new ScopaGame(numG, limite, variante);
+            if (variante === 'scopone') numG = 4;
+            const opzioni = {
+                napola: !!lobby.parametri.scopaNapola,
+                reBello: !!lobby.parametri.scopaReBello
+            };
+            lobby.gameInstance = new ScopaGame(numG, limite, variante, opzioni);
             inviaLobbyPubblicheTutti();
 
             lobby.gameInstance.players.forEach((p, i) => {
@@ -2439,7 +2444,7 @@ io.on('connection', (socket) => {
 
         if (lobby.parametri?.gameType === 'briscola') {
             const numG = parseInt(lobby.parametri.numGiocatori || 2);
-            const variante = (numG === 5) ? 'chiamata' : 'classica';
+            const variante = (numG === 5) ? 'chiamata' : (lobby.parametri.briscolaVariante || 'classica');
             lobby.gameInstance = new BriscolaGame(numG, variante);
             inviaLobbyPubblicheTutti();
 
@@ -4653,7 +4658,7 @@ io.on('connection', (socket) => {
                         nome: p.nome,
                         isHuman: p.isHuman,
                         numCarte: p.mano.length,
-                        mano: isMe ? giocatoreUmano.mano : undefined,
+                        mano: isMe ? giocatoreUmano.mano : (game.variante === 'scoperta' ? p.mano : undefined),
                         cartePreseCount: p.prese.length,
                         puntiTotali: p.puntiTotali,
                         ruolo: ruoloVisibile,

@@ -230,11 +230,25 @@ function renderGiocatoriBriscola(data) {
                 margineNegativo = Math.min(0, Math.round(spazioPerCarta - cW));
             }
 
+            const isScoperta = Array.isArray(p.mano) && p.mano.length > 0 && p.mano[0] && p.mano[0].valore;
             for (let c = 0; c < carteInManoCount; c++) {
-                const cardBack = document.createElement('div');
-                cardBack.className = 'card-back';
-                if (c > 0) cardBack.style.marginLeft = `${margineNegativo}px`;
-                oppHandCont.appendChild(cardBack);
+                if (isScoperta && p.mano[c]) {
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = `card seme-${p.mano[c].seme} val-${p.mano[c].valore}`;
+                    cardDiv.style.width = isMobile ? '28px' : '44px';
+                    cardDiv.style.height = isMobile ? '42px' : '66px';
+                    cardDiv.style.backgroundSize = 'contain';
+                    cardDiv.style.backgroundRepeat = 'no-repeat';
+                    cardDiv.style.boxShadow = '0 2px 5px rgba(0,0,0,0.4)';
+                    cardDiv.style.borderRadius = '3px';
+                    if (c > 0) cardDiv.style.marginLeft = `${margineNegativo}px`;
+                    oppHandCont.appendChild(cardDiv);
+                } else {
+                    const cardBack = document.createElement('div');
+                    cardBack.className = 'card-back';
+                    if (c > 0) cardBack.style.marginLeft = `${margineNegativo}px`;
+                    oppHandCont.appendChild(cardBack);
+                }
             }
             pBlock.appendChild(oppHandCont);
         }
