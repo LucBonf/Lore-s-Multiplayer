@@ -15,12 +15,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=2.6">
+    <link rel="stylesheet" href="style.css?v=2.7">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2c3e50">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <script src="/socket.io/socket.io.js"></script>
-    <script src="js/main.js?v=2.6" type="module" defer></script>
+    <script src="js/main.js?v=2.7" type="module" defer></script>
     <!-- Precaricamento Sprite Carte e Retro -->
     <link rel="preload" href="https://gist.github.com/user-attachments/assets/1be959ff-f211-40ab-ac79-46e049cd336a" as="image">
     <link rel="preload" href="https://gist.github.com/user-attachments/assets/455c0814-2a2a-4a25-84c2-02dc542961ad" as="image">
@@ -267,11 +267,11 @@
                 • Entrambe le regole speciali attive insieme: l'Asso prende tutto il banco e puoi rubare i mazzetti avversari calando carte uguali alla loro cima!</p>
                 <hr style="border-color: rgba(255,255,255,0.1);">
                 <p><strong>💰 Punti di Smazzata:</strong><br>
-                • <strong>Scope:</strong> 1 punto per ogni scopa.<br>
-                • <strong>Carte:</strong> 1 punto a chi ha preso più di 20 carte.<br>
-                • <strong>Denari:</strong> 1 punto a chi ha preso più di 5 carte di Denari.<br>
-                • <strong>Settebello:</strong> 1 punto a chi prende il 7 di Denari.<br>
-                • <strong>Primiera:</strong> 1 punto a chi totalizza il punteggio più alto con le quattro carte migliori dei 4 semi (7=21, 6=18, Asso=16, 5=15, 4=14, 3=13, 2=12, Figure=10).</p>
+                • <strong>Scope:</strong> 1 punto per ogni scopa (tranne sull'ultima presa dell'ultima mano).<br>
+                • <strong>Carte (Lunga):</strong> 1 punto a chi ha raccolto più carte nel mazzo (almeno 21 carte; in caso di parità il punto non viene assegnato).<br>
+                • <strong>Denari (Ori):</strong> 1 punto a chi ha preso più carte di Denari (almeno 6 carte; in caso di parità il punto non viene assegnato).<br>
+                • <strong>Settebello (Piricchio):</strong> 1 punto a chi prende il 7 di Denari.<br>
+                • <strong>Primiera:</strong> 1 punto a chi totalizza il maggior punteggio con quattro carte, una per ciascuno dei quattro semi (7=21, 6=18, Asso=16, 5=15, 4=14, 3=13, 2=12, Re/Cavallo/Fante=10). È obbligatorio aver preso almeno una carta per ciascun seme (altrimenti la Primiera è detta nulla e non può essere calcolata). In caso di parità il punto non viene assegnato.</p>
             </div>
         </div>
     </div>
