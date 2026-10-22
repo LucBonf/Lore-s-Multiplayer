@@ -1944,6 +1944,23 @@ io.on('connection', (socket) => {
             } while (lobbies[code]);
 
             const gameType = dati.gameType || 'lucas';
+            let numG = parseInt(dati.numGiocatori) || 4;
+            if (gameType === 'briscola') {
+                if (![2, 3, 4, 5].includes(numG)) numG = 2;
+            } else if (gameType === 'scopa') {
+                if (dati.scopaVariante === 'scopone') numG = 4;
+                else if (![2, 3, 4].includes(numG)) numG = 2;
+            } else if (gameType === 'rubamazzetto') {
+                if (![2, 3, 4].includes(numG)) numG = 2;
+            } else if (gameType === 'tressette') {
+                if (![2, 4].includes(numG)) numG = 4;
+            } else if (gameType === 'lucas') {
+                if (![3, 4, 5, 6, 7, 8].includes(numG)) numG = 4;
+            } else if (gameType === 'ciapano') {
+                if (![2, 3, 4, 5, 6, 7, 8].includes(numG)) numG = 4;
+            }
+            dati.numGiocatori = numG;
+
             let eloValue = socket.userElo || 1000;
             if (gameType === 'ciapano') eloValue = socket.userEloCiapano || 1000;
             else if (gameType === 'scopa') eloValue = socket.userEloScopa || 1000;

@@ -2052,11 +2052,21 @@ window.selezionaGioco = (tipo) => {
 
     const impostaOpzioniGiocatori = (consentiti, defaultVal) => {
         if (!selectP) return;
-        for (let opt of selectP.options) {
-            const val = parseInt(opt.value);
-            opt.style.display = consentiti.includes(val) ? 'block' : 'none';
-        }
-        if (!consentiti.includes(parseInt(selectP.value))) {
+        const currentVal = parseInt(selectP.value);
+        const lang = localStorage.getItem('lucas_lang') || 'it';
+        const d = dictionary[lang] || dictionary['it'] || {};
+
+        selectP.innerHTML = '';
+        consentiti.forEach(val => {
+            const opt = document.createElement('option');
+            opt.value = val.toString();
+            opt.textContent = (d && d['players' + val]) ? d['players' + val] : `${val} Giocatori`;
+            selectP.appendChild(opt);
+        });
+
+        if (consentiti.includes(currentVal)) {
+            selectP.value = currentVal.toString();
+        } else {
             selectP.value = defaultVal.toString();
         }
     };
