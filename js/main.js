@@ -2040,6 +2040,51 @@ socket.on('mossa_automatica', (d) => {
 
 let currentGameType = 'lucas';
 
+function impostaOpzioniGiocatori(consentiti, defaultVal) {
+    const selectP = document.getElementById('select-players');
+    if (!selectP) return;
+    const currentVal = parseInt(selectP.value);
+    const lang = localStorage.getItem('lucas_lang') || 'it';
+    const d = dictionary[lang] || dictionary['it'] || {};
+
+    selectP.innerHTML = '';
+    consentiti.forEach(val => {
+        const opt = document.createElement('option');
+        opt.value = val.toString();
+        opt.textContent = (d && d['players' + val]) ? d['players' + val] : `${val} Giocatori`;
+        selectP.appendChild(opt);
+    });
+
+    if (consentiti.includes(currentVal)) {
+        selectP.value = currentVal.toString();
+    } else {
+        selectP.value = defaultVal.toString();
+    }
+}
+window.impostaOpzioniGiocatori = impostaOpzioniGiocatori;
+
+window.sincronizzaOpzioniGiocatori = () => {
+    const tipo = currentGameType || 'lucas';
+    const selScopaVar = document.getElementById('select-scopa-variante');
+    if (tipo === 'briscola') {
+        impostaOpzioniGiocatori([2, 3, 4, 5], 2);
+    } else if (tipo === 'tressette') {
+        impostaOpzioniGiocatori([2, 4], 4);
+    } else if (tipo === 'scopa') {
+        if (selScopaVar && selScopaVar.value === 'scopone') {
+            impostaOpzioniGiocatori([4], 4);
+        } else {
+            impostaOpzioniGiocatori([2, 3, 4], 2);
+        }
+    } else if (tipo === 'rubamazzetto') {
+        impostaOpzioniGiocatori([2, 3, 4], 2);
+    } else if (tipo === 'ciapano') {
+        impostaOpzioniGiocatori([2, 3, 4, 5, 6, 7, 8], 4);
+    } else {
+        impostaOpzioniGiocatori([3, 4, 5, 6, 7, 8], 4);
+    }
+};
+
 window.selezionaGioco = (tipo) => {
     currentGameType = tipo;
     const titleEl = document.getElementById('game-title');
@@ -2048,28 +2093,6 @@ window.selezionaGioco = (tipo) => {
     const scopaOpts = document.getElementById('scopa-options-container');
     const briscolaOpts = document.getElementById('briscola-options-container');
     const tressetteOpts = document.getElementById('tressette-options-container');
-    const selectP = document.getElementById('select-players');
-
-    const impostaOpzioniGiocatori = (consentiti, defaultVal) => {
-        if (!selectP) return;
-        const currentVal = parseInt(selectP.value);
-        const lang = localStorage.getItem('lucas_lang') || 'it';
-        const d = dictionary[lang] || dictionary['it'] || {};
-
-        selectP.innerHTML = '';
-        consentiti.forEach(val => {
-            const opt = document.createElement('option');
-            opt.value = val.toString();
-            opt.textContent = (d && d['players' + val]) ? d['players' + val] : `${val} Giocatori`;
-            selectP.appendChild(opt);
-        });
-
-        if (consentiti.includes(currentVal)) {
-            selectP.value = currentVal.toString();
-        } else {
-            selectP.value = defaultVal.toString();
-        }
-    };
 
     if (tipo === 'ciapano') {
         if (badgeEl) {

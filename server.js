@@ -315,10 +315,11 @@ if (process.env.MONGODB_URI) {
 
 app.use(compression());
 app.use(express.static(__dirname, {
-    maxAge: '1h',
     setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.html')) {
-            res.setHeader('Cache-Control', 'no-cache');
+        if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('sw.js')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
         } else if (filePath.match(/\.(png|jpg|jpeg|gif|webp|svg|mp3|ogg|wav|ico)$/)) {
             res.setHeader('Cache-Control', 'public, max-age=86400');
         }

@@ -20,7 +20,7 @@
     <meta name="theme-color" content="#2c3e50">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <script src="/socket.io/socket.io.js"></script>
-    <script src="js/main.js?v=3.0" type="module" defer></script>
+    <script src="js/main.js?v=3.2" type="module" defer></script>
     <!-- Precaricamento Sprite Carte e Retro -->
     <link rel="preload" href="https://gist.github.com/user-attachments/assets/1be959ff-f211-40ab-ac79-46e049cd336a" as="image">
     <link rel="preload" href="https://gist.github.com/user-attachments/assets/455c0814-2a2a-4a25-84c2-02dc542961ad" as="image">
@@ -668,15 +668,8 @@
                 </div>
 
                 <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
-                    <select id="select-players"
+                    <select id="select-players" onfocus="window.sincronizzaOpzioniGiocatori && window.sincronizzaOpzioniGiocatori()" onpointerdown="window.sincronizzaOpzioniGiocatori && window.sincronizzaOpzioniGiocatori()"
                         style="padding: 10px; border-radius: 5px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                        <option value="2">2 Giocatori</option>
-                        <option value="3">3 Giocatori</option>
-                        <option value="4" selected>4 Giocatori</option>
-                        <option value="5">5 Giocatori</option>
-                        <option value="6">6 Giocatori</option>
-                        <option value="7">7 Giocatori</option>
-                        <option value="8">8 Giocatori</option>
                     </select>
                     <button data-i18n="createBtn" onclick="creaNuovaStanza()"
                         style="padding: 10px 20px; font-weight: bold; background: #f1c40f; color: #333; border: none; border-radius: 5px; cursor: pointer; flex-grow: 1; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">CREA</button>
@@ -881,7 +874,8 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').then(registration => {
+                navigator.serviceWorker.register('/sw.js?v=3.2').then(registration => {
+                    registration.update();
                     console.log('ServiceWorker registrato con successo: ', registration.scope);
                 }).catch(err => {
                     console.log('Registrazione ServiceWorker fallita: ', err);
