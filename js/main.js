@@ -2089,7 +2089,7 @@ window.selezionaGioco = (tipo) => {
         if (ciapanoOpts) ciapanoOpts.style.display = 'none';
         if (scopaOpts) scopaOpts.style.display = 'none';
         if (tressetteOpts) tressetteOpts.style.display = 'none';
-        impostaOpzioniGiocatori([2, 4, 5], 2);
+        impostaOpzioniGiocatori([2, 3, 4, 5], 2);
     } else if (tipo === 'tressette') {
         if (badgeEl) {
             badgeEl.innerText = 'Gioco: Tressette';

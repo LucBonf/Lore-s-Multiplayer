@@ -132,6 +132,11 @@ class BriscolaGame {
         const m = [];
         for (let s of SEMI) {
             for (let v of VALORI) {
+                // A 3 giocatori: si rimuove tradizionalmente il 2 di Denari (che vale 0 punti)
+                // in modo che le 39 carte siano distribuite in 13 mani esatte mantenendo tutti i 120 punti
+                if (this.numPlayers === 3 && s === "Denari" && v === "2") {
+                    continue;
+                }
                 m.push({ valore: v, seme: s, giocata: false });
             }
         }
