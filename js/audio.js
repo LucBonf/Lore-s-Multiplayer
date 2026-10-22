@@ -714,6 +714,32 @@ class SoundEngine {
         osc.start(now);
         osc.stop(now + 0.04);
     }
+
+    /**
+     * 11. Suono BUSSO TRESSETTE (Colpo sul tavolo di legno)
+     */
+    playKnock() {
+        const master = this._getMasterGain();
+        if (!master) return;
+        const now = this.ctx.currentTime;
+
+        [0, 0.11].forEach(offset => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(160, now + offset);
+            osc.frequency.exponentialRampToValueAtTime(55, now + offset + 0.08);
+
+            gain.gain.setValueAtTime(0.5, now + offset);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.08);
+
+            osc.connect(gain);
+            gain.connect(master);
+
+            osc.start(now + offset);
+            osc.stop(now + offset + 0.09);
+        });
+    }
 }
 
 // Istanza singleton esportata

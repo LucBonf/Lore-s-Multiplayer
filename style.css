@@ -2560,6 +2560,34 @@ button {
     }
 }
 
+/* TRESSETTE SIGNALS POPUP */
+.tressette-signal-popup {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.95);
+    border: 1.5px solid #3498db;
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.82rem;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 300;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+    animation: popupFade 2.5s forwards;
+}
+
+@keyframes popupFade {
+    0% { opacity: 0; transform: translate(-50%, 6px) scale(0.85); }
+    15% { opacity: 1; transform: translate(-50%, -4px) scale(1.08); }
+    25% { transform: translate(-50%, 0) scale(1); }
+    75% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -14px); }
+}
+
 
 
 

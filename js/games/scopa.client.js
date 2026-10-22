@@ -19,6 +19,8 @@ socket.on('conferma_inizio_scopa', (dati) => {
 
     const scartiBar = document.getElementById('ciapano-scarti-bar');
     if (scartiBar) scartiBar.style.display = 'none';
+    const tressetteSignals = document.getElementById('tressette-signals-bar');
+    if (tressetteSignals) tressetteSignals.style.display = 'none';
 
     aggiornaMazzoScopa(dati.mazzoRimanente);
 

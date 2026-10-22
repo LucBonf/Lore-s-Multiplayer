@@ -36,6 +36,9 @@ socket.on('conferma_inizio_tressette', (dati) => {
     const deckCont = document.getElementById('briscola-deck-container');
     if (deckCont) deckCont.style.display = 'none';
 
+    const signalsBar = document.getElementById('tressette-signals-bar');
+    if (signalsBar) signalsBar.style.display = (dati.numPlayers === 4) ? 'flex' : 'none';
+
     renderGiocatoriTressette(dati);
     updateChatVisibility(dati.tuttiGiocatori);
 
@@ -73,6 +76,50 @@ socket.on('mossa_tressette', (dati) => {
     if (dati.card) sound.playCardPlay(dati.card);
 });
 
+socket.on('segnale_tressette', ({ playerIdx, nome, tipo }) => {
+    if (tipo === 'busso') {
+        if (sound.playKnock) sound.playKnock();
+    } else {
+        if (sound.playCardPlay) sound.playCardPlay();
+    }
+
+    const pBlock = document.querySelector(`.player-block[data-player-id="${playerIdx}"]`);
+    if (pBlock) {
+        const old = pBlock.querySelector('.tressette-signal-popup');
+        if (old) old.remove();
+
+        const popup = document.createElement('div');
+        popup.className = 'tressette-signal-popup';
+        if (tipo === 'busso') {
+            popup.innerHTML = `👊 <b>${nome}</b>: Bussa! (Carichi forti)`;
+            popup.style.borderColor = '#3498db';
+        } else if (tipo === 'striscio') {
+            popup.innerHTML = `📜 <b>${nome}</b>: Striscia! (Niente carichi)`;
+            popup.style.borderColor = '#9b59b6';
+        } else {
+            popup.innerHTML = `🕊️ <b>${nome}</b>: Vola! (Ultima carta)`;
+            popup.style.borderColor = '#2ecc71';
+        }
+        pBlock.appendChild(popup);
+        setTimeout(() => { if (popup.parentNode) popup.remove(); }, 2500);
+    }
+});
+
+function setupTressetteSignals() {
+    const btnBusso = document.getElementById('btn-tressette-busso');
+    const btnStriscio = document.getElementById('btn-tressette-striscio');
+    const btnVolo = document.getElementById('btn-tressette-volo');
+
+    if (btnBusso) btnBusso.onclick = () => socket.emit('segnale_tressette', { tipo: 'busso' });
+    if (btnStriscio) btnStriscio.onclick = () => socket.emit('segnale_tressette', { tipo: 'striscio' });
+    if (btnVolo) btnVolo.onclick = () => socket.emit('segnale_tressette', { tipo: 'volo' });
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupTressetteSignals);
+} else {
+    setupTressetteSignals();
+}
+
 socket.on('vincitore_presa_tressette', ({ vincitoreId, vincitoreIdx, vincitoreNome, cartaVincente }) => {
     const mioIndice = window.ultimoStatoGioco?.tuttiGiocatori?.findIndex(p => p.isMe || p.socketId === socket.id);
     const isMe = (vincitoreIdx !== undefined) ? (vincitoreIdx === mioIndice) : (window.ultimoStatoGioco?.tuttiGiocatori?.[mioIndice]?.id === vincitoreId);
@@ -89,12 +136,20 @@ socket.on('vincitore_presa_tressette', ({ vincitoreId, vincitoreIdx, vincitoreNo
 });
 
 socket.on('fine_smazzata_tressette', (data) => {
-    const righe = (data.punteggi || []).map(p => ({
-        nome: p.nome,
-        stemma: p.stemma,
-        gain: `+${p.puntiSmazzata || 0} pt`,
-        total: `Tot: ${p.puntiTotali || 0} pt`
-    }));
+    const righe = (data.punteggi || []).map(p => {
+        const dett = p.dettaglio || {};
+        const badges = [];
+        if (dett.assi > 0) badges.push(`<span class="recap-badge">👑 ${dett.assi} ${dett.assi === 1 ? 'Asso' : 'Assi'} (+${dett.assi})</span>`);
+        if (dett.puntiPezzi > 0) badges.push(`<span class="recap-badge">🃏 ${dett.pezzi} Carichi/Fig. (+${dett.puntiPezzi})</span>`);
+        if (dett.ultima > 0) badges.push(`<span class="recap-badge" style="background:rgba(46,204,113,0.25);border-color:#2ecc71;">⭐ Ultima Presa (+1)</span>`);
+        return {
+            nome: p.nome,
+            stemma: p.stemma,
+            badge: badges.join(' '),
+            gain: `+${p.puntiSmazzata || 0} pt`,
+            total: `Tot: ${p.puntiTotali || 0} pt`
+        };
+    });
     mostraFineSmazzataGenerica({
         titolo: `🏁 Fine Smazzata ${data.smazzataNum || ''}`,
         righe
@@ -102,6 +157,9 @@ socket.on('fine_smazzata_tressette', (data) => {
 });
 
 socket.on('fine_partita_tressette', (data) => {
+    const signalsBar = document.getElementById('tressette-signals-bar');
+    if (signalsBar) signalsBar.style.display = 'none';
+
     if (window.clientTurnInterval) {
         clearInterval(window.clientTurnInterval);
         window.clientTurnInterval = null;

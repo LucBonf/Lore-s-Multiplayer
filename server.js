@@ -4876,6 +4876,29 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('segnale_tressette', (dati) => {
+        try {
+            const code = socket.roomCode;
+            if (!code || !lobbies[code]) return;
+            const game = lobbies[code].gameInstance;
+            if (!game || !(game instanceof TressetteGame)) return;
+
+            const playerIdx = game.players.findIndex(p => p.id === socket.id);
+            if (playerIdx === -1) return;
+
+            const tipo = dati?.tipo; // 'busso' | 'striscio' | 'volo'
+            if (!['busso', 'striscio', 'volo'].includes(tipo)) return;
+
+            io.to(code).emit('segnale_tressette', {
+                playerIdx,
+                nome: game.players[playerIdx].nome,
+                tipo
+            });
+        } catch (e) {
+            console.error("Errore segnale_tressette:", e);
+        }
+    });
+
     function risolviPresaTressette(code) {
         const lobby = lobbies[code];
         const game = lobby?.gameInstance;
