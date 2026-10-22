@@ -268,7 +268,10 @@ function mostraFineSmazzataScopa(data) {
             if (dett.carte > 0) badges.push(`<span class="recap-badge">🂠 Carte +1</span>`);
             if (dett.denari > 0) badges.push(`<span class="recap-badge">🪙 Denari +1</span>`);
             if (dett.settebello > 0) badges.push(`<span class="recap-badge">⭐ Settebello +1</span>`);
-            if (dett.primiera > 0) badges.push(`<span class="recap-badge">👑 Primiera +1</span>`);
+            if (dett.primiera > 0) {
+                const punteggio = dett.valorePrimiera ? ` (${dett.valorePrimiera} pt)` : '';
+                badges.push(`<span class="recap-badge">👑 Primiera +1${punteggio}</span>`);
+            }
 
             return `
                 <div class="recap-row">

@@ -372,27 +372,19 @@ class ScopaGame {
             if (haSettebello0) { pSmazzata0 += 1; dett0.settebello = 1; }
             else if (haSettebello1) { pSmazzata1 += 1; dett1.settebello = 1; }
 
-            // Primiera (quattro carte, una per ciascuno dei 4 semi)
-            // Regola ufficiale: è necessario avere almeno una carta per ciascuno dei 4 semi.
-            // Se a una squadra manca un seme, la sua Primiera è nulla.
-            // Se entrambe hanno tutti e 4 i semi, vince il totale più alto (in caso di parità, punto non assegnato).
-            // Se a entrambe manca almeno un seme, la Primiera è nulla per entrambe (punto non assegnato).
+            // Primiera: 7=21, 6=18, Asso=16, 5=15, 4=14, 3=13, 2=12, Figure=10 per ciascuno dei 4 semi.
+            // Chi totalizza la somma più alta vince la Primiera. In caso di parità, il punto non viene assegnato.
             const prim0 = calcolaPrimiera(team0Prese);
             const prim1 = calcolaPrimiera(team1Prese);
-            if (prim0.semiMancanti === 0 && prim1.semiMancanti > 0) {
+            dett0.valorePrimiera = prim0.totale;
+            dett1.valorePrimiera = prim1.totale;
+
+            if (prim0.totale > prim1.totale) {
                 pSmazzata0 += 1;
                 dett0.primiera = 1;
-            } else if (prim1.semiMancanti === 0 && prim0.semiMancanti > 0) {
+            } else if (prim1.totale > prim0.totale) {
                 pSmazzata1 += 1;
                 dett1.primiera = 1;
-            } else if (prim0.semiMancanti === 0 && prim1.semiMancanti === 0) {
-                if (prim0.totale > prim1.totale) {
-                    pSmazzata0 += 1;
-                    dett0.primiera = 1;
-                } else if (prim1.totale > prim0.totale) {
-                    pSmazzata1 += 1;
-                    dett1.primiera = 1;
-                }
             }
 
             [this.players[0], this.players[2]].forEach(p => { p.puntiSmazzata = pSmazzata0; p.puntiTotali += pSmazzata0; p.dettaglioPuntiSmazzata = dett0; });
@@ -449,28 +441,19 @@ class ScopaGame {
             dett1.settebello = 1;
         }
 
-        // 5. Primiera (quattro carte, una per ciascuno dei 4 semi)
-        // Regola ufficiale: è necessario avere almeno una carta per ciascuno dei 4 semi.
-        // Se a un giocatore manca un seme, la sua Primiera è nulla.
-        // Se entrambi hanno tutti e 4 i semi, vince il totale più alto (in caso di parità, punto non assegnato).
-        // Se a entrambi manca almeno un seme, la Primiera è nulla per entrambi (punto non assegnato).
+        // 5. Primiera: 7=21, 6=18, Asso=16, 5=15, 4=14, 3=13, 2=12, Figure=10 per ciascuno dei 4 semi.
+        // Chi totalizza la somma più alta vince la Primiera. In caso di parità, il punto non viene assegnato.
         const prim0 = calcolaPrimiera(p0.prese);
         const prim1 = calcolaPrimiera(p1.prese);
+        dett0.valorePrimiera = prim0.totale;
+        dett1.valorePrimiera = prim1.totale;
 
-        if (prim0.semiMancanti === 0 && prim1.semiMancanti > 0) {
+        if (prim0.totale > prim1.totale) {
             p0.puntiSmazzata += 1;
             dett0.primiera = 1;
-        } else if (prim1.semiMancanti === 0 && prim0.semiMancanti > 0) {
+        } else if (prim1.totale > prim0.totale) {
             p1.puntiSmazzata += 1;
             dett1.primiera = 1;
-        } else if (prim0.semiMancanti === 0 && prim1.semiMancanti === 0) {
-            if (prim0.totale > prim1.totale) {
-                p0.puntiSmazzata += 1;
-                dett0.primiera = 1;
-            } else if (prim1.totale > prim0.totale) {
-                p1.puntiSmazzata += 1;
-                dett1.primiera = 1;
-            }
         }
 
         p0.puntiTotali += p0.puntiSmazzata;
