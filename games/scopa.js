@@ -375,11 +375,20 @@ class ScopaGame {
             // Primiera
             const prim0 = calcolaPrimiera(team0Prese);
             const prim1 = calcolaPrimiera(team1Prese);
-            if (prim0.semiMancanti === 0 && prim1.semiMancanti > 0) { pSmazzata0 += 1; dett0.primiera = 1; }
-            else if (prim1.semiMancanti === 0 && prim0.semiMancanti > 0) { pSmazzata1 += 1; dett1.primiera = 1; }
-            else if (prim0.semiMancanti === prim1.semiMancanti) {
-                if (prim0.totale > prim1.totale) { pSmazzata0 += 1; dett0.primiera = 1; }
-                else if (prim1.totale > prim0.totale) { pSmazzata1 += 1; dett1.primiera = 1; }
+            if (prim0.semiMancanti < prim1.semiMancanti) {
+                pSmazzata0 += 1;
+                dett0.primiera = 1;
+            } else if (prim1.semiMancanti < prim0.semiMancanti) {
+                pSmazzata1 += 1;
+                dett1.primiera = 1;
+            } else {
+                if (prim0.totale > prim1.totale) {
+                    pSmazzata0 += 1;
+                    dett0.primiera = 1;
+                } else if (prim1.totale > prim0.totale) {
+                    pSmazzata1 += 1;
+                    dett1.primiera = 1;
+                }
             }
 
             [this.players[0], this.players[2]].forEach(p => { p.puntiSmazzata = pSmazzata0; p.puntiTotali += pSmazzata0; p.dettaglioPuntiSmazzata = dett0; });
@@ -440,13 +449,13 @@ class ScopaGame {
         const prim0 = calcolaPrimiera(p0.prese);
         const prim1 = calcolaPrimiera(p1.prese);
 
-        if (prim0.semiMancanti === 0 && prim1.semiMancanti > 0) {
+        if (prim0.semiMancanti < prim1.semiMancanti) {
             p0.puntiSmazzata += 1;
             dett0.primiera = 1;
-        } else if (prim1.semiMancanti === 0 && prim0.semiMancanti > 0) {
+        } else if (prim1.semiMancanti < prim0.semiMancanti) {
             p1.puntiSmazzata += 1;
             dett1.primiera = 1;
-        } else if (prim0.semiMancanti === prim1.semiMancanti) {
+        } else {
             if (prim0.totale > prim1.totale) {
                 p0.puntiSmazzata += 1;
                 dett0.primiera = 1;

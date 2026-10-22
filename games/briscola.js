@@ -351,15 +351,44 @@ class BriscolaGame {
                 socioNome: socio ? socio.nome : "Nessuno",
                 classifica
             };
-        } else {
-            // Briscola classica (a 2 o 4 giocatori)
-            const classifica = [...this.players].sort((a, b) => b.puntiTotali - a.puntiTotali);
-            const isPareggio = (this.numPlayers === 2 && classifica[0].puntiTotali === 60 && classifica[1].puntiTotali === 60);
-            const vincitoreId = isPareggio ? null : classifica[0].id;
+        } else if (this.numPlayers === 4) {
+            // Briscola classica a 4 giocatori (A coppie: 0 e 2 contro 1 e 3)
+            const puntiSquadra0 = this.players[0].puntiTotali + this.players[2].puntiTotali;
+            const puntiSquadra1 = this.players[1].puntiTotali + this.players[3].puntiTotali;
+            const isPareggio = (puntiSquadra0 === puntiSquadra1); // 60 a 60
+            const vincenteSquadra = isPareggio ? -1 : (puntiSquadra0 > puntiSquadra1 ? 0 : 1);
+            const vincitore = isPareggio ? null : (vincenteSquadra === 0 ? this.players[0] : this.players[1]);
+
+            const classifica = [...this.players].sort((a, b) => {
+                const idxA = this.players.indexOf(a);
+                const idxB = this.players.indexOf(b);
+                const teamA = (idxA % 2 === 0) ? puntiSquadra0 : puntiSquadra1;
+                const teamB = (idxB % 2 === 0) ? puntiSquadra0 : puntiSquadra1;
+                if (teamA !== teamB) return teamB - teamA;
+                return b.puntiTotali - a.puntiTotali;
+            });
 
             return {
                 variante: 'classica',
                 isPareggio,
+                vincitore,
+                vincitoreId: vincitore ? vincitore.id : null,
+                vincenteSquadra,
+                puntiSquadra0,
+                puntiSquadra1,
+                classifica
+            };
+        } else {
+            // Briscola classica a 2 giocatori (1 contro 1)
+            const classifica = [...this.players].sort((a, b) => b.puntiTotali - a.puntiTotali);
+            const isPareggio = (classifica.length > 1 && classifica[0].puntiTotali === classifica[1].puntiTotali);
+            const vincitore = isPareggio ? null : (classifica[0] || null);
+            const vincitoreId = vincitore ? vincitore.id : null;
+
+            return {
+                variante: 'classica',
+                isPareggio,
+                vincitore,
                 vincitoreId,
                 classifica
             };

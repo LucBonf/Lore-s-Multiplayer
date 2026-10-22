@@ -4187,7 +4187,14 @@ io.on('connection', (socket) => {
             if (dbConnected) {
                 const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
                 for (let p of humanPlayers) {
-                    const isWinner = (p.id === ris.vincitoreId) ? 1 : 0;
+                    let isWinner = 0;
+                    if (game.numPlayers === 4) {
+                        const winnerIdx = game.players.findIndex(pl => pl.id === ris.vincitoreId);
+                        const pIdx = game.players.indexOf(p);
+                        isWinner = (winnerIdx !== -1 && (winnerIdx % 2 === pIdx % 2)) ? 1 : 0;
+                    } else {
+                        isWinner = (p.id === ris.vincitoreId) ? 1 : 0;
+                    }
                     const eloChange = isWinner ? 25 : -25;
                     try {
                         await User.updateOne(
@@ -4412,13 +4419,17 @@ io.on('connection', (socket) => {
         if (!game || !(game instanceof RubamazzettoGame)) return;
 
         game.fase = "fine_partita";
-        const { classifica, vincitoreId } = game.calcolaClassificaFinale();
+        const { classifica, vincitoreId, isPareggio } = game.calcolaClassificaFinale();
 
         if (dbConnected) {
             const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
             for (let p of humanPlayers) {
-                const isWinner = (p.id === vincitoreId) ? 1 : 0;
-                const eloChange = isWinner ? 30 : -15;
+                let isWinner = 0;
+                let eloChange = 0;
+                if (!isPareggio) {
+                    isWinner = (p.id === vincitoreId) ? 1 : 0;
+                    eloChange = isWinner ? 30 : -15;
+                }
                 try {
                     await User.updateOne(
                         { uniqueCode: p.uniqueCode },
@@ -4438,6 +4449,7 @@ io.on('connection', (socket) => {
         }
 
         io.to(code).emit('fine_partita_rubamazzetto', {
+            isPareggio,
             classifica: classifica.map((p, idx) => ({
                 posizione: idx + 1,
                 nome: p.nome,
@@ -4671,13 +4683,29 @@ io.on('connection', (socket) => {
             for (let p of humanPlayers) {
                 const pIdx = game.players.indexOf(p);
                 let isWinner = 0;
+                let eloChange = 0;
                 if (game.variante === 'chiamata') {
                     const isInChiamanteTeam = (pIdx === game.chiamanteIdx || pIdx === game.socioIdx);
                     isWinner = (esito.vittoriaChiamante && isInChiamanteTeam) || (!esito.vittoriaChiamante && !isInChiamanteTeam) ? 1 : 0;
+                    eloChange = isWinner ? 30 : -15;
+                } else if (game.numPlayers === 4) {
+                    if (esito.isPareggio) {
+                        isWinner = 0;
+                        eloChange = 0;
+                    } else {
+                        const playerTeam = (pIdx === 0 || pIdx === 2) ? 0 : 1;
+                        isWinner = (playerTeam === esito.vincenteSquadra) ? 1 : 0;
+                        eloChange = isWinner ? 30 : -15;
+                    }
                 } else {
-                    isWinner = (p.id === esito.vincitoreId) ? 1 : 0;
+                    if (esito.isPareggio) {
+                        isWinner = 0;
+                        eloChange = 0;
+                    } else {
+                        isWinner = (p.id === esito.vincitoreId) ? 1 : 0;
+                        eloChange = isWinner ? 30 : -15;
+                    }
                 }
-                const eloChange = isWinner ? 30 : -15;
                 try {
                     await User.updateOne(
                         { uniqueCode: p.uniqueCode },
@@ -4941,14 +4969,19 @@ io.on('connection', (socket) => {
             for (let p of humanPlayers) {
                 const pIdx = game.players.indexOf(p);
                 let isWinner = 0;
-                if (game.numPlayers === 4) {
+                let eloChange = 0;
+                if (esito.isPareggio) {
+                    isWinner = 0;
+                    eloChange = 0;
+                } else if (game.numPlayers === 4) {
                     const winnerIdx = game.players.indexOf(esito.vincitore);
                     const isWinnerTeam = (winnerIdx % 2 === pIdx % 2);
                     isWinner = isWinnerTeam ? 1 : 0;
+                    eloChange = isWinner ? 30 : -15;
                 } else {
                     isWinner = (p.id === esito.vincitore.id) ? 1 : 0;
+                    eloChange = isWinner ? 30 : -15;
                 }
-                const eloChange = isWinner ? 30 : -15;
                 try {
                     await User.updateOne(
                         { uniqueCode: p.uniqueCode },

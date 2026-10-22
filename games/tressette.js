@@ -19,12 +19,16 @@ export const PESO_PRESA_TRESSETTE = {
     "4": 1
 };
 
-// Punti carte: Asso = 1, Figure/2/3 = 1/3, Liscie (7,6,5,4) = 0
-export function puntiCartaTressette(carta) {
+// Punti carte in terzi: Asso = 3 terzi (1 punto), Figure/2/3 = 1 terzo (1/3 punto), Liscie (7,6,5,4) = 0 terzi
+export function terziCartaTressette(carta) {
     if (!carta) return 0;
-    if (carta.valore === "Asso") return 1;
-    if (["3", "2", "Re", "Cavallo", "Fante"].includes(carta.valore)) return 1 / 3;
+    if (carta.valore === "Asso") return 3;
+    if (["3", "2", "Re", "Cavallo", "Fante"].includes(carta.valore)) return 1;
     return 0;
+}
+
+export function puntiCartaTressette(carta) {
+    return terziCartaTressette(carta) / 3;
 }
 
 export function creaMazzoTressette() {
@@ -222,49 +226,53 @@ export class TressetteGame {
     }
 
     calcolaPunteggiSmazzata(ultimoVincitoreIdx) {
-        // Punti calcolati: Assi = 1, Figure/2/3 = 1/3, Ultima = 1
-        // Arrotondamento per difetto della somma dei terzi, +1 all'ultima presa.
-        // Totale disponibile: 11 punti tondi.
+        // Regole Tressette: 33 terzi totali nel mazzo (11 punti esatti per smazzata)
+        // - 4 Assi = 12 terzi (4 punti)
+        // - 20 carte tra 3, 2 e Figure (Re, Cavallo, Fante) = 20 terzi
+        // - Ultima presa ("punto dell'ultima") = 1 terzo
+        // Totale = 12 + 20 + 1 = 33 terzi = 11 punti
+        // Punti assegnati: Math.floor(terzi / 3)
         if (this.numPlayers === 4) {
             // Modalità a coppie (0 e 2 contro 1 e 3)
             const squadra0 = [this.players[0], this.players[2]];
             const squadra1 = [this.players[1], this.players[3]];
 
-            let puntiGrezzi0 = 0;
-            let puntiGrezzi1 = 0;
+            let terzi0 = 0;
+            let terzi1 = 0;
 
             for (const p of squadra0) {
-                for (const c of p.prese) puntiGrezzi0 += puntiCartaTressette(c);
+                for (const c of p.prese) terzi0 += terziCartaTressette(c);
             }
             for (const p of squadra1) {
-                for (const c of p.prese) puntiGrezzi1 += puntiCartaTressette(c);
+                for (const c of p.prese) terzi1 += terziCartaTressette(c);
             }
 
-            // Bonus ultima presa (+1 punto alla squadra che ha preso l'ultima mano)
+            // Bonus ultima presa: 1 terzo
             if (ultimoVincitoreIdx === 0 || ultimoVincitoreIdx === 2) {
-                puntiGrezzi0 += 1;
+                terzi0 += 1;
             } else {
-                puntiGrezzi1 += 1;
+                terzi1 += 1;
             }
 
-            const punti0 = Math.floor(puntiGrezzi0 + 0.0001);
-            const punti1 = Math.floor(puntiGrezzi1 + 0.0001);
+            const punti0 = Math.floor(terzi0 / 3);
+            const punti1 = Math.floor(terzi1 / 3);
 
             squadra0.forEach(p => { p.puntiSmazzata = punti0; p.puntiTotali += punti0; });
             squadra1.forEach(p => { p.puntiSmazzata = punti1; p.puntiTotali += punti1; });
         } else {
             // A 2 giocatori (1 contro 1)
-            let puntiGrezzi0 = 0;
-            let puntiGrezzi1 = 0;
+            let terzi0 = 0;
+            let terzi1 = 0;
 
-            for (const c of this.players[0].prese) puntiGrezzi0 += puntiCartaTressette(c);
-            for (const c of this.players[1].prese) puntiGrezzi1 += puntiCartaTressette(c);
+            for (const c of this.players[0].prese) terzi0 += terziCartaTressette(c);
+            for (const c of this.players[1].prese) terzi1 += terziCartaTressette(c);
 
-            if (ultimoVincitoreIdx === 0) puntiGrezzi0 += 1;
-            else puntiGrezzi1 += 1;
+            // Bonus ultima presa: 1 terzo
+            if (ultimoVincitoreIdx === 0) terzi0 += 1;
+            else terzi1 += 1;
 
-            const p0 = Math.floor(puntiGrezzi0 + 0.0001);
-            const p1 = Math.floor(puntiGrezzi1 + 0.0001);
+            const p0 = Math.floor(terzi0 / 3);
+            const p1 = Math.floor(terzi1 / 3);
 
             this.players[0].puntiSmazzata = p0;
             this.players[0].puntiTotali += p0;
@@ -273,9 +281,13 @@ export class TressetteGame {
             this.players[1].puntiTotali += p1;
         }
 
-        // Verifica raggiungimento limite punti
-        const maxPunti = Math.max(...this.players.map(p => p.puntiTotali));
-        const partitaFinita = maxPunti >= this.limitePunti;
+        // Verifica raggiungimento limite punti:
+        // Nel Tressette, se entrambe le squadre raggiungono il limite contemporaneamente a pari punti,
+        // la partita continua con una smazzata di spareggio finché una squadra non stacca l'altra.
+        const p0 = this.players[0].puntiTotali;
+        const p1 = this.players[1].puntiTotali;
+        const maxPunti = Math.max(p0, p1);
+        const partitaFinita = maxPunti >= this.limitePunti && p0 !== p1;
 
         if (partitaFinita) {
             this.fase = "fine_partita";
@@ -297,12 +309,31 @@ export class TressetteGame {
     }
 
     calcolaClassificaFinale() {
-        const classifica = [...this.players].sort((a, b) => b.puntiTotali - a.puntiTotali);
-        return {
-            vincitore: classifica[0],
-            isPareggio: classifica.length > 1 && (classifica[0].puntiTotali === classifica[1].puntiTotali),
-            classifica
-        };
+        if (this.numPlayers === 4) {
+            const p0 = this.players[0].puntiTotali;
+            const p1 = this.players[1].puntiTotali;
+            const isPareggio = (p0 === p1);
+            let vincitore = this.players[0];
+            if (p1 > p0) vincitore = this.players[1];
+            const classifica = [...this.players].sort((a, b) => b.puntiTotali - a.puntiTotali);
+            return {
+                vincitore,
+                isPareggio,
+                classifica
+            };
+        } else {
+            const p0 = this.players[0].puntiTotali;
+            const p1 = this.players[1].puntiTotali;
+            const isPareggio = (p0 === p1);
+            let vincitore = this.players[0];
+            if (p1 > p0) vincitore = this.players[1];
+            const classifica = [...this.players].sort((a, b) => b.puntiTotali - a.puntiTotali);
+            return {
+                vincitore,
+                isPareggio,
+                classifica
+            };
+        }
     }
 
     scegliMossaIA(playerIdx) {

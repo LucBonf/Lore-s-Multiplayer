@@ -223,8 +223,9 @@ class RubamazzettoGame {
         });
 
         const classifica = [...this.players].sort((a, b) => b.puntiSmazzata - a.puntiSmazzata);
-        const vincitoreId = classifica[0].id;
-        return { classifica, vincitoreId };
+        const isPareggio = (classifica.length > 1 && classifica[0].puntiSmazzata === classifica[1].puntiSmazzata);
+        const vincitoreId = isPareggio ? null : classifica[0].id;
+        return { classifica, vincitoreId, isPareggio };
     }
 
     scegliMossaIA(playerIdx) {
