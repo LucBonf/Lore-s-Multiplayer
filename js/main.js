@@ -311,23 +311,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 3000);
 
-        // --- FIX AUTO-SCALE MOBILE ---
+        // --- GESTIONE VIEWPORT MOBILE ---
         const handleResize = () => {
-            if (window.innerWidth <= 768) {
-                const container = document.getElementById('game-container');
-                if (container) {
-                    const vh = window.innerHeight * 0.01;
-                    document.documentElement.style.setProperty('--vh', `${vh}px`);
-                    
-                    // Se lo schermo è basso (es. iPhone SE) o stretto, riduciamo la scala globale
-                    if (window.innerHeight < 750 || window.innerWidth < 380) {
-                        const scale = Math.min(window.innerWidth / 400, window.innerHeight / 800, 0.9);
-                        container.style.transform = `scale(${scale})`;
-                        container.style.transformOrigin = 'center center';
-                    } else {
-                        container.style.transform = 'none';
-                    }
-                }
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+            const container = document.getElementById('game-container');
+            if (container) {
+                container.style.transform = 'none';
             }
         };
         window.addEventListener('resize', handleResize);
