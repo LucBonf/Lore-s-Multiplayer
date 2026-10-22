@@ -2404,6 +2404,58 @@ Object.defineProperty(window, 'currentGameType', {
     set(v) { currentGameType = v; },
     configurable: true
 });
+// =============================================
+// FUNZIONI COMUNI TAVOLO GIOCHI (SCOPA & RUBAMAZZETTO)
+// =============================================
+function renderTavoloBanco(cardsOnTable, carteTavolo) {
+    if (!cardsOnTable) return;
+    cardsOnTable.innerHTML = '';
+    if (!carteTavolo || carteTavolo.length === 0) return;
+
+    const count = carteTavolo.length;
+    const isMobile = window.innerWidth <= 768;
+    const scala = isMobile ? (count > 6 ? 0.35 : 0.40) : (count > 6 ? 0.58 : 0.68);
+    const maxCols = isMobile ? (count > 6 ? 4 : 3) : 5;
+    const stepX = isMobile ? (count > 6 ? 28 : 34) : (count > 6 ? 50 : 60);
+    const stepY = isMobile ? 38 : 72;
+
+    carteTavolo.forEach((c, idx) => {
+        const divCarta = document.createElement('div');
+        divCarta.className = `card seme-${c.seme} val-${c.valore} table-card`;
+        divCarta.dataset.seme = c.seme;
+        divCarta.dataset.valore = c.valore;
+        divCarta.dataset.idx = idx;
+
+        const row = Math.floor(idx / maxCols);
+        const col = idx % maxCols;
+        const totalInThisRow = Math.min(maxCols, count - row * maxCols);
+
+        const offsetX = (col - (totalInThisRow - 1) / 2) * stepX;
+        const totalRows = Math.ceil(count / maxCols);
+        const offsetY = (row - (totalRows - 1) / 2) * stepY;
+
+        divCarta.style.left = `calc(50% + ${offsetX}px)`;
+        divCarta.style.top = `calc(44% + ${offsetY}px)`;
+        divCarta.style.transform = `translate(-50%, -50%) scale(${scala})`;
+        divCarta.style.zIndex = 50 + idx;
+
+        cardsOnTable.appendChild(divCarta);
+    });
+}
+
+function aggiornaMazzoScopa(conteggio) {
+    const deckCont = document.getElementById('scopa-deck-container');
+    const deckCountEl = document.getElementById('scopa-deck-count');
+    if (!deckCont || !deckCountEl) return;
+
+    if (conteggio !== undefined && conteggio > 0) {
+        deckCont.style.display = 'block';
+        deckCountEl.innerText = `${conteggio}`;
+    } else {
+        deckCont.style.display = 'none';
+    }
+}
+
 window.nascondiErrore = nascondiErrore;
 window.mostraErrore = mostraErrore;
 window.switchSection = switchSection;
@@ -2412,6 +2464,11 @@ window.getPosizioneCartaTavolo = getPosizioneCartaTavolo;
 window.calcolaLayoutCarteMano = calcolaLayoutCarteMano;
 window.renderNomeConStemma = renderNomeConStemma;
 window.mostraFineSmazzataGenerica = mostraFineSmazzataGenerica;
+window.updateChatVisibility = updateChatVisibility;
+window.getPlayerScaleAndCardScale = getPlayerScaleAndCardScale;
+window.getSemeSimbolo = getSemeSimbolo;
+window.renderTavoloBanco = renderTavoloBanco;
+window.aggiornaMazzoScopa = aggiornaMazzoScopa;
 
 // Caricamento modulare asincrono dei motori giochi client
 await Promise.all([
