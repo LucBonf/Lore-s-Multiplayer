@@ -170,7 +170,7 @@ function renderGiocatoriCiapano(data) {
 
         pBlock.innerHTML = `
             <div class="name">${nomeConStemma}${ruolo}</div>
-            <div class="stats"><span class="ciapano-punti-badge">Punti: ${p.puntiTotali}</span> | Presa: ${p.preseCount}</div>
+            <div class="stats"><span class="ciapano-punti-badge">Punti: ${p.puntiTotali}</span></div>
             ${elimBadge}
             ${timerHtml}
         `;

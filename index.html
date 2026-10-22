@@ -15,12 +15,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=2.4">
+    <link rel="stylesheet" href="style.css?v=2.5">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2c3e50">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <script src="/socket.io/socket.io.js"></script>
-    <script src="js/main.js?v=2.4" type="module" defer></script>
+    <script src="js/main.js?v=2.5" type="module" defer></script>
     <!-- Precaricamento Sprite Carte e Retro -->
     <link rel="preload" href="https://gist.github.com/user-attachments/assets/1be959ff-f211-40ab-ac79-46e049cd336a" as="image">
     <link rel="preload" href="https://gist.github.com/user-attachments/assets/455c0814-2a2a-4a25-84c2-02dc542961ad" as="image">
@@ -217,7 +217,7 @@
                 • <strong>7, 6, 5, 4:</strong> 0 punti (scartine)<br>
                 • <strong>Arrotondamento:</strong> Il punteggio delle prese viene <em>arrotondato per difetto</em> ad ogni giocatore.</p>
                 <hr style="border-color: rgba(255,255,255,0.1);">
-                <p><strong>⚖️ Calcolo dell'Ultima Mano:</strong> Chi ha preso l'ultima mano riceve: <code>11 - somma dei punti degli altri</code>. In ogni smazzata vengono assegnati sempre esattamente 11 punti totali.</p>
+                <p><strong>⚖️ Calcolo dell'Ultima Mano:</strong> Chi ha preso l'ultima mano riceve <strong>⅓ di punto aggiuntivo</strong> (il punto dell'ultima presa). I punti di ciascun giocatore corrispondono alle carte effettivamente prese (arrotondati per difetto ad ogni 3 terzi).</p>
                 <hr style="border-color: rgba(255,255,255,0.1);">
                 <p><strong>🔥 Il Cappotto:</strong> Se un giocatore conquista tutti gli 11 punti della smazzata, chi ha preso tutti i punti riceve <strong>0 punti (+0)</strong> e a ciascuno degli altri giocatori vengono assegnati <strong>11 punti (+11)</strong>!</p>
             </div>

@@ -198,24 +198,45 @@ export class CiapanoGame {
 
     calcolaFineSmazzata() {
         const attivi = this.getGiocatoriAttivi();
-        let sommaAltri = 0;
+
+        // 1. Calcola i terzi esatti per ogni giocatore attivo:
+        // Ogni Asso = 3 terzi (1 punto)
+        // Figure, 2, 3 = 1 terzo ciascuno (1/3 di punto)
+        // Chi vince l'ultima presa = +1 terzo (punto dell'ultima mano)
+        const terziPerGiocatore = new Map();
         attivi.forEach(p => {
-            if (p.id !== this.ultimoPresista) {
-                const terzi = p.contaPuntiPrese();
-                p.puntiSmazzata = Math.floor(terzi / 3);
-                sommaAltri += p.puntiSmazzata;
+            let terzi = p.contaPuntiPrese();
+            if (p.id === this.ultimoPresista) {
+                terzi += 1;
             }
+            terziPerGiocatore.set(p.id, terzi);
         });
 
-        const ultPresistaPlayer = this.players[this.ultimoPresista];
-        if (ultPresistaPlayer) {
-            ultPresistaPlayer.puntiSmazzata = Math.max(0, 11 - sommaAltri);
+        // 2. Controllo Cappotto REALE:
+        // C'è cappotto solo se un giocatore ha fatto TUTTI i 33 terzi (tutti gli 11 punti),
+        // cioè tutti gli altri giocatori attivi hanno preso 0 terzi di presa.
+        let cappottoPlayerId = -1;
+        for (const p of attivi) {
+            const terzi = terziPerGiocatore.get(p.id) || 0;
+            if (terzi === 33) {
+                cappottoPlayerId = p.id;
+                break;
+            }
         }
 
-        const cappottoPlayer = attivi.find(p => p.puntiSmazzata === 11);
-        if (cappottoPlayer) {
-            return { isCappotto: true, cappottoPlayerId: cappottoPlayer.id };
+        if (cappottoPlayerId !== -1) {
+            attivi.forEach(p => {
+                p.puntiSmazzata = (p.id === cappottoPlayerId) ? 0 : 11;
+            });
+            return { isCappotto: true, cappottoPlayerId };
         }
+
+        // 3. Calcolo punti per difetto di ciascun giocatore in base ai suoi terzi (ogni 3 terzi = 1 punto)
+        attivi.forEach(p => {
+            const terzi = terziPerGiocatore.get(p.id) || 0;
+            p.puntiSmazzata = Math.floor(terzi / 3);
+        });
+
         return { isCappotto: false, cappottoPlayerId: -1 };
     }
 
