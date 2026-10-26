@@ -231,11 +231,31 @@ export class CiapanoGame {
             return { isCappotto: true, cappottoPlayerId };
         }
 
-        // 3. Calcolo punti per difetto di ciascun giocatore in base ai suoi terzi (ogni 3 terzi = 1 punto)
+        // 3. Calcolo punti effettivi della smazzata:
+        // Per tutti i giocatori tranne chi ha preso l'ultimo giro:
+        // 1/3 per figure, 2, 3 e +1 per l'asso, arrotondato per difetto (Math.floor(terzi / 3)).
+        let sommaAltri = 0;
         attivi.forEach(p => {
-            const terzi = terziPerGiocatore.get(p.id) || 0;
-            p.puntiSmazzata = Math.floor(terzi / 3);
+            if (p.id !== this.ultimoPresista) {
+                const terzi = p.contaPuntiPrese();
+                p.puntiSmazzata = Math.floor(terzi / 3);
+                sommaAltri += p.puntiSmazzata;
+            }
         });
+
+        // Chi ha preso l'ultima mano riceve: 11 - somma dei punteggi effettivi di tutti gli altri.
+        // In questo modo la somma totale della smazzata è SEMPRE esattamente 11.
+        const ultimoPlayer = attivi.find(p => p.id === this.ultimoPresista);
+        if (ultimoPlayer) {
+            ultimoPlayer.puntiSmazzata = 11 - sommaAltri;
+        } else {
+            // Fallback di sicurezza
+            attivi.forEach(p => {
+                if (p.puntiSmazzata === undefined) {
+                    p.puntiSmazzata = Math.floor(p.contaPuntiPrese() / 3);
+                }
+            });
+        }
 
         return { isCappotto: false, cappottoPlayerId: -1 };
     }
