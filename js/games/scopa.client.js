@@ -354,9 +354,14 @@ function renderGiocatoriScopa(data) {
     const { scalaPlayerBlock } = getPlayerScaleAndCardScale(numPlayers, isMobile);
 
     let labelVariante = 'Scopa Classica';
-    if (data.variante === 'asso_piglia_tutto') labelVariante = '⚡ Asso Piglia Tutto';
+    if (data.variante === 'scopone') labelVariante = '🎓 Scopone Scientifico';
+    else if (data.variante === 'asso_piglia_tutto') labelVariante = '⚡ Asso Piglia Tutto';
     else if (data.variante === 'scopa_ladra') labelVariante = '🥷 Scopa Ladra';
     else if (data.variante === 'combinata') labelVariante = '🔥 Asso + Ladra';
+
+    if (data.assoPigliaTutto && data.variante !== 'asso_piglia_tutto' && data.variante !== 'combinata') {
+        labelVariante += ' (⚡ Asso)';
+    }
     const subInfo = (window.ultimaMossaScopaInfo && !isMobile) ? ` | ${window.ultimaMossaScopaInfo}` : '';
     infoGiro.innerText = `${labelVariante} | Smazzata ${data.smazzataNum} | Obiettivo: ${data.limitePunti || 11} pt${subInfo}`;
 

@@ -1230,6 +1230,7 @@ window.creaNuovaStanza = () => {
     let scopaVariante = 'classica';
     let scopaNapola = false;
     let scopaReBello = false;
+    let scopaAssoPigliaTutto = false;
     let briscolaVariante = 'classica';
 
     if (currentGameType === 'scopa') {
@@ -1237,6 +1238,10 @@ window.creaNuovaStanza = () => {
         scopaVariante = document.getElementById('select-scopa-variante') ? document.getElementById('select-scopa-variante').value : 'classica';
         scopaNapola = document.getElementById('check-scopa-napola') ? document.getElementById('check-scopa-napola').checked : false;
         scopaReBello = document.getElementById('check-scopa-rebello') ? document.getElementById('check-scopa-rebello').checked : false;
+        scopaAssoPigliaTutto = document.getElementById('check-scopa-assopigliatutto') ? document.getElementById('check-scopa-assopigliatutto').checked : false;
+        if (scopaVariante === 'asso_piglia_tutto' || scopaVariante === 'combinata') {
+            scopaAssoPigliaTutto = true;
+        }
         if (scopaVariante === 'scopone') {
             num = 4;
         }
@@ -1257,6 +1262,7 @@ window.creaNuovaStanza = () => {
         scopaVariante: scopaVariante,
         scopaNapola: scopaNapola,
         scopaReBello: scopaReBello,
+        scopaAssoPigliaTutto: scopaAssoPigliaTutto,
         briscolaVariante: briscolaVariante,
         tressetteLimite: limitePunti
     });
@@ -1458,10 +1464,11 @@ window.aggiornaRenderingLobbyPubbliche = () => {
         } else if (l.gameType === 'scopa') {
             badgeColor = '#27ae60';
             badgeTextColor = 'white';
-            if (l.scopaVariante === 'asso_piglia_tutto') badgeText = 'Asso Piglia Tutto';
-            else if (l.scopaVariante === 'scopa_ladra') badgeText = 'Scopa Ladra';
+            if (l.scopaVariante === 'scopone') badgeText = l.scopaAssoPigliaTutto ? 'Scopone + Asso' : 'Scopone Scientifico';
+            else if (l.scopaVariante === 'asso_piglia_tutto') badgeText = 'Asso Piglia Tutto';
+            else if (l.scopaVariante === 'scopa_ladra') badgeText = l.scopaAssoPigliaTutto ? 'Asso + Ladra' : 'Scopa Ladra';
             else if (l.scopaVariante === 'combinata') badgeText = 'Asso + Ladra';
-            else badgeText = 'Scopa Classica';
+            else badgeText = l.scopaAssoPigliaTutto ? 'Scopa d\'Assi' : 'Scopa Classica';
         } else if (l.gameType === 'rubamazzetto') {
             badgeColor = '#9b59b6';
             badgeText = 'Rubamazzetto';
@@ -2576,3 +2583,14 @@ document.addEventListener('click', (e) => {
         menu.style.display = 'none';
     }
 });
+
+// Sincronizza selezione variante Scopa con la checkbox Asso Piglia Tutto
+const selScopaVar = document.getElementById('select-scopa-variante');
+const chkScopaAsso = document.getElementById('check-scopa-assopigliatutto');
+if (selScopaVar && chkScopaAsso) {
+    selScopaVar.addEventListener('change', () => {
+        if (selScopaVar.value === 'asso_piglia_tutto' || selScopaVar.value === 'combinata') {
+            chkScopaAsso.checked = true;
+        }
+    });
+}

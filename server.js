@@ -1599,7 +1599,8 @@ function ottieniListaLobbyPubbliche() {
                 playersCount: l.giocatori.length,
                 maxPlayers: parseInt(l.parametri?.numGiocatori || 4),
                 gameType: l.parametri?.gameType || 'lucas',
-                scopaVariante: l.parametri?.scopaVariante || null
+                scopaVariante: l.parametri?.scopaVariante || null,
+                scopaAssoPigliaTutto: !!l.parametri?.scopaAssoPigliaTutto
             });
         }
     }
@@ -2398,7 +2399,8 @@ io.on('connection', (socket) => {
             if (variante === 'scopone') numG = 4;
             const opzioni = {
                 napola: !!lobby.parametri.scopaNapola,
-                reBello: !!lobby.parametri.scopaReBello
+                reBello: !!lobby.parametri.scopaReBello,
+                assoPigliaTutto: !!lobby.parametri.scopaAssoPigliaTutto || (variante === 'asso_piglia_tutto') || (variante === 'combinata')
             };
             lobby.gameInstance = new ScopaGame(numG, limite, variante, opzioni);
             inviaLobbyPubblicheTutti();
@@ -4150,6 +4152,7 @@ io.on('connection', (socket) => {
                 turnoAttuale: game.turnoAttuale,
                 fase: game.fase,
                 variante: game.variante || 'classica',
+                assoPigliaTutto: !!game.assoPigliaTuttoAttivo,
                 tavolo: game.tavolo,
                 smazzataNum: game.smazzataNum,
                 distribuzioneNum: game.distribuzioneNum,

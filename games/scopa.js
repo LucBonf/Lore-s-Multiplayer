@@ -135,6 +135,7 @@ class ScopaGame {
         this.limitePunti = limitePunti;
         this.napolaAttiva = !!opzioni.napola;
         this.reBelloAttivo = !!opzioni.reBello;
+        this.assoPigliaTuttoAttivo = !!opzioni.assoPigliaTutto || (variante === 'asso_piglia_tutto') || (variante === 'combinata');
         this.players = Array.from({ length: this.numPlayers }, (_, i) => new ScopaPlayer(i, `CPU ${i}`));
         this.mazzo = [];
         this.tavolo = []; // Carte scoperte sul tavolo
@@ -220,7 +221,7 @@ class ScopaGame {
 
         const cartaGiocata = p.mano.splice(cartaIdx, 1)[0];
         const isLadra = (this.variante === 'scopa_ladra' || this.variante === 'combinata');
-        const isAssoPigliaTutto = (this.variante === 'asso_piglia_tutto' || this.variante === 'combinata');
+        const isAssoPigliaTutto = this.assoPigliaTuttoAttivo || (this.variante === 'asso_piglia_tutto' || this.variante === 'combinata');
 
         // 1. In Scopa Ladra: verifica prima se ruba il mazzetto di un avversario
         if (isLadra) {
@@ -623,7 +624,7 @@ class ScopaGame {
         if (!p || p.mano.length === 0) return null;
 
         const isLadra = (this.variante === 'scopa_ladra' || this.variante === 'combinata');
-        const isAssoPigliaTutto = (this.variante === 'asso_piglia_tutto' || this.variante === 'combinata');
+        const isAssoPigliaTutto = this.assoPigliaTuttoAttivo || (this.variante === 'asso_piglia_tutto' || this.variante === 'combinata');
 
         let mossaMiglioreIdx = 0;
         let punteggioMigliore = -999;
