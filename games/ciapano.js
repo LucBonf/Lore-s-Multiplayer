@@ -199,39 +199,7 @@ export class CiapanoGame {
     calcolaFineSmazzata() {
         const attivi = this.getGiocatoriAttivi();
 
-        // 1. Calcola i terzi esatti per ogni giocatore attivo:
-        // Ogni Asso = 3 terzi (1 punto)
-        // Figure, 2, 3 = 1 terzo ciascuno (1/3 di punto)
-        // Chi vince l'ultima presa = +1 terzo (punto dell'ultima mano)
-        const terziPerGiocatore = new Map();
-        attivi.forEach(p => {
-            let terzi = p.contaPuntiPrese();
-            if (p.id === this.ultimoPresista) {
-                terzi += 1;
-            }
-            terziPerGiocatore.set(p.id, terzi);
-        });
-
-        // 2. Controllo Cappotto REALE:
-        // C'è cappotto solo se un giocatore ha fatto TUTTI i 33 terzi (tutti gli 11 punti),
-        // cioè tutti gli altri giocatori attivi hanno preso 0 terzi di presa.
-        let cappottoPlayerId = -1;
-        for (const p of attivi) {
-            const terzi = terziPerGiocatore.get(p.id) || 0;
-            if (terzi === 33) {
-                cappottoPlayerId = p.id;
-                break;
-            }
-        }
-
-        if (cappottoPlayerId !== -1) {
-            attivi.forEach(p => {
-                p.puntiSmazzata = (p.id === cappottoPlayerId) ? 0 : 11;
-            });
-            return { isCappotto: true, cappottoPlayerId };
-        }
-
-        // 3. Calcolo punti effettivi della smazzata:
+        // 1. Calcolo punti effettivi della smazzata:
         // Per tutti i giocatori tranne chi ha preso l'ultimo giro:
         // 1/3 per figure, 2, 3 e +1 per l'asso, arrotondato per difetto (Math.floor(terzi / 3)).
         let sommaAltri = 0;
@@ -257,6 +225,20 @@ export class CiapanoGame {
             });
         }
 
+        // 2. Controllo Cappotto:
+        // Se la mano si conclude con tutti i giocatori a 0 e uno solo con 11, allora è cappotto!
+        // Chi ha preso 11 riceve 0 punti (+0) e tutti quelli che hanno preso 0 ricevono 11 punti (+11).
+        let cappottoPlayer = attivi.find(p => p.puntiSmazzata === 11);
+        const tuttiGliAltriAZero = cappottoPlayer && attivi.every(p => p.id === cappottoPlayer.id || p.puntiSmazzata === 0);
+
+        if (cappottoPlayer && tuttiGliAltriAZero) {
+            const cappottoPlayerId = cappottoPlayer.id;
+            attivi.forEach(p => {
+                p.puntiSmazzata = (p.id === cappottoPlayerId) ? 0 : 11;
+            });
+            return { isCappotto: true, cappottoPlayerId };
+        }
+
         return { isCappotto: false, cappottoPlayerId: -1 };
     }
 
@@ -264,12 +246,8 @@ export class CiapanoGame {
         const attivi = this.getGiocatoriAttivi();
         if (isCappotto && cappottoPlayerId !== -1) {
             attivi.forEach(p => {
-                if (p.id === cappottoPlayerId) {
-                    p.puntiSmazzata = 0;
-                } else {
-                    p.puntiSmazzata = 11;
-                    p.puntiTotali += 11;
-                }
+                p.puntiSmazzata = (p.id === cappottoPlayerId) ? 0 : 11;
+                p.puntiTotali += p.puntiSmazzata;
             });
         } else {
             attivi.forEach(p => {
