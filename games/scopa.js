@@ -136,6 +136,7 @@ class ScopaGame {
         this.napolaAttiva = !!opzioni.napola;
         this.reBelloAttivo = !!opzioni.reBello;
         this.assoPigliaTuttoAttivo = !!opzioni.assoPigliaTutto || (variante === 'asso_piglia_tutto') || (variante === 'combinata');
+        this.assoValeScopa = !!opzioni.assoValeScopa;
         this.players = Array.from({ length: this.numPlayers }, (_, i) => new ScopaPlayer(i, `CPU ${i}`));
         this.mazzo = [];
         this.tavolo = []; // Carte scoperte sul tavolo
@@ -279,11 +280,15 @@ class ScopaGame {
                     isScopa
                 };
             } else if (this.tavolo.length > 0) {
-                // Prende tutto il tavolo! (Non è considerata scopa per regola tradizionale)
+                // Prende tutto il tavolo!
                 const cartePreseDalTavolo = this.tavolo.splice(0, this.tavolo.length);
                 const carteCatturate = [...cartePreseDalTavolo, cartaGiocata];
                 p.prese.push(...carteCatturate);
                 this.ultimoPresista = playerIdx;
+
+                const isUltimaCartaAssoluta = (this.mazzo.length === 0 && this.players.every(pl => pl.mano.length === 0));
+                const isScopa = this.assoValeScopa && !isUltimaCartaAssoluta;
+                if (isScopa) p.scope++;
 
                 return {
                     cartaGiocata,
@@ -291,7 +296,7 @@ class ScopaGame {
                     tipoPresa: 'asso_piglia_tutto',
                     cartePrese: carteCatturate,
                     cartePreseDalTavolo: cartePreseDalTavolo,
-                    isScopa: false
+                    isScopa: isScopa
                 };
             } else {
                 // Tavolo vuoto: l'asso resta a terra
@@ -651,122 +656,149 @@ class ScopaGame {
                 }
             }
 
-            // 2. Asso Piglia Tutto: calata tattica dell'Asso
-            if (isAssoPigliaTutto && carta.valore === 'Asso') {
-                const haAssoATerra = this.tavolo.some(c => c.valore === 'Asso');
-                if (!haAssoATerra && this.tavolo.length > 0) {
-                    score += 60 + this.tavolo.length * 8;
-                    if (this.tavolo.some(c => c.valore === '7' && c.seme === 'Denari')) score += 90;
-                    motivi.push("ho usato l'Asso per ripulire il tavolo");
-                }
-            }
+            // 2. Asso Piglia Tutto: gestione strategica dell'Asso (se non c'è Asso a terra ed il tavolo non è vuoto)
+            const isAssoPigliaTuttoPresa = (isAssoPigliaTutto && carta.valore === 'Asso' && !this.tavolo.some(c => c.valore === 'Asso') && this.tavolo.length > 0);
 
-            // 3. Valutazione presa standard
-            const esito = calcolaPresaScopa(carta, this.tavolo);
-            if (esito.presaPossibile) {
-                score += 20;
+            if (isAssoPigliaTuttoPresa) {
+                const numCarteTavolo = this.tavolo.length;
+                const haSettebelloATerra = this.tavolo.some(c => c.valore === '7' && c.seme === 'Denari');
+                const numDenariATerra = this.tavolo.filter(c => c.seme === 'Denari').length;
+                const sommaTavolo = this.tavolo.reduce((acc, c) => acc + valoreNominale(c.valore), 0);
+                const carteInMano = p.mano.length;
 
-                const tavRimanente = this.tavolo.length - esito.cartePrese.length;
-                const isUltimaCartaAssoluta = (this.mazzo.length === 0 && this.players.every(pl => pl.mano.length <= 1));
-
-                // Priorità 1: Fare Scopa!
-                if (tavRimanente === 0 && !isUltimaCartaAssoluta) {
-                    score += 200;
-                    motivi.push("ho fatto Scopa!");
-                } else if (tavRimanente === 0 && isUltimaCartaAssoluta) {
-                    score += 40; // All'ultima mano non vale come scopa ma prende tutto il tavolo
-                    motivi.push("ho preso le ultime carte del tavolo");
+                if (haSettebelloATerra) {
+                    // Situazione critica/imperdibile: c'è il Settebello a terra!
+                    score += 260;
+                    motivi.push("ho calato l'Asso per catturare il Settebello a terra");
+                } else if (numCarteTavolo >= 4 || numDenariATerra >= 2) {
+                    // Tavolo molto ricco di carte o Denari: ottima mossa per fare bottino
+                    score += 100 + (numCarteTavolo * 12) + (numDenariATerra * 25);
+                    motivi.push("ho usato l'Asso per ripulire un tavolo ricco di carte");
+                } else if (numCarteTavolo >= 2 && sommaTavolo <= 10) {
+                    // Situazione critica: l'avversario potrebbe fare scopa subito con una sola carta
+                    score += 75 + (numCarteTavolo * 8);
+                    motivi.push("ho usato l'Asso per sventare una possibile scopa avversaria");
+                } else if (carteInMano === 1) {
+                    // È l'ultima carta rimasta in mano, va giocata per forza
+                    score += 50 + (numCarteTavolo * 5);
+                    motivi.push("ho ripulito il tavolo con l'Asso nell'ultima giocata della mano");
                 } else {
-                    // Evitare di lasciare facili scope all'avversario
-                    // Calcola le carte rimaste a terra
-                    const carteRimaste = this.tavolo.filter(tc => !esito.cartePrese.some(cp => cp.valore === tc.valore && cp.seme === tc.seme));
-                    if (carteRimaste.length === 1 && valoreNominale(carteRimaste[0].valore) <= 10) {
-                        // Lasciare 1 sola carta è pericoloso (l'avversario può fare scopa accoppiando)
-                        score -= 35;
-                    } else {
-                        const sommaRimasta = carteRimaste.reduce((acc, c) => acc + valoreNominale(c.valore), 0);
-                        if (sommaRimasta <= 10) {
-                            score -= 20; // Rischio scopa per somma
-                        } else {
-                            score += 15; // Tavolo sicuro (somma > 10)
-                        }
-                    }
+                    // Tavolo povero (1 o 2 scartine senza Denari o Settebello):
+                    // Non sprecare l'Asso alla leggera! Diamo un punteggio basso/penalità per conservarlo
+                    score = -5;
+                    motivi.push("ho ripulito il tavolo con l'Asso");
                 }
 
-                // Priorità 2: Catturare Denari e Settebello (e Napola)
-                if (carta.valore === '7' && carta.seme === 'Denari') {
-                    score += 70;
-                    motivi.push("ho preso con il Settebello");
-                }
-                if (esito.cartePrese.some(c => c.valore === '7' && c.seme === 'Denari')) {
-                    score += 80;
-                    motivi.push("ho catturato il prezioso Settebello");
-                }
-
-                if (carta.seme === 'Denari') score += 15;
-                const denariPresi = esito.cartePrese.filter(c => c.seme === 'Denari').length;
-                score += denariPresi * 20;
-                if (denariPresi > 0 && !motivi.some(m => m.includes("Settebello"))) {
-                    motivi.push(`ho catturato carte di Denari`);
-                }
-
-                // Se Napola attiva, premia carte di Denari in sequenza bassa
-                if (this.napolaAttiva) {
-                    esito.cartePrese.forEach(c => {
-                        if (c.seme === 'Denari' && ['Asso', '2', '3', '4', '5'].includes(c.valore)) {
-                            score += 25;
-                        }
-                    });
-                }
-
-                // Priorità 3: Gestire la Primiera (7, 6, Asso)
-                if (['7', '6'].includes(carta.valore)) score += 15;
-                esito.cartePrese.forEach(c => {
-                    if (c.valore === '7') score += 20;
-                    else if (c.valore === '6') score += 16;
-                    else if (c.valore === 'Asso') score += 12;
-                });
-
-                // Maggior numero di carte catturate
-                score += (esito.cartePrese.length + 1) * 6;
-
-                if (motivi.length === 0) {
-                    motivi.push(`ho preso ${esito.cartePrese.map(c => `${c.valore} di ${c.seme}`).join(' e ')}`);
+                if (this.assoValeScopa) {
+                    const isUltimaCartaAssoluta = (this.mazzo.length === 0 && this.players.every(pl => pl.mano.length <= 1));
+                    if (!isUltimaCartaAssoluta) score += 150;
                 }
             } else {
-                // Priorità 4: Strategia di scarto sicuro
-                // Non abbiamo prese: dobbiamo scartare una carta senza dare vantaggio all'avversario
-                if (carta.valore === '7' && carta.seme === 'Denari') {
-                    score -= 200; // MAI scartare il Settebello a terra!
-                } else if (carta.seme === 'Denari') {
-                    score -= 30; // Evita di regalare Denari
-                }
-
-                if (['7', '6'].includes(carta.valore)) {
-                    score -= 25; // Evita di regalare carte chiave di primiera
-                }
-
-                // Considera il tavolo risultante dopo lo scarto
-                const tavoloNuovo = [...this.tavolo, carta];
-                const sommaTavoloNuovo = tavoloNuovo.reduce((acc, c) => acc + valoreNominale(c.valore), 0);
-
-                if (this.tavolo.length === 0) {
-                    // Tavolo vuoto: scartare carte alte (figure) riduce il rischio di scopa rispetto a carte basse
-                    score += valoreNominale(carta.valore) * 3;
-                } else if (sommaTavoloNuovo <= 10) {
-                    // Se la somma a terra resta <= 10, l'avversario può fare scopa con una sola carta!
-                    score -= 40;
-                } else {
-                    // Ottimo: somma oltre 10, impedisce la scopa diretta con una sola carta!
+                // 3. Valutazione presa standard (singola o per somma) o scarto
+                const esito = calcolaPresaScopa(carta, this.tavolo);
+                if (esito.presaPossibile) {
                     score += 25;
-                }
 
-                // Preferisci scartare figure (Re, Cavallo, Fante) poiché non valgono per la primiera
-                if (['Re', 'Cavallo', 'Fante'].includes(carta.valore)) {
-                    score += 20;
-                }
+                    const tavRimanente = this.tavolo.length - esito.cartePrese.length;
+                    const isUltimaCartaAssoluta = (this.mazzo.length === 0 && this.players.every(pl => pl.mano.length <= 1));
 
-                motivi.push("ho fatto uno scarto sicuro per proteggere Denari e Primiera");
+                    // Priorità 1: Fare Scopa!
+                    if (tavRimanente === 0 && !isUltimaCartaAssoluta) {
+                        score += 200;
+                        motivi.push("ho fatto Scopa!");
+                    } else if (tavRimanente === 0 && isUltimaCartaAssoluta) {
+                        score += 40; // All'ultima mano non vale come scopa ma prende tutto il tavolo
+                        motivi.push("ho preso le ultime carte del tavolo");
+                    } else {
+                        // Evitare di lasciare facili scope all'avversario
+                        const carteRimaste = this.tavolo.filter(tc => !esito.cartePrese.some(cp => cp.valore === tc.valore && cp.seme === tc.seme));
+                        if (carteRimaste.length === 1 && valoreNominale(carteRimaste[0].valore) <= 10) {
+                            score -= 35; // Pericolo: lasciare 1 sola carta a terra
+                        } else {
+                            const sommaRimasta = carteRimaste.reduce((acc, c) => acc + valoreNominale(c.valore), 0);
+                            if (sommaRimasta <= 10) {
+                                score -= 20; // Rischio scopa per somma
+                            } else {
+                                score += 15; // Tavolo sicuro (somma > 10)
+                            }
+                        }
+                    }
+
+                    // Priorità 2: Catturare Denari e Settebello (e Napola)
+                    if (carta.valore === '7' && carta.seme === 'Denari') {
+                        score += 70;
+                        motivi.push("ho preso con il Settebello");
+                    }
+                    if (esito.cartePrese.some(c => c.valore === '7' && c.seme === 'Denari')) {
+                        score += 80;
+                        motivi.push("ho catturato il prezioso Settebello");
+                    }
+
+                    if (carta.seme === 'Denari') score += 15;
+                    const denariPresi = esito.cartePrese.filter(c => c.seme === 'Denari').length;
+                    score += denariPresi * 20;
+                    if (denariPresi > 0 && !motivi.some(m => m.includes("Settebello"))) {
+                        motivi.push(`ho catturato carte di Denari`);
+                    }
+
+                    // Se Napola attiva, premia carte di Denari in sequenza bassa
+                    if (this.napolaAttiva) {
+                        esito.cartePrese.forEach(c => {
+                            if (c.seme === 'Denari' && ['Asso', '2', '3', '4', '5'].includes(c.valore)) {
+                                score += 25;
+                            }
+                        });
+                    }
+
+                    // Priorità 3: Gestire la Primiera (7, 6, Asso)
+                    if (['7', '6'].includes(carta.valore)) score += 15;
+                    esito.cartePrese.forEach(c => {
+                        if (c.valore === '7') score += 20;
+                        else if (c.valore === '6') score += 16;
+                        else if (c.valore === 'Asso') score += 12;
+                    });
+
+                    // Maggior numero di carte catturate
+                    score += (esito.cartePrese.length + 1) * 6;
+
+                    if (motivi.length === 0) {
+                        motivi.push(`ho preso ${esito.cartePrese.map(c => `${c.valore} di ${c.seme}`).join(' e ')}`);
+                    }
+                } else {
+                    // Priorità 4: Strategia di scarto sicuro
+                    // Non abbiamo prese: dobbiamo scartare una carta senza dare vantaggio all'avversario
+                    if (carta.valore === '7' && carta.seme === 'Denari') {
+                        score -= 200; // MAI scartare il Settebello a terra!
+                    } else if (carta.seme === 'Denari') {
+                        score -= 30; // Evita di regalare Denari
+                    }
+
+                    if (['7', '6'].includes(carta.valore)) {
+                        score -= 25; // Evita di regalare carte chiave di primiera
+                    }
+
+                    // Considera il tavolo risultante dopo lo scarto
+                    const tavoloNuovo = [...this.tavolo, carta];
+                    const sommaTavoloNuovo = tavoloNuovo.reduce((acc, c) => acc + valoreNominale(c.valore), 0);
+
+                    if (this.tavolo.length === 0) {
+                        // Tavolo vuoto: scartare carte alte (figure) riduce il rischio di scopa rispetto a carte basse
+                        score += valoreNominale(carta.valore) * 3;
+                    } else if (sommaTavoloNuovo <= 10) {
+                        // Se la somma a terra resta <= 10, l'avversario può fare scopa con una sola carta!
+                        score -= 40;
+                    } else {
+                        // Ottimo: somma oltre 10, impedisce la scopa diretta con una sola carta!
+                        score += 25;
+                    }
+
+                    // Preferisci scartare figure (Re, Cavallo, Fante) poiché non valgono per la primiera
+                    if (['Re', 'Cavallo', 'Fante'].includes(carta.valore)) {
+                        score += 20;
+                    }
+
+                    motivi.push("ho fatto uno scarto sicuro per proteggere Denari e Primiera");
+                }
             }
 
             if (score > punteggioMigliore) {
