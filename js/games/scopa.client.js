@@ -249,7 +249,29 @@ socket.on('mossa_scopa', (dati) => {
     } else if (dati.presa) {
         descrPrese = ` ➔ Spazza tavolo`;
     }
-    window.ultimaMossaScopaInfo = `${dati.nome} [${valGiocata}${iconSemeGiocata}]${descrPrese}`;
+
+    if (dati.spiegazione) {
+        window.ultimaMossaScopaInfo = dati.spiegazione;
+        const pBlock = document.querySelector(`.player-block[data-player-id="${dati.playerIdx}"]`);
+        if (pBlock) {
+            const botBubble = document.createElement('div');
+            botBubble.className = 'scopa-float-badge';
+            botBubble.style.background = 'rgba(26, 36, 43, 0.95)';
+            botBubble.style.border = '1px solid rgba(255, 215, 0, 0.6)';
+            botBubble.style.color = '#fff';
+            botBubble.style.fontSize = '0.78rem';
+            botBubble.style.maxWidth = '240px';
+            botBubble.style.whiteSpace = 'normal';
+            botBubble.style.textAlign = 'center';
+            botBubble.style.padding = '5px 8px';
+            botBubble.style.lineHeight = '1.3';
+            botBubble.innerText = dati.spiegazione;
+            pBlock.appendChild(botBubble);
+            setTimeout(() => botBubble.remove(), 3200);
+        }
+    } else {
+        window.ultimaMossaScopaInfo = `${dati.nome} [${valGiocata}${iconSemeGiocata}]${descrPrese}`;
+    }
 });
 
 function mostraFineSmazzataScopa(data) {

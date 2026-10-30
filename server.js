@@ -4338,7 +4338,9 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            const cartaIdx = currentGame.scegliMossaIA(currentGame.turnoAttuale);
+            const scelta = currentGame.scegliMossaIA(currentGame.turnoAttuale);
+            const cartaIdx = (typeof scelta === 'object' && scelta !== null) ? scelta.cartaIdx : scelta;
+            const spiegazione = (typeof scelta === 'object' && scelta !== null) ? scelta.spiegazione : "";
             currentGame.botThinking = false;
 
             const res = currentGame.giocaCarta(currentGame.turnoAttuale, cartaIdx);
@@ -4346,6 +4348,7 @@ io.on('connection', (socket) => {
                 playerIdx: currentGame.turnoAttuale,
                 nome: p.nome,
                 carta: res.cartaGiocata,
+                spiegazione,
                 ...res
             });
 
@@ -4386,12 +4389,15 @@ io.on('connection', (socket) => {
         const p = game.players[playerIdx];
         if (!p || p.mano.length === 0) return;
 
-        const cartaIdx = game.scegliMossaIA(playerIdx);
+        const scelta = game.scegliMossaIA(playerIdx);
+        const cartaIdx = (typeof scelta === 'object' && scelta !== null) ? scelta.cartaIdx : scelta;
+        const spiegazione = (typeof scelta === 'object' && scelta !== null) ? scelta.spiegazione : "";
         const res = game.giocaCarta(playerIdx, cartaIdx);
         io.to(code).emit('mossa_scopa', {
             playerIdx,
             nome: p.nome,
             carta: res.cartaGiocata,
+            spiegazione,
             ...res
         });
 
