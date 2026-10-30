@@ -1619,6 +1619,83 @@ const lobbies = {};
 const turnTimers = {};
 const voiceRooms = {};
 
+async function assegnaEloGiocatoreCiapano(game, p, playerSocket = null) {
+    if (!p || p.eloAssegnato) return p?.eloChange || 0;
+    if (!p.uniqueCode || p.uniqueCode.startsWith("GUEST_")) {
+        p.eloAssegnato = true;
+        return 0;
+    }
+    if (!dbConnected) {
+        p.eloAssegnato = true;
+        return 0;
+    }
+
+    try {
+        const userProfile = await User.findOne({ uniqueCode: p.uniqueCode });
+        if (!userProfile) {
+            p.eloAssegnato = true;
+            return 0;
+        }
+
+        const currentElo = userProfile.eloCiapano || 1000;
+        const otherElos = game.players.filter(pl => pl.uniqueCode !== p.uniqueCode).map(pl => {
+            return pl.eloMomentaneo || 1000;
+        });
+        const avgOpponentElo = otherElos.length > 0 ? (otherElos.reduce((a, b) => a + b, 0) / otherElos.length) : 1000;
+
+        let rank = p.rank;
+        if (rank == null) {
+            if (p.posizioneFinale != null) {
+                rank = p.posizioneFinale - 1;
+            } else {
+                rank = p.eliminato ? (game.numPlayers - 1) : 0;
+            }
+        }
+
+        const denom = Math.max(1, game.numPlayers - 1);
+        const actualScore = (game.numPlayers - 1 - rank) / denom;
+        const expectedScore = 1 / (1 + Math.pow(10, (avgOpponentElo - currentElo) / 400));
+        const matchesPlayed = userProfile.partiteGiocate || 0;
+        const K = matchesPlayed < 30 ? 50 : 25;
+        const eloChange = Math.round(K * (actualScore - expectedScore));
+        const isWinner = (rank === 0) ? 1 : 0;
+
+        await User.updateOne(
+            { uniqueCode: p.uniqueCode },
+            {
+                $inc: {
+                    partiteGiocate: 1,
+                    partiteVinte: isWinner,
+                    eloCiapano: eloChange
+                }
+            }
+        );
+
+        p.eloChange = eloChange;
+        p.eloAssegnato = true;
+
+        const sock = playerSocket || (p.id ? io.sockets.sockets.get(p.id) : null);
+        if (sock) {
+            sock.userEloCiapano = currentElo + eloChange;
+            sock.emit('aggiorna_profilo', {
+                eloCiapano: currentElo + eloChange,
+                partiteGiocate: matchesPlayed + 1,
+                partiteVinte: (userProfile.partiteVinte || 0) + isWinner
+            });
+            sock.emit('elo_aggiornato_ciapano', {
+                eloChange,
+                nuovoElo: currentElo + eloChange,
+                posizione: (rank + 1),
+                eliminato: p.eliminato
+            });
+        }
+
+        return eloChange;
+    } catch (errElo) {
+        console.error("Errore salvataggio ELO Ciapanò giocatore:", p.nome, errElo);
+        return 0;
+    }
+}
 
 io.on('connection', (socket) => {
     umaniConnessi++;
@@ -2147,7 +2224,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('esci_partita', () => {
+    socket.on('esci_partita', async () => {
         try {
             const code = socket.roomCode;
             if (!code) return;
@@ -2159,35 +2236,14 @@ io.on('connection', (socket) => {
 
             const lobby = lobbies[code];
             if (lobby) {
-                // Rimuovi dalla lobby (lista d'attesa) Test gits
-                const idx = lobby.giocatori.findIndex(p => p.id === socket.id);
-                const wasHost = (socket.id === lobby.host);
-                if (idx !== -1) lobby.giocatori.splice(idx, 1);
-
-                if (lobby.giocatori.length === 0) {
-                    delete lobbies[code];
-                    if (voiceRooms[code]) delete voiceRooms[code];
-                    if (turnTimers[code]) {
-                        clearTimeout(turnTimers[code]);
-                        delete turnTimers[code];
-                    }
-                    if (dbConnected) {
-                        MatchState.deleteOne({ roomCode: code }).catch(e => {});
-                    }
-                } else {
-                    if (wasHost) {
-                        lobby.host = lobby.giocatori[0].id;
-                    }
-                    inviaAggiornamentoLobby(code);
-                    salvaStatoMatch(code);
-                }
-                inviaLobbyPubblicheTutti();
-
-                // Gestione del subentro IA se il gioco è in corso
+                // Gestione del subentro IA e assegnazione ELO se il gioco è in corso
                 if (lobby.gameInstance) {
                     const game = lobby.gameInstance;
-                    const p = game.players.find(pl => pl.id === socket.id);
+                    const p = game.players.find(pl => pl.id === socket.id || (socket.userUniqueCode && pl.uniqueCode === socket.userUniqueCode));
                     if (p) {
+                        if (game instanceof CiapanoGame && p.eliminato && !p.eloAssegnato) {
+                            await assegnaEloGiocatoreCiapano(game, p, socket);
+                        }
                         p.isHuman = false;
                         p.id = null; // Stacca il socketId
                         p.nome += " (Bot)";
@@ -2217,11 +2273,31 @@ io.on('connection', (socket) => {
                             avviaTimerTurno(code);
                         }
                     }
-                } else {
-                    // Se era ancora in lobby, aggiorna gli altri
-                    inviaAggiornamentoLobby(code);
                 }
-                salvaStatoMatch(code);
+
+                // Rimuovi dalla lobby (lista d'attesa)
+                const idx = lobby.giocatori.findIndex(p => p.id === socket.id);
+                const wasHost = (socket.id === lobby.host);
+                if (idx !== -1) lobby.giocatori.splice(idx, 1);
+
+                if (lobby.giocatori.length === 0) {
+                    delete lobbies[code];
+                    if (voiceRooms[code]) delete voiceRooms[code];
+                    if (turnTimers[code]) {
+                        clearTimeout(turnTimers[code]);
+                        delete turnTimers[code];
+                    }
+                    if (dbConnected) {
+                        MatchState.deleteOne({ roomCode: code }).catch(e => {});
+                    }
+                } else {
+                    if (wasHost) {
+                        lobby.host = lobby.giocatori[0].id;
+                    }
+                    inviaAggiornamentoLobby(code);
+                    salvaStatoMatch(code);
+                }
+                inviaLobbyPubblicheTutti();
             }
         } catch (e) {
             console.error("Errore esci_partita:", e);
@@ -2271,13 +2347,16 @@ io.on('connection', (socket) => {
                             }
                             salvaStatoMatch(code);
 
-                            setTimeout(() => {
+                            setTimeout(async () => {
                                 const currentLobby = lobbies[code];
                                 if (!currentLobby || !currentLobby.gameInstance) return;
 
                                 const p = currentLobby.gameInstance.players.find(pl => pl.token === playerToken);
                                 // Se dopo il timeout non si è riconnesso (id è ancora null) ed è ancora umano
                                 if (p && p.id === null && p.isHuman) {
+                                    if (currentLobby.gameInstance instanceof CiapanoGame && p.eliminato && !p.eloAssegnato) {
+                                        await assegnaEloGiocatoreCiapano(currentLobby.gameInstance, p, null);
+                                    }
                                     p.isHuman = false;
                                     p.nome += " (Bot)";
                                     if (currentLobby.gameInstance instanceof CiapanoGame) {
@@ -3887,57 +3966,33 @@ io.on('connection', (socket) => {
         if (gameOver) {
             game.fase = "fine_partita";
             const classificaFinale = [...game.players].sort((a, b) => {
+                if (a.posizioneFinale != null && b.posizioneFinale != null) {
+                    return a.posizioneFinale - b.posizioneFinale;
+                }
                 if (a.eliminato !== b.eliminato) return a.eliminato ? 1 : -1;
                 return a.puntiTotali - b.puntiTotali;
             });
+            classificaFinale.forEach((p, idx) => {
+                if (p.posizioneFinale == null) {
+                    p.posizioneFinale = idx + 1;
+                    p.rank = idx;
+                }
+            });
 
             if (dbConnected) {
-                const humanPlayers = game.players.filter(p => p.isHuman && p.uniqueCode && !p.uniqueCode.startsWith("GUEST_"));
-                if (humanPlayers.length > 0) {
-                    try {
-                        const userProfiles = await User.find({ uniqueCode: { $in: humanPlayers.map(p => p.uniqueCode) } });
-                        const profileMap = {};
-                        userProfiles.forEach(u => profileMap[u.uniqueCode] = u);
-
-                        for (let p of humanPlayers) {
-                            const currentElo = profileMap[p.uniqueCode]?.eloCiapano || 1000;
-                            const otherElos = game.players.filter(pl => pl.id !== p.id).map(pl => {
-                                if (pl.isHuman) return profileMap[pl.uniqueCode]?.eloCiapano || 1000;
-                                return 1000;
-                            });
-                            const avgOpponentElo = otherElos.length > 0 ? (otherElos.reduce((a, b) => a + b, 0) / otherElos.length) : 1000;
-
-                            const rank = classificaFinale.findIndex(cf => cf.id === p.id);
-                            const actualScore = (game.numPlayers - 1 - rank) / (game.numPlayers - 1);
-                            const expectedScore = 1 / (1 + Math.pow(10, (avgOpponentElo - currentElo) / 400));
-                            const matchesPlayed = profileMap[p.uniqueCode]?.partiteGiocate || 0;
-                            const K = matchesPlayed < 30 ? 50 : 25;
-                            let eloChange = Math.round(K * (actualScore - expectedScore));
-
-                            const isWinner = (p.id === classificaFinale[0].id) ? 1 : 0;
-
-                            await User.updateOne(
-                                { uniqueCode: p.uniqueCode },
-                                {
-                                    $inc: {
-                                        partiteGiocate: 1,
-                                        partiteVinte: isWinner,
-                                        eloCiapano: eloChange
-                                    }
-                                }
-                            );
-                            p.eloChange = eloChange;
+                for (let p of game.players) {
+                    if (p.uniqueCode && !p.uniqueCode.startsWith("GUEST_")) {
+                        if (!p.eloAssegnato) {
+                            await assegnaEloGiocatoreCiapano(game, p);
                         }
-                    } catch (errElo) {
-                        console.error("Errore salvataggio ELO Ciapanò:", errElo);
                     }
                 }
             }
 
             io.to(code).emit('fine_partita_ciapano', {
                 classifica: classificaFinale.map((p, idx) => ({
-                    posizione: idx + 1,
-                    nome: p.nome,
+                    posizione: p.posizioneFinale || (idx + 1),
+                    nome: p.nome.replace(" (Bot)", ""),
                     puntiTotali: p.puntiTotali,
                     eliminato: p.eliminato,
                     eloChange: p.eloChange || 0,

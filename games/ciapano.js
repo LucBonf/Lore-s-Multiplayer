@@ -60,6 +60,10 @@ export class CiapanoPlayer {
         this.eliminato = false;
         this.aiLevel = 0;
         this.aiVariant = "Human";
+        this.posizioneFinale = null;
+        this.rank = null;
+        this.eloAssegnato = false;
+        this.eloChange = 0;
     }
     resetSmazzata() {
         this.mano = [];
@@ -255,14 +259,40 @@ export class CiapanoGame {
             });
         }
 
+        const appenaEliminati = [];
         attivi.forEach(p => {
             if (p.puntiTotali >= this.limitePunti) {
                 p.eliminato = true;
+                appenaEliminati.push(p);
             }
         });
 
         const attiviRimasti = this.getGiocatoriAttivi();
+        const K = attiviRimasti.length;
+
+        // Assegniamo la posizione finale e rank a chi è appena stato eliminato
+        if (appenaEliminati.length > 0) {
+            // Chi ha meno punti totali si classifica meglio tra gli eliminati della stessa mano
+            appenaEliminati.sort((a, b) => a.puntiTotali - b.puntiTotali);
+            appenaEliminati.forEach((p, idx) => {
+                p.posizioneFinale = (K + 1) + idx;
+                p.rank = p.posizioneFinale - 1;
+            });
+        }
+
         const gameOver = attiviRimasti.length <= 1;
-        return { gameOver, attiviRimasti };
+
+        if (gameOver) {
+            if (attiviRimasti.length === 1) {
+                attiviRimasti[0].posizioneFinale = 1;
+                attiviRimasti[0].rank = 0;
+            } else if (attiviRimasti.length === 0 && appenaEliminati.length > 0) {
+                // Nel caso raro in cui tutti i rimasti superino la soglia contemporaneamente
+                appenaEliminati[0].posizioneFinale = 1;
+                appenaEliminati[0].rank = 0;
+            }
+        }
+
+        return { gameOver, attiviRimasti, appenaEliminati };
     }
 }

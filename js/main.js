@@ -432,6 +432,19 @@ socket.on('login_ok', (profile) => {
     aggiornaWelcomeMessage();
 });
 
+socket.on('aggiorna_profilo', (data) => {
+    if (userProfile && data) {
+        Object.assign(userProfile, data);
+        aggiornaWelcomeMessage();
+    }
+});
+
+socket.on('elo_aggiornato_ciapano', (dati) => {
+    if (userProfile && dati && dati.nuovoElo !== undefined) {
+        userProfile.eloCiapano = dati.nuovoElo;
+        aggiornaWelcomeMessage();
+    }
+});
 
 socket.on('login_err', (msg) => {
     mostraErrore(msg);
