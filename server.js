@@ -4216,6 +4216,8 @@ io.on('connection', (socket) => {
                 mano: giocatoreUmano.mano,
                 tuttiGiocatori: game.players.map((p, i) => {
                     const isMe = (p.id === giocatoreUmano.id);
+                    const compagnoIdx = (game.numPlayers === 4) ? (i + 2) % 4 : null;
+                    const preseCoppiaCount = compagnoIdx !== null ? (p.prese.length + game.players[compagnoIdx].prese.length) : p.prese.length;
                     return {
                         id: p.id,
                         nome: p.nome,
@@ -4223,6 +4225,8 @@ io.on('connection', (socket) => {
                         numCarte: p.mano.length,
                         mano: isMe ? giocatoreUmano.mano : undefined,
                         preseCount: p.prese.length,
+                        preseCoppiaCount: preseCoppiaCount,
+                        compagnoIdx: compagnoIdx,
                         cimaMazzetto: game.getCimaMazzetto(i),
                         scopeCount: p.scope,
                         puntiTotali: p.puntiTotali,

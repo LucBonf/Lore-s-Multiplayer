@@ -177,15 +177,30 @@ class ScopaGame {
         this.distribuzioneNum = 1;
         this.ultimoPresista = -1;
 
+        this.carteUscite = [];
+
         if (this.variante === 'scopone') {
-            // Scopone Scientifico: 10 carte a testa distribuite tutte all'inizio (40 carte totali), 0 carte sul tavolo!
-            this.mazzo = this.creaMazzo();
-            this.tavolo = [];
-            for (let i = 0; i < 10; i++) {
+            // Scopone Scientifico: 9 carte a testa a ciascuno dei 4 giocatori (36 carte)
+            // e le 4 carte rimanenti vengono scoperte direttamente sul tavolo all'inizio.
+            // Tutte le 40 carte vengono distribuite interamente (nessuna distribuzione intermedia).
+            let mazzoValido = false;
+            while (!mazzoValido) {
+                this.mazzo = this.creaMazzo();
+                // 4 carte scoperte sul tavolo
+                this.tavolo = [this.mazzo.pop(), this.mazzo.pop(), this.mazzo.pop(), this.mazzo.pop()];
+                // Regola tradizionale Scopone: se sul tavolo ci sono 3 o 4 Re, si rimescola
+                const numRe = this.tavolo.filter(c => c.valore === 'Re').length;
+                if (numRe < 3) {
+                    mazzoValido = true;
+                }
+            }
+            // Distribuisci 9 carte a ciascuno dei 4 giocatori (36 carte distribuite)
+            for (let i = 0; i < 9; i++) {
                 for (let p of this.players) {
                     p.mano.push(this.mazzo.pop());
                 }
             }
+            this.carteUscite = [...this.tavolo];
         } else {
             let mazzoValido = false;
             while (!mazzoValido) {
@@ -198,6 +213,7 @@ class ScopaGame {
                     mazzoValido = true;
                 }
             }
+            this.carteUscite = [...this.tavolo];
             // Distribuisci 3 carte a testa
             this.distribuisciMano();
         }
@@ -221,6 +237,7 @@ class ScopaGame {
         if (!p || cartaIdx < 0 || cartaIdx >= p.mano.length) return null;
 
         const cartaGiocata = p.mano.splice(cartaIdx, 1)[0];
+        if (this.carteUscite) this.carteUscite.push(cartaGiocata);
         const isLadra = (this.variante === 'scopa_ladra' || this.variante === 'combinata');
         const isAssoPigliaTutto = this.assoPigliaTuttoAttivo || (this.variante === 'asso_piglia_tutto' || this.variante === 'combinata');
 
@@ -628,6 +645,18 @@ class ScopaGame {
         const p = this.players[playerIdx];
         if (!p || p.mano.length === 0) return { cartaIdx: 0, spiegazione: "" };
 
+        const isSquadre = (this.numPlayers === 4);
+        const compagnoIdx = isSquadre ? (playerIdx + 2) % 4 : null;
+        const compagno = isSquadre ? this.players[compagnoIdx] : null;
+        const avversarioSuccIdx = (playerIdx + 1) % this.numPlayers;
+        const avversarioSucc = this.players[avversarioSuccIdx];
+
+        // Prese congiunte della squadra (nello Scopone a 4 conta il mazzetto comune)
+        const preseCoppia = isSquadre ? [...p.prese, ...compagno.prese] : p.prese;
+        const denariCoppia = preseCoppia.filter(c => c.seme === 'Denari').length;
+        const haSettebelloCoppia = preseCoppia.some(c => c.valore === '7' && c.seme === 'Denari');
+        const haReBelloCoppia = preseCoppia.some(c => c.valore === 'Re' && c.seme === 'Denari');
+
         const isLadra = (this.variante === 'scopa_ladra' || this.variante === 'combinata');
         const isAssoPigliaTutto = this.assoPigliaTuttoAttivo || (this.variante === 'asso_piglia_tutto' || this.variante === 'combinata');
 
@@ -643,7 +672,7 @@ class ScopaGame {
             if (isLadra) {
                 for (let oppIdx = 0; oppIdx < this.numPlayers; oppIdx++) {
                     if (oppIdx === playerIdx) continue;
-                    if (this.numPlayers === 4 && (oppIdx % 2 === playerIdx % 2)) continue;
+                    if (isSquadre && (oppIdx % 2 === playerIdx % 2)) continue; // Mai rubare al compagno!
                     const opp = this.players[oppIdx];
                     if (opp.prese.length > 0) {
                         const cima = opp.prese[opp.prese.length - 1];
@@ -677,9 +706,8 @@ class ScopaGame {
                 } else if (numCarteTavolo >= 2 && sommaTavolo <= 10) {
                     // Situazione critica: l'avversario potrebbe fare scopa subito con una sola carta
                     score += 75 + (numCarteTavolo * 8);
-                    motivi.push("ho usato l'Asso per sventare una possibile scopa avversaria");
+                    motivi.push(isSquadre ? "ho usato l'Asso per proteggere la coppia da una possibile scopa" : "ho usato l'Asso per sventare una possibile scopa avversaria");
                 } else if (carteInMano === 1) {
-                    // È l'ultima carta rimasta in mano, va giocata per forza
                     score += 50 + (numCarteTavolo * 5);
                     motivi.push("ho ripulito il tavolo con l'Asso nell'ultima giocata della mano");
                 } else {
@@ -702,102 +730,106 @@ class ScopaGame {
                     const tavRimanente = this.tavolo.length - esito.cartePrese.length;
                     const isUltimaCartaAssoluta = (this.mazzo.length === 0 && this.players.every(pl => pl.mano.length <= 1));
 
-                    // Priorità 1: Fare Scopa!
+                    // Priorità 1: Fare Scopa! (1 punto per la squadra)
                     if (tavRimanente === 0 && !isUltimaCartaAssoluta) {
                         score += 200;
-                        motivi.push("ho fatto Scopa!");
+                        motivi.push(isSquadre ? "ho fatto Scopa per la nostra coppia!" : "ho fatto Scopa!");
                     } else if (tavRimanente === 0 && isUltimaCartaAssoluta) {
                         score += 40; // All'ultima mano non vale come scopa ma prende tutto il tavolo
-                        motivi.push("ho preso le ultime carte del tavolo");
+                        motivi.push("ho preso le ultime carte del tavolo per la squadra");
                     } else {
-                        // Evitare di lasciare facili scope all'avversario
+                        // Nello Scopone: prevenzione assoluta della scopa all'avversario immediatamente successivo!
                         const carteRimaste = this.tavolo.filter(tc => !esito.cartePrese.some(cp => cp.valore === tc.valore && cp.seme === tc.seme));
                         if (carteRimaste.length === 1 && valoreNominale(carteRimaste[0].valore) <= 10) {
-                            score -= 35; // Pericolo: lasciare 1 sola carta a terra
+                            score -= 45; // Penalità severa nello Scopone: lasciare una carta singola all'avversario successivo
                         } else {
                             const sommaRimasta = carteRimaste.reduce((acc, c) => acc + valoreNominale(c.valore), 0);
                             if (sommaRimasta <= 10) {
-                                score -= 20; // Rischio scopa per somma
+                                score -= 25; // Rischio scopa per somma
                             } else {
-                                score += 15; // Tavolo sicuro (somma > 10)
+                                score += 20; // Tavolo sicuro (somma > 10)
                             }
                         }
                     }
 
-                    // Priorità 2: Catturare Denari e Settebello (e Napola)
+                    // Priorità 2: Catturare Denari e Settebello (e Napola per la coppia)
                     if (carta.valore === '7' && carta.seme === 'Denari') {
                         score += 70;
                         motivi.push("ho preso con il Settebello");
                     }
                     if (esito.cartePrese.some(c => c.valore === '7' && c.seme === 'Denari')) {
-                        score += 80;
-                        motivi.push("ho catturato il prezioso Settebello");
+                        score += 85;
+                        motivi.push(isSquadre ? "ho catturato il prezioso Settebello per la coppia" : "ho catturato il prezioso Settebello");
+                    }
+
+                    if (this.reBelloAttivo && esito.cartePrese.some(c => c.valore === 'Re' && c.seme === 'Denari')) {
+                        score += 40;
+                        motivi.push("ho catturato il Re Bello");
                     }
 
                     if (carta.seme === 'Denari') score += 15;
                     const denariPresi = esito.cartePrese.filter(c => c.seme === 'Denari').length;
                     score += denariPresi * 20;
                     if (denariPresi > 0 && !motivi.some(m => m.includes("Settebello"))) {
-                        motivi.push(`ho catturato carte di Denari`);
+                        motivi.push(isSquadre ? `ho portato carte di Denari al monte della coppia` : `ho catturato carte di Denari`);
                     }
 
-                    // Se Napola attiva, premia carte di Denari in sequenza bassa
+                    // Se Napola attiva, premia la continuazione della sequenza della coppia
                     if (this.napolaAttiva) {
                         esito.cartePrese.forEach(c => {
                             if (c.seme === 'Denari' && ['Asso', '2', '3', '4', '5'].includes(c.valore)) {
-                                score += 25;
+                                score += 30;
                             }
                         });
                     }
 
-                    // Priorità 3: Gestire la Primiera (7, 6, Asso)
-                    if (['7', '6'].includes(carta.valore)) score += 15;
+                    // Priorità 3: Gestire la Primiera della coppia (7, 6, Asso)
+                    if (['7', '6'].includes(carta.valore)) score += 18;
                     esito.cartePrese.forEach(c => {
-                        if (c.valore === '7') score += 20;
-                        else if (c.valore === '6') score += 16;
-                        else if (c.valore === 'Asso') score += 12;
+                        if (c.valore === '7') score += 22;
+                        else if (c.valore === '6') score += 18;
+                        else if (c.valore === 'Asso') score += 14;
                     });
 
-                    // Maggior numero di carte catturate
+                    // Maggior numero complessivo di carte per la coppia (> 20)
                     score += (esito.cartePrese.length + 1) * 6;
 
                     if (motivi.length === 0) {
                         motivi.push(`ho preso ${esito.cartePrese.map(c => `${c.valore} di ${c.seme}`).join(' e ')}`);
                     }
                 } else {
-                    // Priorità 4: Strategia di scarto sicuro
-                    // Non abbiamo prese: dobbiamo scartare una carta senza dare vantaggio all'avversario
+                    // Priorità 4: Strategia di scarto sicuro e gioco di squadra
                     if (carta.valore === '7' && carta.seme === 'Denari') {
-                        score -= 200; // MAI scartare il Settebello a terra!
+                        score -= 250; // MAI scartare il Settebello a terra!
                     } else if (carta.seme === 'Denari') {
-                        score -= 30; // Evita di regalare Denari
+                        score -= 35; // Evita di regalare Denari agli avversari
                     }
 
                     if (['7', '6'].includes(carta.valore)) {
-                        score -= 25; // Evita di regalare carte chiave di primiera
+                        score -= 30; // Evita di regalare carichi di primiera
                     }
 
-                    // Considera il tavolo risultante dopo lo scarto
+                    // Considera il tavolo risultante dopo lo scarto rispetto all'avversario successivo
                     const tavoloNuovo = [...this.tavolo, carta];
                     const sommaTavoloNuovo = tavoloNuovo.reduce((acc, c) => acc + valoreNominale(c.valore), 0);
 
                     if (this.tavolo.length === 0) {
-                        // Tavolo vuoto: scartare carte alte (figure) riduce il rischio di scopa rispetto a carte basse
+                        // Tavolo vuoto: scartare figure alte (Re=10, Cavallo=9, Fante=8)
                         score += valoreNominale(carta.valore) * 3;
                     } else if (sommaTavoloNuovo <= 10) {
-                        // Se la somma a terra resta <= 10, l'avversario può fare scopa con una sola carta!
-                        score -= 40;
+                        // Pericolo estremo: l'avversario successivo può fare scopa con una singola carta!
+                        score -= 50;
                     } else {
-                        // Ottimo: somma oltre 10, impedisce la scopa diretta con una sola carta!
+                        // Ottimo per lo Scopone: somma oltre 10, impedisce la scopa diretta dell'avversario successivo!
+                        score += 30;
+                    }
+
+                    // Nello Scopone le figure (Re, Cavallo, Fante) sono ideali per scarti sicuri
+                    if (['Re', 'Cavallo', 'Fante'].includes(carta.valore)) {
                         score += 25;
                     }
 
-                    // Preferisci scartare figure (Re, Cavallo, Fante) poiché non valgono per la primiera
-                    if (['Re', 'Cavallo', 'Fante'].includes(carta.valore)) {
-                        score += 20;
-                    }
-
-                    motivi.push("ho fatto uno scarto sicuro per proteggere Denari e Primiera");
+                    motivi.push(isSquadre ? "ho fatto uno scarto sicuro oltre il 10 per passare la mano al compagno senza rischi" : "ho fatto uno scarto sicuro per proteggere Denari e Primiera");
                 }
             }
 

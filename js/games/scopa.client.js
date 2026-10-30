@@ -427,12 +427,17 @@ function renderGiocatoriScopa(data) {
             }
         }
 
+        const isSquadre = (numPlayers === 4);
+        const preseStr = isSquadre && p.preseCoppiaCount !== undefined
+            ? `${p.preseCoppiaCount} carte coppia`
+            : `${p.preseCount !== undefined ? p.preseCount : (p.cartePreseCount || 0)} carte`;
+
         pBlock.innerHTML = `
             <div class="name">${nomeConStemma}${ruolo}</div>
             <div class="stats"><span class="scopa-punti-badge">Punti: ${p.puntiTotali}</span> | Scope: <span class="scopa-badge">🧹 ${p.scopeCount || 0}</span></div>
-            <div class="player-mazzetto-stack">
+            <div class="player-mazzetto-stack" title="${isSquadre ? `Prese della coppia: ${p.preseCoppiaCount || 0} carte (${p.preseCount || 0} personali)` : 'Carte catturate'}">
                 <div class="card card-back player-mazzetto-mini"></div>
-                <span>${p.preseCount !== undefined ? p.preseCount : (p.cartePreseCount || 0)} carte</span>
+                <span>${preseStr}</span>
             </div>
             ${cimaHtml}
             ${timerHtml}
